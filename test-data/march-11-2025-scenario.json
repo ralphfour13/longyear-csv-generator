@@ -1,0 +1,59 @@
+{
+  "scenario": "March 11, 2025 - Two Orders, One Refund",
+  "payout": {
+    "id": "po_1234567890",
+    "date": "2025-03-11",
+    "amount": 203.85,
+    "currency": "USD",
+    "status": "paid"
+  },
+  "orders": [
+    {
+      "orderNumber": 1001,
+      "name": "#1001",
+      "createdAt": "2025-03-11T10:30:00Z",
+      "subtotal": 100.00,
+      "tax": 8.25,
+      "shipping": 10.00,
+      "discounts": 0.00,
+      "total": 118.25,
+      "fees": {
+        "shopify": 2.50,
+        "gateway": 0.70,
+        "total": 3.20
+      },
+      "netToPayout": 115.05
+    },
+    {
+      "orderNumber": 1002,
+      "name": "#1002",
+      "createdAt": "2025-03-11T14:45:00Z",
+      "subtotal": 150.00,
+      "tax": 12.38,
+      "shipping": 15.00,
+      "discounts": 10.00,
+      "total": 167.38,
+      "fees": {
+        "shopify": 3.75,
+        "gateway": 0.98,
+        "total": 4.73
+      },
+      "netToPayout": 162.65,
+      "refund": {
+        "amount": 50.00,
+        "tax": 4.13,
+        "total": 54.13,
+        "date": "2025-03-11T18:20:00Z"
+      },
+      "netAfterRefund": 108.52
+    }
+  ],
+  "calculation": {
+    "order1Net": 115.05,
+    "order2Net": 162.65,
+    "refundAmount": -54.13,
+    "order2NetAfterRefund": 108.52,
+    "totalPayout": 223.57,
+    "note": "Payout = Order1 (115.05) + Order2AfterRefund (108.52) = 223.57"
+  }
+}
