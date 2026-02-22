@@ -2,7 +2,7 @@
 
 client_id = "13462dfdac930130ca8ba2e6ca1a995c"
 name = "Sage50 Journal Entry Sync"
-application_url = "https://YOUR-PROJECT.vercel.app"
+application_url = "https://sage50.four13.dev"
 embedded = true
 
 [build]
@@ -30,4 +30,7 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ ]
+redirect_urls = [
+  "https://sage50.four13.dev/auth/callback",
+  "https://sage50.four13.dev/auth/shopify/callback"
+]
