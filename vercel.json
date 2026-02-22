@@ -1,0 +1,20 @@
+{
+  "buildCommand": "prisma generate && npm run build",
+  "installCommand": "npm install",
+  "framework": null,
+  "regions": ["iad1"],
+  "functions": {
+    "app/routes/api.*.tsx": {
+      "maxDuration": 60
+    },
+    "app/routes/webhooks.*.tsx": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/nightly-export",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

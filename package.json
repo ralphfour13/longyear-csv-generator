@@ -32,6 +32,7 @@
     "@shopify/app-bridge-react": "^4.2.4",
     "@shopify/shopify-app-react-router": "^1.1.0",
     "@shopify/shopify-app-session-storage-prisma": "^8.0.0",
+    "@vercel/blob": "^0.23.4",
     "csv-writer": "^1.6.0",
     "date-fns": "^3.3.1",
     "decimal.js": "^10.4.3",
