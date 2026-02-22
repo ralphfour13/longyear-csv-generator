@@ -100,9 +100,16 @@ function setupShutdownHandlers(): void {
 
 // Auto-initialize when module is imported
 // This runs once when the server starts
-if (typeof window === 'undefined') {
-  // Only run on server side
+// DISABLED for Vercel/serverless - use Vercel Cron instead
+const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
+
+if (typeof window === 'undefined' && !IS_VERCEL) {
+  // Only run on server side AND not on Vercel
+  // On Vercel, use the api/cron route instead
+  console.log('Initializing scheduler for non-serverless environment...');
   initializeServer().catch((error) => {
     console.error('Auto-initialization failed:', error);
   });
+} else if (IS_VERCEL) {
+  console.log('Running on Vercel - scheduler disabled (use Vercel Cron instead)');
 }
