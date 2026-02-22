@@ -1,0 +1,233 @@
+import { Decimal } from 'decimal.js';
+
+/**
+ * Sage 50 Journal Entry
+ * Represents a single line in a journal entry (either debit or credit)
+ */
+export interface JournalEntry {
+  date: string; // Format: MM/DD/YYYY
+  reference: string; // e.g., "SO-1001", "PO-456", "RF-1001"
+  account: string; // Account code from mappings (e.g., "4000-00")
+  accountName?: string; // Account name for reference
+  debit: Decimal; // Debit amount
+  credit: Decimal; // Credit amount
+  memo: string; // Description/memo line
+}
+
+/**
+ * Account Mapping Configuration
+ * Maps business logic to Sage 50 account codes
+ */
+export interface AccountMapping {
+  accountCode: string; // e.g., "4000-00"
+  accountName: string; // e.g., "Sales Revenue"
+  description?: string; // Optional description
+}
+
+/**
+ * Account Mappings Collection
+ */
+export interface AccountMappings {
+  sales_revenue: AccountMapping;
+  sales_tax: AccountMapping;
+  shipping_revenue: AccountMapping;
+  discounts: AccountMapping;
+  accounts_receivable: AccountMapping;
+  cash_account: AccountMapping;
+  clearing_account: AccountMapping;
+  payment_processing_fees: AccountMapping;
+  shopify_fees: AccountMapping;
+  refunds_given: AccountMapping;
+  cogs: AccountMapping;
+  inventory: AccountMapping;
+  [key: string]: AccountMapping; // Allow dynamic account types
+}
+
+/**
+ * Sync Configuration
+ * Stored in config.json per shop
+ */
+export interface SyncConfig {
+  shop: string; // Shop domain (e.g., "example-shop.myshopify.com")
+  syncEnabled: boolean;
+  syncSchedule: 'nightly' | 'manual';
+  scheduledTime: string; // 24-hour format: "02:00"
+  autoExportDate: 'yesterday' | 'today' | 'last_7_days' | 'custom';
+  transactionTypes: {
+    orders: boolean;
+    refunds: boolean;
+    payments: boolean;
+    inventory: boolean;
+  };
+  csvFormat: 'standard' | 'extended';
+  lastExportDate?: string; // ISO date string (optional tracking)
+}
+
+/**
+ * Shopify Payout
+ * What actually hit the bank account (anchor point)
+ */
+export interface Payout {
+  id: string; // Shopify payout ID
+  status: string; // "paid", "pending", "failed"
+  date: string; // ISO date string
+  amount: Decimal; // Total payout amount (what hit bank)
+  currency: string; // e.g., "USD"
+  balanceTransactions?: BalanceTransaction[]; // Detailed breakdown
+}
+
+/**
+ * Shopify Balance Transaction
+ * Detailed breakdown of what's in each payout
+ */
+export interface BalanceTransaction {
+  id: string;
+  type: 'charge' | 'refund' | 'adjustment' | 'reserve' | 'payout';
+  sourceOrderId?: string; // Order ID if applicable
+  sourceType?: string; // "Order", "Refund", etc.
+  net: Decimal; // Net amount after fees
+  fee: Decimal; // Total fees
+  gross: Decimal; // Gross amount before fees
+  currency: string;
+  processedAt: string; // ISO timestamp
+  order?: Order; // Populated order details
+  feeBreakdown?: FeeBreakdown; // Detailed fee components
+}
+
+/**
+ * Fee Breakdown
+ * Detailed components of transaction fees
+ */
+export interface FeeBreakdown {
+  shopifyFee: Decimal;
+  gatewayFee: Decimal;
+  chargebackFee?: Decimal;
+  otherFees?: Decimal;
+  total: Decimal;
+}
+
+/**
+ * Shopify Order (simplified)
+ */
+export interface Order {
+  id: string; // Order ID
+  orderNumber: number; // Display order number
+  name: string; // e.g., "#1001"
+  createdAt: string; // ISO timestamp
+  totalPrice: Decimal; // Total including tax and shipping
+  subtotalPrice: Decimal; // Subtotal before tax/shipping
+  totalTax: Decimal; // Total tax amount
+  totalShipping: Decimal; // Shipping charges
+  totalDiscounts: Decimal; // Discount amount
+  currency: string;
+  financialStatus: string; // "paid", "pending", "refunded", etc.
+  lineItems: OrderLineItem[];
+  transactions?: Transaction[]; // Payment transactions
+}
+
+/**
+ * Order Line Item
+ */
+export interface OrderLineItem {
+  id: string;
+  productId: string;
+  variantId: string;
+  title: string;
+  quantity: number;
+  price: Decimal;
+  totalDiscount: Decimal;
+  taxable: boolean;
+  taxes: Array<{
+    title: string;
+    rate: number;
+    price: Decimal;
+  }>;
+}
+
+/**
+ * Payment Transaction
+ */
+export interface Transaction {
+  id: string;
+  orderId: string;
+  kind: 'sale' | 'refund' | 'capture' | 'authorization' | 'void';
+  gateway: string; // "shopify_payments", "paypal", etc.
+  status: string; // "success", "pending", "failure"
+  amount: Decimal;
+  currency: string;
+  processedAt: string; // ISO timestamp
+  fees: TransactionFee[];
+}
+
+/**
+ * Transaction Fee Details
+ */
+export interface TransactionFee {
+  type: 'shopify_fee' | 'gateway_fee' | 'chargeback_fee';
+  amount: Decimal;
+  currency: string;
+}
+
+/**
+ * Export History Entry
+ */
+export interface ExportHistoryEntry {
+  id: string; // Unique ID
+  date: string; // Export date (ISO)
+  filename: string; // CSV filename
+  entryCount: number; // Number of journal entries
+  totalDebit: Decimal; // Total debit amount
+  totalCredit: Decimal; // Total credit amount
+  balanced: boolean; // Whether debits = credits
+  createdAt: string; // ISO timestamp
+  downloadUrl: string; // URL to download CSV
+}
+
+/**
+ * CSV Export Request
+ */
+export interface ExportRequest {
+  shop: string;
+  startDate: string; // ISO date
+  endDate: string; // ISO date
+  transactionTypes: string[]; // ["orders", "refunds", "payments"]
+}
+
+/**
+ * Reconciliation Result
+ * Result of payout-first reconciliation
+ */
+export interface ReconciliationResult {
+  payout: Payout;
+  journalEntries: JournalEntry[];
+  totalDebit: Decimal;
+  totalCredit: Decimal;
+  balanced: boolean; // true if totalDebit === totalCredit === payout.amount
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Validation Error
+ */
+export interface ValidationError {
+  field: string;
+  message: string;
+  value?: unknown;
+}
+
+/**
+ * Export Job Status
+ */
+export interface ExportJob {
+  id: string;
+  shop: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  startDate: string;
+  endDate: string;
+  progress: number; // 0-100
+  createdAt: string;
+  completedAt?: string;
+  error?: string;
+  resultFilename?: string;
+}

@@ -1,0 +1,34 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "13462dfdac930130ca8ba2e6ca1a995c"
+name = "Sage50 Journal Entry Sync"
+application_url = "https://example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2026-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+# Required scopes for Sage 50 Journal Entry Sync:
+# - read_shopify_payments_payouts: Access payout data (what hit the bank)
+# - read_shopify_payments_accounts: Access payment account and balance transactions
+# - read_orders: Access order details for reconciliation
+scopes = "read_shopify_payments_payouts,read_shopify_payments_accounts,read_orders"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ ]
