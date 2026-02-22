@@ -2,10 +2,25 @@
   "buildCommand": "prisma generate && npm run build",
   "installCommand": "npm install",
   "framework": null,
-  "regions": ["iad1"],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/build/client/(.*)",
+      "dest": "/build/client/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.js"
+    }
+  ],
   "crons": [
     {
-      "path": "/app/api/cron/nightly-export",
+      "path": "/api/cron/nightly-export",
       "schedule": "0 2 * * *"
     }
   ]
