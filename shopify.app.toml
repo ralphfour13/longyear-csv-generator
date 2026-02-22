@@ -2,7 +2,7 @@
 
 client_id = "13462dfdac930130ca8ba2e6ca1a995c"
 name = "Sage50 Journal Entry Sync"
-application_url = "https://example.com"
+application_url = "https://YOUR-PROJECT.vercel.app"
 embedded = true
 
 [build]
