@@ -88,6 +88,17 @@ export async function reconcilePayout(
       memo: `Shopify Payout ${payout.id}`,
     });
 
+    // Add corresponding AR credit to clear the clearing account
+    journalEntries.push({
+      date: formatDate(payout.date),
+      reference: `PO-${payout.id}`,
+      account: '1250-00',
+      accountName: 'Shopify Clearing Account',
+      debit: new Decimal(0),
+      credit: payout.amount,
+      memo: `Payout Clearing`,
+    });
+
     // Calculate totals and validate balance
     const totalDebit = journalEntries.reduce(
       (sum, entry) => sum.plus(entry.debit),
