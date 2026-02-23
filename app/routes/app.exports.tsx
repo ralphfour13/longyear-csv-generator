@@ -89,9 +89,9 @@ export default function Exports() {
             <s-text variant="headingSm">{actionData.message}</s-text>
             {actionData.filename && (
               <s-stack direction="inline" gap="tight" alignItems="center">
-                <s-link href={`https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${actionData.filename}`}>
+                <a href={`https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${actionData.filename}`}>
                   Download {actionData.filename}
-                </s-link>
+                </a>
                 <s-text>
                   ({actionData.entryCount} entries, {actionData.balanced ? '✓ balanced' : '✗ unbalanced'})
                 </s-text>
