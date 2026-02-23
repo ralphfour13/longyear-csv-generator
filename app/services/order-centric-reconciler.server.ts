@@ -82,12 +82,44 @@ export async function reconcileOrdersByDate(
     // Process each order
     for (const order of orders) {
       try {
+        // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
+        // Check this BEFORE capture logic to catch refund-only transactions
+        const allCaptureTransactions = order.transactions?.filter(
+          (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
+        ) || [];
+
+        if (allCaptureTransactions.length === 0) {
+          // No captures - check if this is a refund-only order
+          const refundTransactions = filterRefundTransactions(order, targetDate);
+          if (refundTransactions.length > 0) {
+            console.log(
+              `Processing refund-only order ${order.name} with ${refundTransactions.length} refund(s)`
+            );
+
+            await processOrderRefunds(
+              shop,
+              accessToken,
+              order,
+              refundTransactions,
+              targetDate,
+              journalEntries,
+              enrichedTransactions,
+              warnings
+            );
+
+            processedOrderIds.add(order.id);
+            ordersProcessed++;
+          }
+          // Skip to next order (either processed refunds or nothing to do)
+          continue;
+        }
+
         // LAST-CAPTURE-DATE RULE: Order posts on the date of its LAST captured payment
         // This ensures split-payment orders post as a complete unit (all legs balance)
         const lastCaptureDate = getOrderCaptureDate(order);
 
         if (!lastCaptureDate) {
-          // No captures at all, skip this order
+          // Should not happen since we checked for captures above, but safety check
           continue;
         }
 
@@ -97,16 +129,9 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
-        // Get ALL capture transactions for this order (not just today's)
+        // Use ALL capture transactions (already filtered above)
         // This ensures we include all payment legs when the order posts
-        const captureTransactions = order.transactions?.filter(
-          (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
-        ) || [];
-
-        if (captureTransactions.length === 0) {
-          // No captures, skip this order
-          continue;
-        }
+        const captureTransactions = allCaptureTransactions;
 
         // Check if we've already processed this order
         if (processedOrderIds.has(order.id)) {
