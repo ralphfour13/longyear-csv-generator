@@ -313,9 +313,10 @@ function createOrderEntries(
     return; // Skip SO- entry generation
   }
 
-  // AR Debit: What customer actually paid (use CURRENT total for edited orders)
-  // For edited orders with multiple captures, this reflects the final order total
-  const arAmount = order.currentTotalPrice || order.totalPrice;
+  // AR Debit: Use balance transaction gross (what actually flowed through Shopify)
+  // This represents the actual cash captured and is more reliable than order.totalPrice
+  // which can have rounding issues or adjustments
+  const arAmount = balanceTxn.gross;
 
   journalEntries.push({
     date: orderDate,
