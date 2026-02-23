@@ -89,7 +89,7 @@ export default function Exports() {
             <s-text variant="headingSm">{actionData.message}</s-text>
             {actionData.filename && (
               <s-stack direction="inline" gap="tight" alignItems="center">
-                <s-link href={`/api/download-csv?shop=${shop}&filename=${actionData.filename}`}>
+                <s-link href={`https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${actionData.filename}`}>
                   Download {actionData.filename}
                 </s-link>
                 <s-text>
@@ -222,7 +222,7 @@ export default function Exports() {
                     </td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
                       <s-button
-                        href={`/api/download-csv?shop=${shop}&filename=${exp.filename}`}
+                        href={`https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${exp.filename}`}
                         variant="secondary"
                         size="slim"
                       >
