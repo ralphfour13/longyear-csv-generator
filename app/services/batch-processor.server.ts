@@ -116,32 +116,32 @@ export async function processExport(
     await logInfo(shop, 'Export', 'Generating export files...');
     const generatedFiles: GeneratedFile[] = [];
 
-    // File #1: Daily Sales Report
-    await logInfo(shop, 'Export', 'Generating Daily Sales Report...');
+    // File #1: Detailed Sales Report
+    await logInfo(shop, 'Export', 'Generating Detailed Sales Report...');
     try {
-      const dailySalesFilename = `daily-sales-report_${targetDate}.csv`;
-      const dailySalesContent = generateDailySalesReport(allEnrichedTransactions, targetDate);
-      const dailySalesPath = await writeExport(shop, dailySalesFilename, dailySalesContent);
+      const detailedSalesFilename = `detailed-sales-report_${targetDate}.csv`;
+      const detailedSalesContent = generateDailySalesReport(allEnrichedTransactions, targetDate);
+      const detailedSalesPath = await writeExport(shop, detailedSalesFilename, detailedSalesContent);
 
-      const rowCount = dailySalesContent.split('\n').length - 2; // Subtract header and totals row
+      const rowCount = detailedSalesContent.split('\n').length - 2; // Subtract header and totals row
       generatedFiles.push({
         type: 'daily-sales',
-        filename: dailySalesFilename,
-        downloadUrl: `/api/download-csv?shop=${shop}&filename=${dailySalesFilename}`,
+        filename: detailedSalesFilename,
+        downloadUrl: `/api/download-csv?shop=${shop}&filename=${detailedSalesFilename}`,
         rowCount,
       });
 
-      console.log(`✅ Daily Sales Report created: ${dailySalesFilename} (${rowCount} rows)`);
-      await logInfo(shop, 'Export', `Daily Sales Report saved: ${dailySalesFilename}`);
+      console.log(`✅ Detailed Sales Report created: ${detailedSalesFilename} (${rowCount} rows)`);
+      await logInfo(shop, 'Export', `Detailed Sales Report saved: ${detailedSalesFilename}`);
     } catch (error) {
-      const errorMsg = `Daily Sales Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
-      console.error('❌ Daily Sales Report error:', error);
+      const errorMsg = `Detailed Sales Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('❌ Detailed Sales Report error:', error);
       await logError(shop, 'Export', errorMsg);
       allWarnings.push(errorMsg);
 
       generatedFiles.push({
         type: 'daily-sales',
-        filename: `daily-sales-report_${targetDate}.csv`,
+        filename: `detailed-sales-report_${targetDate}.csv`,
         downloadUrl: '',
         rowCount: 0,
         error: errorMsg,

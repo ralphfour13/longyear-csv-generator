@@ -66,18 +66,10 @@ export function generateDailySalesReport(
   // Group transactions by order
   const orderGroups = groupByOrder(enrichedTransactions);
 
+  // Process all orders that were already filtered by the reconciler
+  // The reconciler has already filtered transactions by the target date,
+  // so we don't need to filter again here
   for (const [orderId, transactions] of orderGroups.entries()) {
-    // Determine report date for this order (latest capture date)
-    const allTransactions = transactions.flatMap(
-      (txn) => txn.enrichedData?.transactions || []
-    );
-    const reportDate = determineReportDate(allTransactions);
-
-    // Only include orders that match the target date
-    if (reportDate !== targetDate) {
-      continue;
-    }
-
     // For each transaction in the order, create a separate row
     for (const enrichedTxn of transactions) {
       const row = transformToReportRow(enrichedTxn, transactions);
