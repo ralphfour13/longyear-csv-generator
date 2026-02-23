@@ -41,30 +41,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     try {
-      // Trigger export via API endpoint (relative URL to call our own backend)
-      const exportUrl = new URL(`/api/manual-export?startDate=${startDate}&endDate=${endDate}`, request.url);
+      // Import processExport to call directly (has authentication context)
+      const { processExport } = await import('../services/batch-processor.server');
 
-      // Call our own API endpoint
-      const response = await fetch(exportUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(error);
-      }
-
-      const result = await response.json();
+      // Process export directly (we already have authenticated session)
+      const result = await processExport(
+        shop,
+        session.accessToken,
+        startDate,
+        endDate
+      );
 
       return Response.json({
         success: true,
         message: 'Export completed successfully',
         filename: result.filename,
+        entryCount: result.entryCount,
+        balanced: result.balanced,
       });
     } catch (error) {
+      console.error('Export error:', error);
       return Response.json(
         {
           success: false,
