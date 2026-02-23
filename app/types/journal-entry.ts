@@ -192,7 +192,7 @@ export interface ExportHistoryEntry {
  * Metadata for a single generated file in multi-file export
  */
 export interface GeneratedFile {
-  type: 'daily-sales' | 'payouts-orders' | 'journal-entries';
+  type: 'daily-sales' | 'payouts-orders' | 'journal-entries-details' | 'journal-entry-summary';
   filename: string;
   downloadUrl: string;
   rowCount: number;

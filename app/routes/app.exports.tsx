@@ -106,9 +106,12 @@ export default function Exports() {
                   } else if (file.type === 'payouts-orders') {
                     label = 'Payouts with Orders';
                     description = `${file.rowCount} order rows`;
-                  } else if (file.type === 'journal-entries') {
+                  } else if (file.type === 'journal-entries-details') {
                     label = 'Journal Entry Details';
-                    description = `${file.rowCount} entries, ${actionData.balanced ? '✓ balanced' : '✗ unbalanced'}`;
+                    description = `${file.rowCount} detailed entries`;
+                  } else if (file.type === 'journal-entry-summary') {
+                    label = 'Journal Entry';
+                    description = `${file.rowCount} accounts, ${actionData.balanced ? '✓ balanced' : '✗ unbalanced'}`;
                   }
 
                   return (
@@ -194,11 +197,12 @@ export default function Exports() {
               <s-text variant="headingSm">How it works</s-text>
               <s-stack direction="block" gap="tight">
                 <s-text>1. Select the date (transactions captured on this day)</s-text>
-                <s-text>2. Click "Generate CSV" to create three export files:</s-text>
+                <s-text>2. Click "Generate CSV" to create four export files:</s-text>
                 <s-text style={{ paddingLeft: '20px' }}>• Detailed Sales Report - Transaction-level detail for bookkeeping</s-text>
                 <s-text style={{ paddingLeft: '20px' }}>• Payouts with Orders - Reconciliation view of payout breakdown</s-text>
-                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry Details - Import into Sage 50</s-text>
-                <s-text>3. Download all three files for complete audit trail</s-text>
+                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry Details - Detailed transaction entries</s-text>
+                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry - Summary by account (import into Sage 50)</s-text>
+                <s-text>3. Download all four files for complete audit trail</s-text>
               </s-stack>
             </s-stack>
           </s-box>
