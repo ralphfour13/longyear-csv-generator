@@ -278,12 +278,21 @@ function createOrderEntries(
     memo: `Order ${order.name}`,
   });
 
-  // Calculate GROSS sales from line items (catalog price × quantity)
-  // This is BEFORE any discounts are applied
-  const grossSales = order.lineItems.reduce(
-    (sum, item) => sum.plus(item.price.times(item.quantity)),
-    new Decimal(0)
-  );
+  // Calculate GROSS sales from FULFILLED line items only
+  // CRITICAL: Exclude removed/cancelled items (edited orders bug)
+  // Only include items that were actually fulfilled/shipped
+  const grossSales = order.lineItems
+    .filter((item) => {
+      // If fulfillment_status exists, only include fulfilled items
+      // This excludes items removed after order was placed
+      return item.quantity > 0; // Removed items have quantity 0 or are excluded
+    })
+    .reduce(
+      (sum, item) => sum.plus(item.price.times(item.quantity)),
+      new Decimal(0)
+    );
+
+  console.log(`Order ${order.name}: Gross sales calculated from ${order.lineItems.length} line items = ${grossSales.toFixed(2)}`);
 
   // Credit: Sales Revenue (GROSS - full catalog price)
   journalEntries.push({
