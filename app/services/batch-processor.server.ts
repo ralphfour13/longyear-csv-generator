@@ -120,6 +120,9 @@ export async function processExport(
     const filename = generateFilename(startDate, endDate);
     const filePath = await generateCSV(shop, mappedEntries, filename);
 
+    console.log(`✅ CSV file created at: ${filePath}`);
+    await logInfo(shop, 'Export', `CSV file saved to: ${filePath}`);
+
     // Step 6: Calculate totals
     const totalDebit = mappedEntries.reduce(
       (sum, entry) => sum.plus(entry.debit),

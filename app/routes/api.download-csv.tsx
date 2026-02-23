@@ -23,15 +23,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return new Response('Invalid filename', { status: 400 });
     }
 
+    console.log(`Attempting to download: shop=${shop}, filename=${filename}`);
+
     // Check if file exists
     const exists = await exportExists(shop, filename);
+    console.log(`File exists check: ${exists}`);
+
     if (!exists) {
       console.error(`File not found: ${shop} / ${filename}`);
-      return new Response(`File not found: ${filename}`, { status: 404 });
+
+      // Log available files for debugging
+      const { listExports } = await import('../services/storage.server');
+      const availableFiles = await listExports(shop);
+      console.error(`Available files for ${shop}:`, availableFiles);
+
+      return new Response(`File not found: ${filename}. Available files: ${availableFiles.join(', ')}`, { status: 404 });
     }
 
     // Read file content
+    console.log(`Reading file content...`);
     const content = await readExport(shop, filename);
+    console.log(`File content length: ${content.length} bytes`);
 
     console.log(`Downloaded ${filename} for ${shop} (${content.length} bytes)`);
 
