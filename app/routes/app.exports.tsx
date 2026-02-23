@@ -81,6 +81,12 @@ export default function Exports() {
   yesterday.setDate(yesterday.getDate() - 1);
   const defaultDate = format(yesterday, 'yyyy-MM-dd');
 
+  // Download handler to bypass Shopify routing
+  const handleDownload = (filename: string) => {
+    const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${filename}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <s-page heading="Export Center">
       {actionData?.success && (
@@ -89,9 +95,21 @@ export default function Exports() {
             <s-text variant="headingSm">{actionData.message}</s-text>
             {actionData.filename && (
               <s-stack direction="inline" gap="tight" alignItems="center">
-                <a href={`https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${actionData.filename}`}>
+                <button
+                  onClick={() => handleDownload(actionData.filename)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--p-color-text-link)',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    padding: 0,
+                    font: 'inherit',
+                    fontWeight: 500,
+                  }}
+                >
                   Download {actionData.filename}
-                </a>
+                </button>
                 <s-text>
                   ({actionData.entryCount} entries, {actionData.balanced ? '✓ balanced' : '✗ unbalanced'})
                 </s-text>
@@ -221,13 +239,21 @@ export default function Exports() {
                       <s-text>{formatFileSize(exp.size)}</s-text>
                     </td>
                     <td style={{ padding: '16px', textAlign: 'center' }}>
-                      <s-button
-                        href={`https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${exp.filename}`}
-                        variant="secondary"
-                        size="slim"
+                      <button
+                        onClick={() => handleDownload(exp.filename)}
+                        style={{
+                          padding: '6px 12px',
+                          backgroundColor: 'var(--p-color-bg-surface-secondary)',
+                          color: 'var(--p-color-text)',
+                          border: '1px solid var(--p-color-border)',
+                          borderRadius: 'var(--p-border-radius-200)',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: 500,
+                        }}
                       >
                         Download
-                      </s-button>
+                      </button>
                     </td>
                   </tr>
                 ))}
