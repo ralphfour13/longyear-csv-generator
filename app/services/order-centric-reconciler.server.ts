@@ -114,8 +114,18 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
+        // Log timezone-aware capture information for debugging
+        const firstCapture = captureTransactions[0];
+        const firstCaptureUTC = new Date(firstCapture.processedAt).toISOString();
+        const firstCapturePacific = new Date(firstCapture.processedAt).toLocaleString('en-US', {
+          timeZone: 'America/Los_Angeles',
+          dateStyle: 'short',
+          timeStyle: 'short',
+        });
+
         console.log(
-          `Processing order ${order.name} with ${captureTransactions.length} capture(s) (last capture: ${lastCaptureDate})`
+          `Processing order ${order.name} with ${captureTransactions.length} capture(s) ` +
+          `(last capture: ${lastCaptureDate}, first capture UTC: ${firstCaptureUTC}, Pacific: ${firstCapturePacific})`
         );
 
         // Process captures
@@ -428,12 +438,30 @@ function formatDate(isoDate: string): string {
 
 /**
  * Extract date-only portion from ISO timestamp (YYYY-MM-DD)
+ *
+ * CRITICAL: Converts UTC timestamp to store's local timezone (Pacific)
+ * before extracting the date. This ensures orders captured in the evening
+ * Pacific time don't appear on the next day's journal entry.
+ *
+ * Example:
+ * - UTC: 2026-01-29 01:00:00 UTC
+ * - Pacific: 2026-01-28 17:00:00 PST
+ * - Returns: "2026-01-28" (correct date for journal entry)
  */
 function formatDateOnly(isoTimestamp: string): string {
   const date = new Date(isoTimestamp);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+
+  // Convert to Pacific timezone (America/Los_Angeles)
+  // This handles both PST (-0800) and PDT (-0700) automatically
+  const pacificDateString = date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  // Parse MM/DD/YYYY format to YYYY-MM-DD
+  const [month, day, year] = pacificDateString.split('/');
   return `${year}-${month}-${day}`;
 }
 
