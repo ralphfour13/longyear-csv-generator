@@ -102,6 +102,32 @@ function getDefaultMappings(): AccountMappings {
       accountName: 'Inventory Asset',
       description: 'Inventory on hand',
     },
+    // Payment method specific accounts
+    gift_card_liability: {
+      accountCode: '2320-00',
+      accountName: 'Gift Card Liability',
+      description: 'Gift cards sold to customers',
+    },
+    store_credit_liability: {
+      accountCode: '2340-00',
+      accountName: 'Store Credit Liability',
+      description: 'Store credit issued to customers',
+    },
+    cash_register: {
+      accountCode: '1061-00',
+      accountName: 'Cash Register',
+      description: 'Cash payments at point of sale',
+    },
+    cogs_inventory_writeoff: {
+      accountCode: '1310-00',
+      accountName: 'COGS - Inventory Write-off',
+      description: 'Cost of goods for manual charges (e.g., travel giveaways)',
+    },
+    undeposited_funds: {
+      accountCode: '1051-00',
+      accountName: 'Undeposited Funds',
+      description: 'Checks received but not yet deposited',
+    },
   };
 }
 

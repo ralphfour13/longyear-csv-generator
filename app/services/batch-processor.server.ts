@@ -3,6 +3,7 @@ import type { ExportHistoryEntry, ReconciliationResult, JournalEntry, EnrichedTr
 import { fetchPayouts } from './shopify/payout-fetcher.server';
 import { fetchOrdersByDateRange } from './shopify/order-fetcher.server';
 import { reconcilePayout } from './reconciler.server';
+import { reconcileOrdersByDate } from './order-centric-reconciler.server'; // NEW: Order-centric reconciler
 import { applyAccountMappings } from './account-mapper.server';
 import { generateCSV, generateFilename, validateEntries } from './csv-generator.server';
 import { getAccountMappings, getShopConfig, writeExport } from './storage.server';
@@ -14,14 +15,13 @@ import { generatePayoutsWithOrders } from './payouts-with-orders-generator.serve
 import { generateJournalEntrySummary } from './journal-entry-summary-generator.server';
 
 /**
- * Process payouts and generate CSV export
+ * Process orders and generate CSV export (Order-Centric Approach)
  *
  * This is the main orchestration function that:
- * 1. Fetches payouts from wider date range (target date +/- 60 days)
- * 2. Filters balance transactions by processedAt matching target date
- * 3. Reconciles filtered transactions (capture-date based)
- * 4. Applies account mappings
- * 5. Generates CSV file
+ * 1. Reconciles orders directly by capture date (no payout dependency)
+ * 2. Captures ALL payment methods (cash, gift card, store credit, etc.)
+ * 3. Applies account mappings
+ * 4. Generates four export files
  *
  * @param shop - Shop domain
  * @param accessToken - Shopify access token
@@ -33,7 +33,7 @@ export async function processExport(
   accessToken: string,
   targetDate: string
 ): Promise<ExportHistoryEntry> {
-  await logInfo(shop, 'Export', `Starting export for ${targetDate} (by capture date)`);
+  await logInfo(shop, 'Export', `Starting order-centric export for ${targetDate}`);
 
   try {
     // Step 0: Validate request
@@ -47,50 +47,17 @@ export async function processExport(
       throw new Error(errorMsg);
     }
 
-    // Step 1: Fetch payouts from wider date range (target +/- 60 days)
-    const lookbackDate = calculateDateOffset(targetDate, -60);
-    const lookforwardDate = calculateDateOffset(targetDate, +60);
+    // Step 1: Reconcile orders by capture date (order-centric approach)
+    await logInfo(shop, 'Export', `Reconciling orders by capture date: ${targetDate}...`);
 
-    await logInfo(shop, 'Export', `Fetching payouts from ${lookbackDate} to ${lookforwardDate}...`);
-    const payouts = await fetchPayouts(shop, accessToken, lookbackDate, lookforwardDate);
-    await logInfo(shop, 'Export', `Found ${payouts.length} payouts in wider range`);
+    const result = await reconcileOrdersByDate(shop, accessToken, targetDate);
 
-    const allJournalEntries: JournalEntry[] = [];
-    const allEnrichedTransactions: EnrichedTransaction[] = []; // NEW: Collect enriched transactions
-    const allErrors: string[] = [];
-    const allWarnings: string[] = [];
+    const allJournalEntries: JournalEntry[] = result.journalEntries;
+    const allEnrichedTransactions: EnrichedTransaction[] = result.enrichedTransactions;
+    const allErrors: string[] = result.errors;
+    const allWarnings: string[] = result.warnings;
 
-    if (payouts.length === 0) {
-      const errorMsg = `No payouts found in range ${lookbackDate} to ${lookforwardDate}. Cannot generate entries for ${targetDate}.`;
-      await logError(shop, 'Export', errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    // Step 2: Reconcile each payout, filtering transactions by target date
-    await logInfo(shop, 'Export', `Filtering transactions to ${targetDate} capture date...`);
-
-    for (const payout of payouts) {
-      try {
-        await logInfo(shop, 'Reconcile', `Processing payout ${payout.id} (${payout.amount.toFixed(2)} ${payout.currency})`);
-
-        const result = await reconcilePayout(shop, accessToken, payout, targetDate);
-
-        allJournalEntries.push(...result.journalEntries);
-        allEnrichedTransactions.push(...result.enrichedTransactions); // NEW: Collect enriched transactions
-        allErrors.push(...result.errors);
-        allWarnings.push(...result.warnings);
-
-        if (!result.balanced) {
-          await logWarning(shop, 'Reconcile', `Filtered entries from payout ${payout.id} not balanced`);
-        }
-      } catch (error) {
-        const errorMsg = `Failed to reconcile payout ${payout.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`;
-        await logError(shop, 'Reconcile', errorMsg);
-        allErrors.push(errorMsg);
-      }
-    }
+    await logInfo(shop, 'Export', `Reconciled ${result.orderCount} orders with ${result.captureCount} captures`)
 
     if (allJournalEntries.length === 0) {
       const errorMsg = 'No journal entries generated';
