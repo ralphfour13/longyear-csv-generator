@@ -5,14 +5,12 @@ import { fetchOrdersByDateRange } from './shopify/order-fetcher.server';
 import { reconcilePayout } from './reconciler.server';
 import { applyAccountMappings } from './account-mapper.server';
 import { generateCSV, generateFilename, validateEntries } from './csv-generator.server';
-import { getAccountMappings, getShopConfig } from './storage.server';
+import { getAccountMappings, getShopConfig, writeExport } from './storage.server';
 import { randomUUID } from 'crypto';
 import { logError, logWarning, logInfo } from './error-logger.server';
 import { validateExportRequest, validateEntriesBalanceToPayout } from './validator.server';
 import { generateDailySalesReport } from './daily-sales-report-generator.server';
 import { generatePayoutsWithOrders } from './payouts-with-orders-generator.server';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
 
 /**
  * Process payouts and generate CSV export
@@ -123,7 +121,7 @@ export async function processExport(
     try {
       const dailySalesFilename = `daily-sales-report_${targetDate}.csv`;
       const dailySalesContent = generateDailySalesReport(allEnrichedTransactions, targetDate);
-      const dailySalesPath = await saveCSVFile(shop, dailySalesContent, dailySalesFilename);
+      const dailySalesPath = await writeExport(shop, dailySalesFilename, dailySalesContent);
 
       const rowCount = dailySalesContent.split('\n').length - 2; // Subtract header and totals row
       generatedFiles.push({
@@ -155,7 +153,7 @@ export async function processExport(
     try {
       const payoutsFilename = `payouts-with-orders_${targetDate}.txt`;
       const payoutsContent = generatePayoutsWithOrders(allEnrichedTransactions);
-      const payoutsPath = await saveCSVFile(shop, payoutsContent, payoutsFilename);
+      const payoutsPath = await writeExport(shop, payoutsFilename, payoutsContent);
 
       const rowCount = payoutsContent.split('\n').length - 1; // Subtract header row
       generatedFiles.push({
@@ -454,30 +452,4 @@ function formatDate(isoDate: string): string {
   const year = date.getFullYear();
 
   return `${month}/${day}/${year}`;
-}
-
-/**
- * Save CSV content to file
- *
- * @param shop - Shop domain
- * @param content - CSV content
- * @param filename - Filename for the CSV
- * @returns File path
- */
-async function saveCSVFile(
-  shop: string,
-  content: string,
-  filename: string
-): Promise<string> {
-  // Use the same storage location as existing CSV generator
-  const exportDir = process.env.EXPORT_DIR || join(process.cwd(), 'exports', shop);
-
-  // Create directory if it doesn't exist
-  const fs = await import('fs/promises');
-  await fs.mkdir(exportDir, { recursive: true });
-
-  const filePath = join(exportDir, filename);
-  await writeFile(filePath, content, 'utf-8');
-
-  return filePath;
 }

@@ -182,9 +182,9 @@ export async function listExports(shop: string): Promise<string[]> {
     const exportsDir = path.join(DATA_DIR, shop, 'exports');
     const files = await fs.readdir(exportsDir);
 
-    // Filter for CSV files and sort by date (newest first)
+    // Filter for CSV and TXT files and sort by date (newest first)
     return files
-      .filter(file => file.endsWith('.csv'))
+      .filter(file => file.endsWith('.csv') || file.endsWith('.txt'))
       .sort((a, b) => b.localeCompare(a));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {

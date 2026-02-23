@@ -15,10 +15,13 @@ This app automates the process of exporting Shopify transaction data to Sage 50 
 
 - ✅ **Payout-First Reconciliation** - Anchors all entries to actual bank deposits
 - ✅ **Perfect Balance** - All journal entries reconcile to exact payout amounts
+- ✅ **Three-File Export System** - Comprehensive reporting with transaction details, payout mapping, and journal entries
 - ✅ **Manual & Automated Exports** - Generate CSVs on-demand or schedule nightly
 - ✅ **Customizable Account Mappings** - Map transactions to your Sage 50 chart of accounts
 - ✅ **Fee Breakdown** - Separates Shopify fees and payment gateway fees
+- ✅ **Payment Method Tracking** - Detailed breakdown by cash, card, gift card, store credit, check
 - ✅ **Error Logging** - Comprehensive logging for debugging and monitoring
+- ✅ **Error Isolation** - Each file generates independently; partial failures don't block export
 - ✅ **No Database Needed** - Configuration stored in JSON files (Session table only)
 
 ## 📊 How It Works
@@ -69,6 +72,81 @@ Date,Reference,Account,Debit,Credit,Memo
 ```
 
 **Result**: Clearing Account balances to $0, Cash matches bank deposit.
+
+## 📁 Export Output Files
+
+Each export generates **three comprehensive files** for complete bookkeeping and reconciliation:
+
+### File #1: Daily Sales Report
+**Filename**: `daily-sales-report_YYYY-MM-DD.csv`
+
+**Purpose**: Transaction-level detail for bookkeeping team validation
+
+**Format**: 32 columns including:
+- Order details (name, tags)
+- Tax breakdown (up to 3 tax lines with title, rate, amount)
+- Payment method allocation (CASH, CHARGE, GIFT CARD, STORE CREDIT, CHECK, card)
+- Shipping information (address, city, zip)
+- Transaction details (kind, gateway, processed date, amount)
+- Fulfillment and financial status
+- Totals row for verification
+
+**Use Case**:
+- Validate that journal entries are correct
+- Identify payment method distribution
+- Track tax by jurisdiction
+- Audit shipping addresses
+- Verify transaction capture dates
+
+### File #2: Payouts with Orders
+**Filename**: `payouts-with-orders_YYYY-MM-DD.txt`
+
+**Purpose**: Reconciliation view showing which orders went into which payout
+
+**Format**: 7 columns (flat structure):
+- Payout ID
+- Payout Date
+- Payout Amount
+- Order Name
+- Order Date
+- Order Total
+- Net to Payout (amount from this order in the payout)
+
+**Use Case**:
+- Trace specific payouts back to source orders
+- Reconcile payout amounts to order totals
+- Understand transaction breakdown per payout
+- Identify which orders were included in each bank deposit
+
+### File #3: Journal Entry Summary
+**Filename**: `journal-entries_YYYY-MM-DD.txt`
+
+**Purpose**: Import into Sage 50 accounting software
+
+**Format**: 5 columns with signed amounts:
+- Date (MM/DD/YYYY)
+- Reference (SO-, RF-, FEE-, PO-)
+- Account (GL account code)
+- Amount (positive=debit, negative=credit)
+- Memo (description)
+
+**Use Case**:
+- Direct import into Sage 50 using Journal Entry import feature
+- Balanced to $0.00 (debits = credits)
+- GAAP-compliant (gross sales and refunds shown separately)
+
+## 💳 Payment Method & GL Account Mapping
+
+| Payment Method | Report Column | GL Account | Description |
+|----------------|---------------|------------|-------------|
+| Credit/Debit Card (shopify_payments) | card field | 1061-00 | Shopify Payments clearing |
+| Cash | CASH | 1051-00 | Cash on Hand |
+| Gift Card | GIFT CARD | 2320-00 | Gift Card Liability |
+| Store Credit | STORE CREDIT | 2320-00 | Gift Card Liability (same as gift card) |
+| Check | CHECK | 1051-00 | Cash on Hand (same as cash) |
+| Charge Gateway | CHARGE | 9999-00 | Travel Give Aways (placeholder - TBD) |
+
+**Note**: The Daily Sales Report shows payment method distribution. GL accounts are used in the Journal Entry Summary file.
 
 ## 🚀 Quick Start
 
