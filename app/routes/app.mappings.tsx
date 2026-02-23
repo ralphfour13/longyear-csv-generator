@@ -41,7 +41,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (action === 'reset') {
-    // Reset to defaults by deleting and re-initializing
     const defaultMappings = await getAccountMappings(shop);
     await saveAccountMappings(shop, defaultMappings);
 
@@ -56,38 +55,17 @@ export default function AccountMappings() {
   const actionData = useActionData<typeof action>();
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Account Mappings</h1>
-      <p>Configure Sage 50 account codes for different transaction types.</p>
-
+    <s-page heading="Account Mappings">
       {actionData?.success && (
-        <div
-          style={{
-            padding: '12px',
-            marginBottom: '16px',
-            backgroundColor: '#d4edda',
-            border: '1px solid #c3e6cb',
-            borderRadius: '4px',
-            color: '#155724',
-          }}
-        >
-          {actionData.message}
-        </div>
+        <s-banner tone="success" style={{ marginBottom: '20px' }}>
+          <s-text>{actionData.message}</s-text>
+        </s-banner>
       )}
 
       {actionData?.error && (
-        <div
-          style={{
-            padding: '12px',
-            marginBottom: '16px',
-            backgroundColor: '#f8d7da',
-            border: '1px solid #f5c6cb',
-            borderRadius: '4px',
-            color: '#721c24',
-          }}
-        >
-          {actionData.error}
-        </div>
+        <s-banner tone="critical" style={{ marginBottom: '20px' }}>
+          <s-text>{actionData.error}</s-text>
+        </s-banner>
       )}
 
       <Form method="post" id="mappingsForm">
@@ -99,123 +77,133 @@ export default function AccountMappings() {
           value={JSON.stringify(mappings)}
         />
 
-        <div style={{ marginBottom: '24px' }}>
-          <h2>Revenue Accounts</h2>
-          <MappingRow
-            label="Sales Revenue"
-            mappingKey="sales_revenue"
-            mapping={mappings.sales_revenue}
-          />
-          <MappingRow
-            label="Shipping Revenue"
-            mappingKey="shipping_revenue"
-            mapping={mappings.shipping_revenue}
-          />
-          <MappingRow
-            label="Discounts Given"
-            mappingKey="discounts"
-            mapping={mappings.discounts}
-          />
-        </div>
+        <s-section heading="Revenue Accounts">
+          <s-stack direction="block" gap="base">
+            <s-paragraph>
+              Configure Sage 50 account codes for revenue transactions
+            </s-paragraph>
 
-        <div style={{ marginBottom: '24px' }}>
-          <h2>Asset Accounts</h2>
-          <MappingRow
-            label="Cash Account (Shopify Payouts)"
-            mappingKey="cash_account"
-            mapping={mappings.cash_account}
-          />
-          <MappingRow
-            label="Clearing Account"
-            mappingKey="clearing_account"
-            mapping={mappings.clearing_account}
-          />
-          <MappingRow
-            label="Accounts Receivable"
-            mappingKey="accounts_receivable"
-            mapping={mappings.accounts_receivable}
-          />
-          <MappingRow
-            label="Inventory Asset"
-            mappingKey="inventory"
-            mapping={mappings.inventory}
-          />
-        </div>
+            <MappingRow
+              label="Sales Revenue"
+              mappingKey="sales_revenue"
+              mapping={mappings.sales_revenue}
+            />
+            <MappingRow
+              label="Shipping Revenue"
+              mappingKey="shipping_revenue"
+              mapping={mappings.shipping_revenue}
+            />
+            <MappingRow
+              label="Discounts Given"
+              mappingKey="discounts"
+              mapping={mappings.discounts}
+            />
+          </s-stack>
+        </s-section>
 
-        <div style={{ marginBottom: '24px' }}>
-          <h2>Liability Accounts</h2>
-          <MappingRow
-            label="Sales Tax Payable"
-            mappingKey="sales_tax"
-            mapping={mappings.sales_tax}
-          />
-        </div>
+        <s-section heading="Asset Accounts">
+          <s-stack direction="block" gap="base">
+            <s-paragraph>
+              Configure Sage 50 account codes for asset accounts
+            </s-paragraph>
 
-        <div style={{ marginBottom: '24px' }}>
-          <h2>Expense Accounts</h2>
-          <MappingRow
-            label="Payment Processing Fees"
-            mappingKey="payment_processing_fees"
-            mapping={mappings.payment_processing_fees}
-          />
-          <MappingRow
-            label="Shopify Transaction Fees"
-            mappingKey="shopify_fees"
-            mapping={mappings.shopify_fees}
-          />
-          <MappingRow
-            label="Cost of Goods Sold"
-            mappingKey="cogs"
-            mapping={mappings.cogs}
-          />
-          <MappingRow
-            label="Sales Returns & Refunds"
-            mappingKey="refunds_given"
-            mapping={mappings.refunds_given}
-          />
-        </div>
+            <MappingRow
+              label="Cash Account (Shopify Payouts)"
+              mappingKey="cash_account"
+              mapping={mappings.cash_account}
+            />
+            <MappingRow
+              label="Clearing Account"
+              mappingKey="clearing_account"
+              mapping={mappings.clearing_account}
+            />
+            <MappingRow
+              label="Accounts Receivable"
+              mappingKey="accounts_receivable"
+              mapping={mappings.accounts_receivable}
+            />
+            <MappingRow
+              label="Inventory Asset"
+              mappingKey="inventory"
+              mapping={mappings.inventory}
+            />
+          </s-stack>
+        </s-section>
 
-        <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-          <button
-            type="submit"
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#008060',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-            }}
-          >
+        <s-section heading="Liability Accounts">
+          <s-stack direction="block" gap="base">
+            <s-paragraph>
+              Configure Sage 50 account codes for liability accounts
+            </s-paragraph>
+
+            <MappingRow
+              label="Sales Tax Payable"
+              mappingKey="sales_tax"
+              mapping={mappings.sales_tax}
+            />
+          </s-stack>
+        </s-section>
+
+        <s-section heading="Expense Accounts">
+          <s-stack direction="block" gap="base">
+            <s-paragraph>
+              Configure Sage 50 account codes for expense accounts
+            </s-paragraph>
+
+            <MappingRow
+              label="Payment Processing Fees"
+              mappingKey="payment_processing_fees"
+              mapping={mappings.payment_processing_fees}
+            />
+            <MappingRow
+              label="Shopify Transaction Fees"
+              mappingKey="shopify_fees"
+              mapping={mappings.shopify_fees}
+            />
+            <MappingRow
+              label="Cost of Goods Sold"
+              mappingKey="cogs"
+              mapping={mappings.cogs}
+            />
+            <MappingRow
+              label="Sales Returns & Refunds"
+              mappingKey="refunds_given"
+              mapping={mappings.refunds_given}
+            />
+          </s-stack>
+        </s-section>
+
+        <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
+          <s-button type="submit" variant="primary">
             Save Mappings
-          </button>
+          </s-button>
 
-          <button
-            type="button"
-            onClick={() => {
+          <s-button
+            variant="secondary"
+            onClick={(e: any) => {
+              e.preventDefault();
               const form = document.getElementById('mappingsForm') as HTMLFormElement;
               const actionInput = form.querySelector('[name="action"]') as HTMLInputElement;
               actionInput.value = 'reset';
               form.submit();
             }}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#f6f6f7',
-              color: '#202223',
-              border: '1px solid #c9cccf',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-            }}
           >
             Reset to Defaults
-          </button>
+          </s-button>
         </div>
       </Form>
-    </div>
+
+      <s-section heading="About Account Codes" slot="aside">
+        <s-stack direction="block" gap="base">
+          <s-paragraph>
+            Account codes should match your Sage 50 chart of accounts. Use the format XXXX-XX (e.g., 4000-00).
+          </s-paragraph>
+          <s-paragraph>
+            Changes take effect immediately on the next export.
+          </s-paragraph>
+        </s-stack>
+      </s-section>
+    </s-page>
   );
 }
 
@@ -239,65 +227,70 @@ function MappingRow({ label, mappingKey, mapping }: MappingRowProps) {
   };
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '200px 150px 250px 1fr',
-        gap: '12px',
-        marginBottom: '12px',
-        padding: '12px',
-        backgroundColor: '#f6f6f7',
-        borderRadius: '4px',
-      }}
-    >
-      <div>
-        <strong>{label}</strong>
-      </div>
-      <div>
-        <input
-          type="text"
-          defaultValue={mapping.accountCode}
-          onChange={(e) => handleChange('accountCode', e.target.value)}
-          placeholder="4000-00"
-          style={{
-            width: '100%',
-            padding: '8px',
-            border: '1px solid #c9cccf',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
-        />
-      </div>
-      <div>
-        <input
-          type="text"
-          defaultValue={mapping.accountName}
-          onChange={(e) => handleChange('accountName', e.target.value)}
-          placeholder="Account Name"
-          style={{
-            width: '100%',
-            padding: '8px',
-            border: '1px solid #c9cccf',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
-        />
-      </div>
-      <div>
-        <input
-          type="text"
-          defaultValue={mapping.description || ''}
-          onChange={(e) => handleChange('description', e.target.value)}
-          placeholder="Description (optional)"
-          style={{
-            width: '100%',
-            padding: '8px',
-            border: '1px solid #c9cccf',
-            borderRadius: '4px',
-            fontSize: '14px',
-          }}
-        />
-      </div>
-    </div>
+    <s-box padding="base" borderWidth="base" borderRadius="base">
+      <s-stack direction="block" gap="base">
+        <s-text variant="headingSm">{label}</s-text>
+
+        <s-stack direction="inline" gap="base" style={{ width: '100%' }}>
+          <div style={{ flex: '0 0 150px' }}>
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodySm">Account Code</s-text>
+              <input
+                type="text"
+                defaultValue={mapping.accountCode}
+                onChange={(e) => handleChange('accountCode', e.target.value)}
+                placeholder="4000-00"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid var(--p-color-border)',
+                  borderRadius: 'var(--p-border-radius-200)',
+                  fontSize: '14px',
+                  fontFamily: 'monospace',
+                }}
+              />
+            </s-stack>
+          </div>
+
+          <div style={{ flex: '1 1 200px' }}>
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodySm">Account Name</s-text>
+              <input
+                type="text"
+                defaultValue={mapping.accountName}
+                onChange={(e) => handleChange('accountName', e.target.value)}
+                placeholder="Account Name"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid var(--p-color-border)',
+                  borderRadius: 'var(--p-border-radius-200)',
+                  fontSize: '14px',
+                }}
+              />
+            </s-stack>
+          </div>
+
+          <div style={{ flex: '1 1 300px' }}>
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodySm">Description</s-text>
+              <input
+                type="text"
+                defaultValue={mapping.description || ''}
+                onChange={(e) => handleChange('description', e.target.value)}
+                placeholder="Optional description"
+                style={{
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid var(--p-color-border)',
+                  borderRadius: 'var(--p-border-radius-200)',
+                  fontSize: '14px',
+                }}
+              />
+            </s-stack>
+          </div>
+        </s-stack>
+      </s-stack>
+    </s-box>
   );
 }
