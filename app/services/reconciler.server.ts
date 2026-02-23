@@ -202,6 +202,31 @@ async function processBalanceTransaction(
       break;
     }
 
+    case 'payout': {
+      // Payout transaction within balance transactions (clearing to bank)
+      // This represents the final settlement from clearing account to bank
+      journalEntries.push({
+        date: txnDate,
+        reference: `PO-${balanceTxn.id}`,
+        account: '1000-00',
+        accountName: 'Cash - Shopify Account',
+        debit: balanceTxn.net.abs(),
+        credit: new Decimal(0),
+        memo: `Bank Deposit - Payout`,
+      });
+
+      journalEntries.push({
+        date: txnDate,
+        reference: `PO-${balanceTxn.id}`,
+        account: '1250-00',
+        accountName: 'Shopify Clearing Account',
+        debit: new Decimal(0),
+        credit: balanceTxn.net.abs(),
+        memo: `Clear to Bank`,
+      });
+      break;
+    }
+
     case 'adjustment':
     case 'reserve': {
       journalEntries.push({
