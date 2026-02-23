@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useLoaderData, useNavigation } from 'react-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats } from '../services/storage.server';
 import { format } from 'date-fns';
@@ -29,34 +29,102 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const action = formData.get('action');
 
   if (action === 'export') {
-    const dateParam = formData.get('date');
-
-    if (!dateParam || typeof dateParam !== 'string') {
-      return Response.json(
-        { success: false, error: 'Export date is required' },
-        { status: 400 }
-      );
-    }
-
-    const date = dateParam;
+    const useRange = formData.get('useRange') === 'true';
 
     try {
       const { processExport } = await import('../services/batch-processor.server');
 
-      const result = await processExport(
-        shop,
-        session.accessToken,
-        date
-      );
+      if (useRange) {
+        // Date range mode
+        const startDateParam = formData.get('startDate');
+        const endDateParam = formData.get('endDate');
 
-      return Response.json({
-        success: true,
-        message: 'Export completed successfully',
-        filename: result.filename, // Keep for backward compatibility
-        files: result.files, // NEW: Include all generated files
-        entryCount: result.entryCount,
-        balanced: result.balanced,
-      });
+        if (!startDateParam || typeof startDateParam !== 'string' ||
+            !endDateParam || typeof endDateParam !== 'string') {
+          return Response.json(
+            { success: false, error: 'Start and end dates are required' },
+            { status: 400 }
+          );
+        }
+
+        const startDate = new Date(startDateParam);
+        const endDate = new Date(endDateParam);
+
+        if (startDate > endDate) {
+          return Response.json(
+            { success: false, error: 'Start date must be before end date' },
+            { status: 400 }
+          );
+        }
+
+        // Generate exports for each date in range
+        const allFiles: any[] = [];
+        let totalEntries = 0;
+        let allBalanced = true;
+        const dates: string[] = [];
+
+        let currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          const dateStr = format(currentDate, 'yyyy-MM-dd');
+          dates.push(dateStr);
+
+          const result = await processExport(
+            shop,
+            session.accessToken,
+            dateStr
+          );
+
+          // Append date to filenames for clarity
+          const dateLabel = format(currentDate, 'MMM-dd');
+          result.files.forEach((file: any) => {
+            const nameParts = file.filename.split('.');
+            const ext = nameParts.pop();
+            const baseName = nameParts.join('.');
+            file.filename = `${baseName}_${dateLabel}.${ext}`;
+            file.date = dateStr;
+          });
+
+          allFiles.push(...result.files);
+          totalEntries += result.entryCount;
+          if (!result.balanced) allBalanced = false;
+
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        return Response.json({
+          success: true,
+          message: `Export completed for ${dates.length} days (${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')})`,
+          files: allFiles,
+          entryCount: totalEntries,
+          balanced: allBalanced,
+          dateRange: { start: startDateParam, end: endDateParam, count: dates.length },
+        });
+      } else {
+        // Single date mode
+        const dateParam = formData.get('date');
+
+        if (!dateParam || typeof dateParam !== 'string') {
+          return Response.json(
+            { success: false, error: 'Export date is required' },
+            { status: 400 }
+          );
+        }
+
+        const result = await processExport(
+          shop,
+          session.accessToken,
+          dateParam
+        );
+
+        return Response.json({
+          success: true,
+          message: 'Export completed successfully',
+          filename: result.filename, // Keep for backward compatibility
+          files: result.files,
+          entryCount: result.entryCount,
+          balanced: result.balanced,
+        });
+      }
     } catch (error) {
       console.error('Export error:', error);
       return Response.json(
@@ -78,6 +146,7 @@ export default function Exports() {
   const navigation = useNavigation();
 
   const isExporting = navigation.state === 'submitting';
+  const [useRange, setUseRange] = useState(false);
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -177,19 +246,32 @@ export default function Exports() {
       <s-section heading="Generate New Export">
         <s-stack direction="block" gap="large">
           <s-paragraph>
-            Select a date to export journal entries for charges captured on that day.
+            Select a date {useRange ? 'range' : ''} to export journal entries for charges captured on {useRange ? 'those days' : 'that day'}.
           </s-paragraph>
 
           <Form method="post">
             <input type="hidden" name="action" value="export" />
+            <input type="hidden" name="useRange" value={useRange ? 'true' : 'false'} />
 
             <s-stack direction="block" gap="base">
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={useRange}
+                    onChange={(e) => setUseRange(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <s-text>Use date range (generate exports for multiple days)</s-text>
+                </label>
+              </div>
+
               <div style={{ maxWidth: '300px' }}>
                 <s-stack direction="block" gap="tight">
-                  <s-text variant="bodySm">Export Date</s-text>
+                  <s-text variant="bodySm">{useRange ? 'Start Date' : 'Export Date'}</s-text>
                   <input
                     type="date"
-                    name="date"
+                    name={useRange ? 'startDate' : 'date'}
                     defaultValue={defaultDate}
                     required
                     style={{
@@ -202,6 +284,27 @@ export default function Exports() {
                   />
                 </s-stack>
               </div>
+
+              {useRange && (
+                <div style={{ maxWidth: '300px' }}>
+                  <s-stack direction="block" gap="tight">
+                    <s-text variant="bodySm">End Date</s-text>
+                    <input
+                      type="date"
+                      name="endDate"
+                      defaultValue={defaultDate}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid var(--p-color-border)',
+                        borderRadius: 'var(--p-border-radius-200)',
+                        fontSize: '14px',
+                      }}
+                    />
+                  </s-stack>
+                </div>
+              )}
 
               <div>
                 <s-button type="submit" variant="primary" loading={isExporting ? true : undefined}>
