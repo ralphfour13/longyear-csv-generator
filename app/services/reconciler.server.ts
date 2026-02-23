@@ -280,6 +280,10 @@ async function processBalanceTransaction(
  * - Uses current_subtotal_price + current_total_discounts = GROSS sales
  * - Automatically excludes removed line items
  *
+ * FULLY REFUNDED ORDERS:
+ * - Skipped entirely (no SO- entry generated)
+ * - RF- entries handle the refund accounting separately
+ *
  * NOTE: If multiple balance transactions exist for the same order (e.g., edited
  * orders with additional captures in the same payout), this will create multiple
  * SO- entries. Consider deduplicating by order ID if this becomes an issue.
@@ -292,6 +296,22 @@ function createOrderEntries(
 ): void {
   const orderDate = formatDate(order.createdAt);
   const reference = `SO-${order.name}`;
+
+  // EARLY EXIT: Skip fully refunded orders
+  // Fully refunded orders create dangling tax credits if we generate SO- entries
+  // The refund is already accounted for in separate RF- entries
+  const currentTotal = order.currentTotalPrice || order.totalPrice;
+  const isFullyRefunded =
+    order.financialStatus === 'refunded' ||
+    currentTotal.equals(new Decimal(0));
+
+  if (isFullyRefunded) {
+    console.log(
+      `Skipping ${reference}: fully refunded order ` +
+      `(financial_status=${order.financialStatus}, current_total=${currentTotal.toFixed(2)})`
+    );
+    return; // Skip SO- entry generation
+  }
 
   // AR Debit: What customer actually paid (use CURRENT total for edited orders)
   // For edited orders with multiple captures, this reflects the final order total
