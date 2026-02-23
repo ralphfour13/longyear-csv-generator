@@ -1,3 +1,22 @@
 .cache
 build
 node_modules
+
+# Environment files - use CapRover env vars instead
+.env
+.env.*
+.env.local
+.env.production
+
+# Development files
+.shopify
+.vercel
+.git
+.vscode
+*.log
+
+# Test data
+test-data
+
+# Scripts
+scripts
