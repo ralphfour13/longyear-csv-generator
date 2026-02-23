@@ -13,16 +13,8 @@ import { fetchOrderTransactions } from './shopify/transaction-fetcher.server';
 /**
  * Payout-First Reconciliation Engine
  *
- * This is the core reconciliation logic that:
- * 1. Starts with the payout (what hit the bank - the anchor)
- * 2. Works backwards through balance transactions
- * 3. Fetches order details for each transaction
- * 4. Builds journal entries that reconcile to the exact payout amount
- *
- * @param shop - Shop domain
- * @param accessToken - Shopify access token
- * @param payout - The payout to reconcile
- * @returns Reconciliation result with journal entries and validation
+ * CRITICAL: Each SO- reference MUST balance internally (debits = credits)
+ * AR debit MUST equal the sum of Sales + Tax + Shipping credits
  */
 export async function reconcilePayout(
   shop: string,
@@ -34,7 +26,6 @@ export async function reconcilePayout(
   const journalEntries: JournalEntry[] = [];
 
   try {
-    // Step 1: Fetch all balance transactions for this payout
     console.log(`Fetching balance transactions for payout ${payout.id}...`);
     const balanceTransactions = await fetchBalanceTransactions(
       shop,
@@ -44,7 +35,6 @@ export async function reconcilePayout(
 
     console.log(`Found ${balanceTransactions.length} balance transactions`);
 
-    // Step 2: For each balance transaction, fetch order details and build entries
     for (const balanceTxn of balanceTransactions) {
       try {
         await processBalanceTransaction(
@@ -52,7 +42,8 @@ export async function reconcilePayout(
           accessToken,
           balanceTxn,
           journalEntries,
-          warnings
+          warnings,
+          errors
         );
       } catch (error) {
         errors.push(
@@ -63,18 +54,18 @@ export async function reconcilePayout(
       }
     }
 
-    // Step 3: Add payout cash entry (final debit to bank account)
+    // Add payout cash entry (final debit to bank account)
     journalEntries.push({
       date: formatDate(payout.date),
       reference: `PO-${payout.id}`,
-      account: '1000-00', // Will be mapped to actual account later
+      account: '1000-00',
       accountName: 'Cash - Shopify Account',
       debit: payout.amount,
       credit: new Decimal(0),
       memo: `Shopify Payout ${payout.id}`,
     });
 
-    // Step 4: Calculate totals and validate balance
+    // Calculate totals and validate balance
     const totalDebit = journalEntries.reduce(
       (sum, entry) => sum.plus(entry.debit),
       new Decimal(0)
@@ -94,7 +85,6 @@ export async function reconcilePayout(
       );
     }
 
-    // Step 5: Validate that total credits from clearing equal payout amount
     const clearingTotal = journalEntries
       .filter((entry) => entry.account === '1250-00' && entry.credit.greaterThan(0))
       .reduce((sum, entry) => sum.plus(entry.credit), new Decimal(0));
@@ -139,29 +129,24 @@ async function processBalanceTransaction(
   accessToken: string,
   balanceTxn: BalanceTransaction,
   journalEntries: JournalEntry[],
-  warnings: string[]
+  warnings: string[],
+  errors: string[]
 ): Promise<void> {
   const txnDate = formatDate(balanceTxn.processedAt);
 
-  // Handle different transaction types
   switch (balanceTxn.type) {
     case 'charge': {
-      // This is a sale - fetch order details
       if (balanceTxn.sourceOrderId) {
         const order = await fetchOrderById(shop, accessToken, balanceTxn.sourceOrderId);
 
         if (order) {
-          // Create entries for the order
-          createOrderEntries(order, balanceTxn, journalEntries);
-
-          // Create entries for fees
+          createOrderEntries(order, balanceTxn, journalEntries, errors);
           createFeeEntries(balanceTxn, txnDate, journalEntries);
         } else {
           warnings.push(
             `Order ${balanceTxn.sourceOrderId} not found for balance transaction ${balanceTxn.id}`
           );
 
-          // Create generic entry even if order not found
           journalEntries.push({
             date: txnDate,
             reference: `CHG-${balanceTxn.id}`,
@@ -187,14 +172,12 @@ async function processBalanceTransaction(
     }
 
     case 'refund': {
-      // Refund transaction
       if (balanceTxn.sourceOrderId) {
         const order = await fetchOrderById(shop, accessToken, balanceTxn.sourceOrderId);
 
         if (order) {
           createRefundEntries(order, balanceTxn, txnDate, journalEntries);
         } else {
-          // Generic refund entry
           journalEntries.push({
             date: txnDate,
             reference: `RF-${balanceTxn.id}`,
@@ -221,7 +204,6 @@ async function processBalanceTransaction(
 
     case 'adjustment':
     case 'reserve': {
-      // Adjustment or reserve entry
       journalEntries.push({
         date: txnDate,
         reference: `ADJ-${balanceTxn.id}`,
@@ -242,64 +224,103 @@ async function processBalanceTransaction(
 
 /**
  * Create journal entries for an order (sales revenue)
+ *
+ * FIXED: Always creates tax and shipping lines if they exist in the order
+ * FIXED: Shows discounts as separate line (Option B from feedback)
+ * FIXED: Validates that entries balance for this order
  */
 function createOrderEntries(
   order: Order,
   balanceTxn: BalanceTransaction,
-  journalEntries: JournalEntry[]
+  journalEntries: JournalEntry[],
+  errors: string[]
 ): void {
   const orderDate = formatDate(order.createdAt);
   const reference = `SO-${order.name}`;
 
-  // Debit: Clearing account (gross amount)
+  // AR Debit: Clearing account (gross amount from balance transaction)
+  const arAmount = balanceTxn.gross;
+
   journalEntries.push({
     date: orderDate,
     reference,
     account: '1250-00',
     accountName: 'Shopify Clearing Account',
-    debit: balanceTxn.gross,
+    debit: arAmount,
     credit: new Decimal(0),
     memo: `Order ${order.name}`,
   });
 
-  // Credit: Sales Revenue (subtotal - discounts)
-  const netSales = order.subtotalPrice.minus(order.totalDiscounts);
-  if (netSales.greaterThan(0)) {
-    journalEntries.push({
-      date: orderDate,
-      reference,
-      account: '4000-00',
-      accountName: 'Sales Revenue',
-      debit: new Decimal(0),
-      credit: netSales,
-      memo: `Sales - Order ${order.name}`,
-    });
-  }
+  // Credit: Sales Revenue (full subtotal, BEFORE discounts)
+  // We'll show discounts separately below
+  journalEntries.push({
+    date: orderDate,
+    reference,
+    account: '4000-00',
+    accountName: 'Sales Revenue',
+    debit: new Decimal(0),
+    credit: order.subtotalPrice,
+    memo: `Sales - Order ${order.name}`,
+  });
 
-  // Credit: Sales Tax
-  if (order.totalTax.greaterThan(0)) {
+  // Credit: Sales Tax (ALWAYS include if order has totalTax data)
+  // Fix: Check for existence AND value
+  const taxAmount = order.totalTax || new Decimal(0);
+  if (taxAmount.greaterThan(0)) {
     journalEntries.push({
       date: orderDate,
       reference,
       account: '2200-00',
       accountName: 'Sales Tax Payable',
       debit: new Decimal(0),
-      credit: order.totalTax,
+      credit: taxAmount,
       memo: `Sales Tax - Order ${order.name}`,
     });
   }
 
-  // Credit: Shipping Revenue
-  if (order.totalShipping.greaterThan(0)) {
+  // Credit: Shipping Revenue (ALWAYS include if order has shipping)
+  const shippingAmount = order.totalShipping || new Decimal(0);
+  if (shippingAmount.greaterThan(0)) {
     journalEntries.push({
       date: orderDate,
       reference,
       account: '4100-00',
       accountName: 'Shipping Revenue',
       debit: new Decimal(0),
-      credit: order.totalShipping,
+      credit: shippingAmount,
       memo: `Shipping - Order ${order.name}`,
     });
+  }
+
+  // Debit: Discounts (if any) - shown as contra-revenue
+  const discountAmount = order.totalDiscounts || new Decimal(0);
+  if (discountAmount.greaterThan(0)) {
+    journalEntries.push({
+      date: orderDate,
+      reference,
+      account: '4050-00',
+      accountName: 'Discounts Given',
+      debit: discountAmount,
+      credit: new Decimal(0),
+      memo: `Discount - Order ${order.name}`,
+    });
+  }
+
+  // VALIDATION: Check that this order's entries balance
+  // AR = Sales + Tax + Shipping - Discounts
+  const expectedCredits = order.subtotalPrice
+    .plus(taxAmount)
+    .plus(shippingAmount)
+    .minus(discountAmount);
+
+  if (!arAmount.equals(expectedCredits)) {
+    const diff = arAmount.minus(expectedCredits);
+    errors.push(
+      `Order ${order.name} imbalanced: AR=${arAmount.toFixed(2)}, ` +
+      `Expected=${expectedCredits.toFixed(2)} (diff=${diff.toFixed(2)}). ` +
+      `Sales=${order.subtotalPrice.toFixed(2)}, Tax=${taxAmount.toFixed(2)}, ` +
+      `Shipping=${shippingAmount.toFixed(2)}, Discount=${discountAmount.toFixed(2)}`
+    );
   }
 }
 
