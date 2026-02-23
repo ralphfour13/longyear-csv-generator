@@ -35,6 +35,10 @@ export async function reconcilePayout(
 
     console.log(`Found ${balanceTransactions.length} balance transactions`);
 
+    // Track processed orders to prevent duplicates
+    // (multiple balance transactions can reference the same order)
+    const processedOrderIds = new Set<string>();
+
     for (const balanceTxn of balanceTransactions) {
       try {
         await processBalanceTransaction(
@@ -43,7 +47,8 @@ export async function reconcilePayout(
           balanceTxn,
           journalEntries,
           warnings,
-          errors
+          errors,
+          processedOrderIds
         );
       } catch (error) {
         errors.push(
@@ -130,18 +135,29 @@ async function processBalanceTransaction(
   balanceTxn: BalanceTransaction,
   journalEntries: JournalEntry[],
   warnings: string[],
-  errors: string[]
+  errors: string[],
+  processedOrderIds: Set<string>
 ): Promise<void> {
   const txnDate = formatDate(balanceTxn.processedAt);
 
   switch (balanceTxn.type) {
     case 'charge': {
       if (balanceTxn.sourceOrderId) {
+        // Check if we've already processed this order
+        if (processedOrderIds.has(balanceTxn.sourceOrderId)) {
+          console.log(`Skipping duplicate order ${balanceTxn.sourceOrderId} (already processed)`);
+          // Still process fees for this transaction
+          createFeeEntries(balanceTxn, txnDate, journalEntries);
+          break;
+        }
+
         const order = await fetchOrderById(shop, accessToken, balanceTxn.sourceOrderId);
 
         if (order) {
           createOrderEntries(order, balanceTxn, journalEntries, errors);
           createFeeEntries(balanceTxn, txnDate, journalEntries);
+          // Mark this order as processed
+          processedOrderIds.add(balanceTxn.sourceOrderId);
         } else {
           warnings.push(
             `Order ${balanceTxn.sourceOrderId} not found for balance transaction ${balanceTxn.id}`
@@ -173,6 +189,8 @@ async function processBalanceTransaction(
 
     case 'refund': {
       if (balanceTxn.sourceOrderId) {
+        // Note: We DON'T deduplicate refunds because each refund transaction
+        // represents a separate refund event (partial refunds, etc.)
         const order = await fetchOrderById(shop, accessToken, balanceTxn.sourceOrderId);
 
         if (order) {
