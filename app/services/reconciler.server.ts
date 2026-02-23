@@ -285,9 +285,11 @@ function createOrderEntries(
     });
   }
 
-  // Credit: Sales Tax (ALWAYS create if > 0)
+  // Credit: Sales Tax (only if > 0, zero is valid for out-of-state)
   const taxAmount = order.totalTax;
-  if (taxAmount && taxAmount.greaterThan(0)) {
+  const hasTax = taxAmount && taxAmount.greaterThan(0);
+
+  if (hasTax) {
     journalEntries.push({
       date: orderDate,
       reference,
@@ -299,9 +301,11 @@ function createOrderEntries(
     });
   }
 
-  // Credit: Shipping Revenue (ALWAYS create if > 0)
+  // Credit: Shipping Revenue (only if > 0, zero is valid for POS/pickup)
   const shippingAmount = order.totalShipping;
-  if (shippingAmount && shippingAmount.greaterThan(0)) {
+  const hasShipping = shippingAmount && shippingAmount.greaterThan(0);
+
+  if (hasShipping) {
     journalEntries.push({
       date: orderDate,
       reference,
@@ -319,14 +323,37 @@ function createOrderEntries(
     .plus(taxAmount || new Decimal(0))
     .plus(shippingAmount || new Decimal(0));
 
-  if (!totalDebits.equals(totalCredits)) {
+  // Check if balanced
+  const isBalanced = totalDebits.equals(totalCredits);
+
+  if (!isBalanced) {
     const diff = totalDebits.minus(totalCredits);
-    errors.push(
-      `Order ${order.name} IMBALANCE: ` +
-      `AR+Disc=${totalDebits.toFixed(2)}, Sales+Tax+Ship=${totalCredits.toFixed(2)} (diff=${diff.toFixed(2)}). ` +
+
+    // Build detailed error message
+    let errorMsg = `Order ${order.name} IMBALANCE: ` +
+      `Debits(AR+Disc)=${totalDebits.toFixed(2)}, ` +
+      `Credits(S+T+Sh)=${totalCredits.toFixed(2)} (diff=${diff.toFixed(2)}). ` +
       `[GrossSales=${grossSales.toFixed(2)}, Discount=${(discountAmount || new Decimal(0)).toFixed(2)}, ` +
-      `Tax=${(taxAmount || new Decimal(0)).toFixed(2)}, Ship=${(shippingAmount || new Decimal(0)).toFixed(2)}]`
-    );
+      `Tax=${(taxAmount || new Decimal(0)).toFixed(2)}, Ship=${(shippingAmount || new Decimal(0)).toFixed(2)}]`;
+
+    // Add context about missing amounts
+    if (!hasTax) {
+      errorMsg += ' [No tax - may be out-of-state order]';
+    }
+    if (!hasShipping) {
+      errorMsg += ' [No shipping - may be POS/pickup order]';
+    }
+
+    errors.push(errorMsg);
+  } else {
+    // Log successful balance with context
+    let successMsg = `Order ${order.name} ✓ Balanced: ${arAmount.toFixed(2)}`;
+    if (!hasTax) {
+      console.log(`${successMsg} [Out-of-state - no tax]`);
+    }
+    if (!hasShipping) {
+      console.log(`${successMsg} [POS/Pickup - no shipping]`);
+    }
   }
 }
 
