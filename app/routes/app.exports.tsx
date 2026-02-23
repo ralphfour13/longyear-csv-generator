@@ -107,7 +107,7 @@ export default function Exports() {
                     label = 'Payouts with Orders';
                     description = `${file.rowCount} order rows`;
                   } else if (file.type === 'journal-entries') {
-                    label = 'Journal Entry Summary';
+                    label = 'Journal Entry Details';
                     description = `${file.rowCount} entries, ${actionData.balanced ? '✓ balanced' : '✗ unbalanced'}`;
                   }
 
@@ -197,7 +197,7 @@ export default function Exports() {
                 <s-text>2. Click "Generate CSV" to create three export files:</s-text>
                 <s-text style={{ paddingLeft: '20px' }}>• Detailed Sales Report - Transaction-level detail for bookkeeping</s-text>
                 <s-text style={{ paddingLeft: '20px' }}>• Payouts with Orders - Reconciliation view of payout breakdown</s-text>
-                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry Summary - Import into Sage 50</s-text>
+                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry Details - Import into Sage 50</s-text>
                 <s-text>3. Download all three files for complete audit trail</s-text>
               </s-stack>
             </s-stack>

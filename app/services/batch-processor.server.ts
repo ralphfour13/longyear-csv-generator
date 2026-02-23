@@ -180,9 +180,9 @@ export async function processExport(
       });
     }
 
-    // File #3: Journal Entries (existing format for Sage 50 import)
-    await logInfo(shop, 'Export', 'Generating Journal Entry Summary...');
-    const journalEntriesFilename = `journal-entries_${targetDate}.txt`;
+    // File #3: Journal Entry Details (existing format for Sage 50 import)
+    await logInfo(shop, 'Export', 'Generating Journal Entry Details...');
+    const journalEntriesFilename = `journal-entry-details_${targetDate}.txt`;
     let journalEntriesPath: string;
     try {
       journalEntriesPath = await generateCSV(shop, mappedEntries, journalEntriesFilename);
@@ -194,11 +194,11 @@ export async function processExport(
         rowCount: mappedEntries.length,
       });
 
-      console.log(`✅ Journal Entry Summary created: ${journalEntriesFilename} (${mappedEntries.length} rows)`);
-      await logInfo(shop, 'Export', `Journal Entry Summary saved: ${journalEntriesFilename}`);
+      console.log(`✅ Journal Entry Details created: ${journalEntriesFilename} (${mappedEntries.length} rows)`);
+      await logInfo(shop, 'Export', `Journal Entry Details saved: ${journalEntriesFilename}`);
     } catch (error) {
-      const errorMsg = `Journal Entry Summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
-      console.error('❌ Journal Entry Summary error:', error);
+      const errorMsg = `Journal Entry Details generation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('❌ Journal Entry Details error:', error);
       await logError(shop, 'Export', errorMsg);
       allErrors.push(errorMsg);
 
