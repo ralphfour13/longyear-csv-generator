@@ -277,21 +277,9 @@ function createOrderEntriesFromOrder(
   const orderDate = formatDate(order.createdAt);
   const reference = `SO-${order.name}`;
 
-  // EARLY EXIT: Skip fully refunded orders
-  const currentTotal = order.currentTotalPrice || order.totalPrice;
-  const isFullyRefunded =
-    order.financialStatus === 'refunded' ||
-    currentTotal.equals(new Decimal(0));
-
-  if (isFullyRefunded) {
-    console.log(
-      `Skipping ${reference}: fully refunded order ` +
-      `(financial_status=${order.financialStatus}, current_total=${currentTotal.toFixed(2)})`
-    );
-    return []; // Return empty array, skip SO- entry generation
-  }
-
   // AR Debit: What customer actually paid (use CURRENT total for edited orders)
+  // Note: For fully refunded orders, we still generate SO- entries using original amounts
+  // The refund is handled separately by RF- entries, which net together on AR
   const arAmount = order.currentTotalPrice || order.totalPrice;
 
   entries.push({
