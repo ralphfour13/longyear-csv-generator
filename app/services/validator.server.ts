@@ -244,13 +244,13 @@ export function validateAccountMappings(mappings: AccountMappings): ValidationEr
       });
     }
 
-    // Validate account code format (basic pattern: XXXX-XX)
+    // Validate account code format (supports both XXXX-XX and X000.000 formats)
     if (mapping.accountCode) {
-      const codeRegex = /^\d{4}-\d{2}$/;
+      const codeRegex = /^(\d{4}-\d{2}|\d{1,4}\.\d{3})$/;
       if (!codeRegex.test(mapping.accountCode)) {
         errors.push({
           field: `${key}.accountCode`,
-          message: `Invalid account code format. Expected XXXX-XX (e.g., 4000-00)`,
+          message: `Invalid account code format. Expected XXXX-XX (e.g., 4000-00) or X000.000 (e.g., 3000.000)`,
           value: mapping.accountCode,
         });
       }
