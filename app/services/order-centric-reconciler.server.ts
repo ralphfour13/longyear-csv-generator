@@ -8,6 +8,7 @@ import type {
 import {
   fetchOrdersByCaptureDateRange,
   filterOrderTransactionsByDate,
+  getOrderCaptureDate,
 } from './order-centric-fetcher.server';
 import {
   analyzeOrderPayments,
@@ -81,11 +82,29 @@ export async function reconcileOrdersByDate(
     // Process each order
     for (const order of orders) {
       try {
-        // Filter transactions to only those captured on target date
-        const captureTransactions = filterOrderTransactionsByDate(order, targetDate);
+        // LAST-CAPTURE-DATE RULE: Order posts on the date of its LAST captured payment
+        // This ensures split-payment orders post as a complete unit (all legs balance)
+        const lastCaptureDate = getOrderCaptureDate(order);
+
+        if (!lastCaptureDate) {
+          // No captures at all, skip this order
+          continue;
+        }
+
+        if (lastCaptureDate !== targetDate) {
+          // This order's last capture is on a different date, skip for now
+          // It will be processed when we run reconciliation for that date
+          continue;
+        }
+
+        // Get ALL capture transactions for this order (not just today's)
+        // This ensures we include all payment legs when the order posts
+        const captureTransactions = order.transactions?.filter(
+          (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
+        ) || [];
 
         if (captureTransactions.length === 0) {
-          // No captures on target date, skip this order
+          // No captures, skip this order
           continue;
         }
 
@@ -96,7 +115,7 @@ export async function reconcileOrdersByDate(
         }
 
         console.log(
-          `Processing order ${order.name} with ${captureTransactions.length} capture(s) on ${targetDate}`
+          `Processing order ${order.name} with ${captureTransactions.length} capture(s) (last capture: ${lastCaptureDate})`
         );
 
         // Process captures
@@ -142,7 +161,31 @@ export async function reconcileOrdersByDate(
 
     console.log(`\nProcessed ${ordersProcessed} orders with ${capturesProcessed} captures`);
 
-    // Calculate totals and validate balance
+    // VALIDATION: Verify each SO- reference balances (per-order balance check)
+    console.log('\nValidating per-order balance...');
+    const soReferences = new Set(
+      journalEntries
+        .filter((entry) => entry.reference.startsWith('SO-'))
+        .map((entry) => entry.reference)
+    );
+
+    for (const reference of soReferences) {
+      const refEntries = journalEntries.filter((entry) => entry.reference === reference);
+      const refDebits = refEntries.reduce((sum, entry) => sum.plus(entry.debit), new Decimal(0));
+      const refCredits = refEntries.reduce((sum, entry) => sum.plus(entry.credit), new Decimal(0));
+      const refDiff = refDebits.minus(refCredits).abs();
+
+      if (refDiff.greaterThan(new Decimal('0.01'))) {
+        errors.push(
+          `❌ ${reference} does NOT balance: Debits=${refDebits.toFixed(2)}, ` +
+          `Credits=${refCredits.toFixed(2)}, Diff=${refDebits.minus(refCredits).toFixed(2)}`
+        );
+      } else {
+        console.log(`✓ ${reference} balanced: ${refDebits.toFixed(2)}`);
+      }
+    }
+
+    // Calculate totals and validate overall balance
     const totalDebit = journalEntries.reduce(
       (sum, entry) => sum.plus(entry.debit),
       new Decimal(0)
@@ -161,7 +204,7 @@ export async function reconcileOrdersByDate(
           `(Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)})`
       );
     } else {
-      console.log(`✓ Journal entries balanced: ${totalDebit.toFixed(2)}`);
+      console.log(`✓ Overall journal entries balanced: ${totalDebit.toFixed(2)}`);
     }
 
     return {
