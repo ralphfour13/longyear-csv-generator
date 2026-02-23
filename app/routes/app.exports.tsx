@@ -23,7 +23,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
   const formData = await request.formData();
@@ -87,213 +87,155 @@ export default function Exports() {
   const defaultDate = format(yesterday, 'yyyy-MM-dd');
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Export Center</h1>
-      <p>Generate CSV files for import into Sage 50.</p>
+    <s-page heading="Export Center">
+      <s-button slot="primary-action" variant="primary" disabled={isExporting ? true : undefined}>
+        {isExporting ? 'Generating...' : 'Generate Export'}
+      </s-button>
 
+      {/* Success Banner */}
       {actionData?.success && (
-        <div
-          style={{
-            padding: '12px',
-            marginBottom: '16px',
-            backgroundColor: '#d4edda',
-            border: '1px solid #c3e6cb',
-            borderRadius: '4px',
-            color: '#155724',
-          }}
-        >
-          {actionData.message}
+        <s-banner tone="success">
+          <s-paragraph>{actionData.message}</s-paragraph>
           {actionData.filename && (
-            <div style={{ marginTop: '8px' }}>
-              <a
-                href={`/api/download-csv?shop=${shop}&filename=${actionData.filename}`}
-                download
-                style={{
-                  color: '#155724',
-                  textDecoration: 'underline',
-                  fontWeight: '500',
-                }}
-              >
+            <s-paragraph>
+              <s-link href={`/api/download-csv?shop=${shop}&filename=${actionData.filename}`}>
                 Download {actionData.filename}
-              </a>
-            </div>
+              </s-link>
+              {' '}({actionData.entryCount} entries, {actionData.balanced ? 'balanced ✓' : 'unbalanced ✗'})
+            </s-paragraph>
           )}
-        </div>
+        </s-banner>
       )}
 
+      {/* Error Banner */}
       {actionData?.error && (
-        <div
-          style={{
-            padding: '12px',
-            marginBottom: '16px',
-            backgroundColor: '#f8d7da',
-            border: '1px solid #f5c6cb',
-            borderRadius: '4px',
-            color: '#721c24',
-          }}
-        >
-          {actionData.error}
-        </div>
+        <s-banner tone="critical">
+          <s-paragraph>{actionData.error}</s-paragraph>
+        </s-banner>
       )}
 
-      {/* Export Form */}
-      <div
-        style={{
-          marginBottom: '32px',
-          padding: '20px',
-          backgroundColor: '#f6f6f7',
-          borderRadius: '8px',
-        }}
-      >
-        <h2 style={{ marginTop: 0 }}>Generate New Export</h2>
+      {/* Export Form Section */}
+      <s-section heading="Generate New Export">
+        <s-paragraph>
+          Select a date range to export journal entries. The export uses payout-first reconciliation to ensure perfect balance.
+        </s-paragraph>
 
         <Form method="post">
           <input type="hidden" name="action" value="export" />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                Start Date
-              </label>
-              <input
-                type="date"
-                name="startDate"
-                defaultValue={defaultDate}
-                required
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '1px solid #c9cccf',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
+          <s-stack direction="block" gap="base">
+            <s-stack direction="inline" gap="base">
+              <div style={{ flex: 1 }}>
+                <s-text>Start Date</s-text>
+                <input
+                  type="date"
+                  name="startDate"
+                  defaultValue={defaultDate}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    marginTop: '4px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-100)',
+                  }}
+                />
+              </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-                End Date
-              </label>
-              <input
-                type="date"
-                name="endDate"
-                defaultValue={defaultDate}
-                required
-                style={{
-                  width: '100%',
-                  padding: '8px',
-                  border: '1px solid #c9cccf',
-                  borderRadius: '4px',
-                  fontSize: '14px',
-                }}
-              />
-            </div>
-          </div>
+              <div style={{ flex: 1 }}>
+                <s-text>End Date</s-text>
+                <input
+                  type="date"
+                  name="endDate"
+                  defaultValue={defaultDate}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    marginTop: '4px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-100)',
+                  }}
+                />
+              </div>
+            </s-stack>
 
-          <button
-            type="submit"
-            disabled={isExporting}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: isExporting ? '#c9cccf' : '#008060',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: isExporting ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-            }}
-          >
-            {isExporting ? 'Generating Export...' : 'Generate CSV'}
-          </button>
+            <s-button type="submit" variant="primary" loading={isExporting ? true : undefined}>
+              {isExporting ? 'Generating Export...' : 'Generate CSV'}
+            </s-button>
+          </s-stack>
         </Form>
 
-        <div
-          style={{
-            marginTop: '16px',
-            padding: '12px',
-            backgroundColor: '#fff',
-            borderRadius: '4px',
-            fontSize: '14px',
-            color: '#637381',
-          }}
-        >
-          <strong>How it works:</strong>
-          <ol style={{ marginBottom: 0, paddingLeft: '20px' }}>
-            <li>Select date range (payouts that hit your bank during this period)</li>
-            <li>Click "Generate CSV" to start payout-first reconciliation</li>
-            <li>Download the generated CSV file</li>
-            <li>Import into Sage 50 using Journal Entry import feature</li>
-          </ol>
-        </div>
-      </div>
+        <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued" style={{ marginTop: '16px' }}>
+          <s-stack direction="block" gap="tight">
+            <s-text variant="headingSm">How it works:</s-text>
+            <ol style={{ paddingLeft: '20px', margin: 0 }}>
+              <li>Select date range (payouts that hit your bank during this period)</li>
+              <li>Click "Generate CSV" to start payout-first reconciliation</li>
+              <li>Download the generated CSV file</li>
+              <li>Import into Sage 50 using Journal Entry import feature</li>
+            </ol>
+          </s-stack>
+        </s-box>
+      </s-section>
 
-      {/* Export History */}
-      <div>
-        <h2>Export History</h2>
-
+      {/* Export History Section */}
+      <s-section heading="Export History">
         {exports.length === 0 ? (
-          <p style={{ color: '#637381' }}>No exports yet. Generate your first export above.</p>
+          <s-paragraph>No exports yet. Generate your first export above.</s-paragraph>
         ) : (
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              backgroundColor: '#fff',
-              borderRadius: '8px',
-              overflow: 'hidden',
-            }}
-          >
-            <thead>
-              <tr style={{ backgroundColor: '#f6f6f7', borderBottom: '1px solid #e1e3e5' }}>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Filename</th>
-                <th style={{ padding: '12px', textAlign: 'left', fontWeight: '500' }}>Created</th>
-                <th style={{ padding: '12px', textAlign: 'right', fontWeight: '500' }}>Size</th>
-                <th style={{ padding: '12px', textAlign: 'center', fontWeight: '500' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {exports.map((exp, index) => (
-                <tr
-                  key={exp.filename}
-                  style={{
-                    borderBottom: index < exports.length - 1 ? '1px solid #e1e3e5' : 'none',
-                  }}
-                >
-                  <td style={{ padding: '12px' }}>
-                    <code style={{ fontSize: '13px' }}>{exp.filename}</code>
-                  </td>
-                  <td style={{ padding: '12px', fontSize: '14px', color: '#637381' }}>
-                    {format(new Date(exp.created), 'MMM d, yyyy h:mm a')}
-                  </td>
-                  <td style={{ padding: '12px', textAlign: 'right', fontSize: '14px', color: '#637381' }}>
-                    {formatFileSize(exp.size)}
-                  </td>
-                  <td style={{ padding: '12px', textAlign: 'center' }}>
-                    <a
-                      href={`/api/download-csv?shop=${shop}&filename=${exp.filename}`}
-                      download
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: '#f6f6f7',
-                        color: '#202223',
-                        border: '1px solid #c9cccf',
-                        borderRadius: '4px',
-                        textDecoration: 'none',
-                        fontSize: '13px',
-                        display: 'inline-block',
-                      }}
-                    >
-                      Download
-                    </a>
-                  </td>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--p-color-border)' }}>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600 }}>
+                    <s-text>Filename</s-text>
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600 }}>
+                    <s-text>Created</s-text>
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'right', fontWeight: 600 }}>
+                    <s-text>Size</s-text>
+                  </th>
+                  <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600 }}>
+                    <s-text>Actions</s-text>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {exports.map((exp, index) => (
+                  <tr
+                    key={exp.filename}
+                    style={{
+                      borderBottom: index < exports.length - 1 ? '1px solid var(--p-color-border-subdued)' : 'none',
+                    }}
+                  >
+                    <td style={{ padding: '12px' }}>
+                      <code style={{ fontSize: '13px' }}>{exp.filename}</code>
+                    </td>
+                    <td style={{ padding: '12px' }}>
+                      <s-text>{format(new Date(exp.created), 'MMM d, yyyy h:mm a')}</s-text>
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'right' }}>
+                      <s-text>{formatFileSize(exp.size)}</s-text>
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <s-button
+                        href={`/api/download-csv?shop=${shop}&filename=${exp.filename}`}
+                        variant="tertiary"
+                        size="slim"
+                      >
+                        Download
+                      </s-button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
-    </div>
+      </s-section>
+    </s-page>
   );
 }
 
