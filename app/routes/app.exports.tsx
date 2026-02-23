@@ -52,6 +52,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         success: true,
         message: 'Export completed successfully',
         filename: result.filename,
+        summaryFilename: (result as any).summaryFilename,
         entryCount: result.entryCount,
         balanced: result.balanced,
       });
@@ -91,28 +92,53 @@ export default function Exports() {
     <s-page heading="Export Center">
       {actionData?.success && (
         <s-banner tone="success" style={{ marginBottom: '20px' }}>
-          <s-stack direction="block" gap="tight">
+          <s-stack direction="block" gap="base">
             <s-text variant="headingSm">{actionData.message}</s-text>
             {actionData.filename && (
-              <s-stack direction="inline" gap="tight" alignItems="center">
-                <button
-                  onClick={() => handleDownload(actionData.filename)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--p-color-text-link)',
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
-                    padding: 0,
-                    font: 'inherit',
-                    fontWeight: 500,
-                  }}
-                >
-                  Download {actionData.filename}
-                </button>
-                <s-text>
-                  ({actionData.entryCount} entries, {actionData.balanced ? '✓ balanced' : '✗ unbalanced'})
-                </s-text>
+              <s-stack direction="block" gap="tight">
+                <s-stack direction="inline" gap="tight" alignItems="center">
+                  <s-text variant="bodySm"><strong>Detailed Journal Entries:</strong></s-text>
+                  <button
+                    onClick={() => handleDownload(actionData.filename)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--p-color-text-link)',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: 0,
+                      font: 'inherit',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {actionData.filename}
+                  </button>
+                  <s-text>
+                    ({actionData.entryCount} entries, {actionData.balanced ? '✓ balanced' : '✗ unbalanced'})
+                  </s-text>
+                </s-stack>
+
+                {actionData.summaryFilename && (
+                  <s-stack direction="inline" gap="tight" alignItems="center">
+                    <s-text variant="bodySm"><strong>Daily Summary:</strong></s-text>
+                    <button
+                      onClick={() => handleDownload(actionData.summaryFilename)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--p-color-text-link)',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        padding: 0,
+                        font: 'inherit',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {actionData.summaryFilename}
+                    </button>
+                    <s-text>(rolled up by account)</s-text>
+                  </s-stack>
+                )}
               </s-stack>
             )}
           </s-stack>
