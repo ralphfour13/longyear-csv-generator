@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useLoaderData, useNavigation } from 'react-router';
+import { useEffect } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats } from '../services/storage.server';
 import { format } from 'date-fns';
@@ -87,6 +88,24 @@ export default function Exports() {
     const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${filename}`;
     window.open(url, '_blank');
   };
+
+  // Auto-download all files when export completes
+  useEffect(() => {
+    if (actionData?.success && actionData?.files) {
+      // Small delay to ensure UI updates before downloads start
+      setTimeout(() => {
+        actionData.files.forEach((file: any, index: number) => {
+          if (!file.error) {
+            // Stagger downloads slightly to avoid browser blocking
+            setTimeout(() => {
+              const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${file.filename}`;
+              window.open(url, '_blank');
+            }, index * 300); // 300ms between each download
+          }
+        });
+      }, 500);
+    }
+  }, [actionData, shop]);
 
   return (
     <s-page heading="Export Center">
