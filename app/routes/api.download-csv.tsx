@@ -9,15 +9,13 @@ import { readExport, exportExists } from '../services/storage.server';
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    const { session } = await authenticate.admin(request);
-    const shop = session.shop;
-
-    // Get filename from query params
+    // Get parameters from query string
     const url = new URL(request.url);
+    const shop = url.searchParams.get('shop');
     const filename = url.searchParams.get('filename');
 
-    if (!filename) {
-      return new Response('Missing filename parameter', { status: 400 });
+    if (!shop || !filename) {
+      return new Response('Missing shop or filename parameter', { status: 400 });
     }
 
     // Validate filename (only allow CSV files, no path traversal)
@@ -28,24 +26,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Check if file exists
     const exists = await exportExists(shop, filename);
     if (!exists) {
-      return new Response('File not found', { status: 404 });
+      console.error(`File not found: ${shop} / ${filename}`);
+      return new Response(`File not found: ${filename}`, { status: 404 });
     }
 
     // Read file content
     const content = await readExport(shop, filename);
 
+    console.log(`Downloaded ${filename} for ${shop} (${content.length} bytes)`);
+
     // Return CSV file
     return new Response(content, {
       status: 200,
       headers: {
-        'Content-Type': 'text/csv',
+        'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Cache-Control': 'private, max-age=3600',
+        'Cache-Control': 'no-cache',
       },
     });
   } catch (error) {
     console.error('Download CSV error:', error);
 
-    return new Response('Failed to download file', { status: 500 });
+    return new Response(
+      `Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      { status: 500 }
+    );
   }
 };
