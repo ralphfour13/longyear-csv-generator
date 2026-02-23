@@ -82,31 +82,8 @@ export async function reconcilePayout(
       }
     }
 
-    // Only add payout entries if there were filtered transactions
-    // When filtering by target date, skip payouts with zero matching transactions
-    if (!targetDate || filteredTransactions.length > 0) {
-      // Add payout cash entry (final debit to bank account)
-      journalEntries.push({
-        date: formatDate(payout.date),
-        reference: `PO-${payout.id}`,
-        account: '1000-00',
-        accountName: 'Cash - Shopify Account',
-        debit: payout.amount,
-        credit: new Decimal(0),
-        memo: `Shopify Payout ${payout.id}`,
-      });
-
-      // Add corresponding AR credit to clear the clearing account
-      journalEntries.push({
-        date: formatDate(payout.date),
-        reference: `PO-${payout.id}`,
-        account: '1250-00',
-        accountName: 'Shopify Clearing Account',
-        debit: new Decimal(0),
-        credit: payout.amount,
-        memo: `Payout Clearing`,
-      });
-    }
+    // REMOVED: Payout entries (PO-) are no longer included in journal entry exports
+    // The merchant will record bank deposits separately from bank statements
 
     // Calculate totals and validate balance
     const totalDebit = journalEntries.reduce(
@@ -373,27 +350,9 @@ async function processBalanceTransaction(
     }
 
     case 'payout': {
-      // Payout transaction within balance transactions (clearing to bank)
-      // This represents the final settlement from clearing account to bank
-      journalEntries.push({
-        date: txnDate,
-        reference: `PO-${balanceTxn.id}`,
-        account: '1000-00',
-        accountName: 'Cash - Shopify Account',
-        debit: balanceTxn.net.abs(),
-        credit: new Decimal(0),
-        memo: `Bank Deposit - Payout`,
-      });
-
-      journalEntries.push({
-        date: txnDate,
-        reference: `PO-${balanceTxn.id}`,
-        account: '1250-00',
-        accountName: 'Shopify Clearing Account',
-        debit: new Decimal(0),
-        credit: balanceTxn.net.abs(),
-        memo: `Clear to Bank`,
-      });
+      // REMOVED: Payout entries are no longer included in journal entry exports
+      // The merchant will record bank deposits separately from bank statements
+      // Skip this transaction type
       break;
     }
 
