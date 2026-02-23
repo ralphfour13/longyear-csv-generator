@@ -151,7 +151,7 @@ export async function processExport(
     // File #2: Payouts with Orders
     await logInfo(shop, 'Export', 'Generating Payouts with Orders...');
     try {
-      const payoutsFilename = `payouts-with-orders_${targetDate}.txt`;
+      const payoutsFilename = `payouts-with-orders_${targetDate}.csv`;
       const payoutsContent = generatePayoutsWithOrders(allEnrichedTransactions);
       const payoutsPath = await writeExport(shop, payoutsFilename, payoutsContent);
 
@@ -173,7 +173,7 @@ export async function processExport(
 
       generatedFiles.push({
         type: 'payouts-orders',
-        filename: `payouts-with-orders_${targetDate}.txt`,
+        filename: `payouts-with-orders_${targetDate}.csv`,
         downloadUrl: '',
         rowCount: 0,
         error: errorMsg,
