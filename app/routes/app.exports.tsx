@@ -41,12 +41,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     try {
-      // Trigger export via API endpoint
-      const exportUrl = new URL(`https://${shop}/app/api/manual-export`);
-      exportUrl.searchParams.set('startDate', startDate);
-      exportUrl.searchParams.set('endDate', endDate);
+      // Trigger export via API endpoint (relative URL to call our own backend)
+      const exportUrl = new URL(`/api/manual-export?startDate=${startDate}&endDate=${endDate}`, request.url);
 
-      // We'll call our own API endpoint
+      // Call our own API endpoint
       const response = await fetch(exportUrl.toString(), {
         method: 'POST',
         headers: {
