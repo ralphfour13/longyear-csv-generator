@@ -2,7 +2,7 @@
 
 client_id = "ec004ce28be778f86415a4b18a7ab9a2"
 name = "Sage 50 Sync for Fly Shop"
-application_url = "https://sage50-journal-entry-sync-prod.server.four13.dev"
+application_url = "https://sage50-sync.four13.dev"
 embedded = true
 
 [build]
@@ -27,6 +27,6 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://sage50-journal-entry-sync-prod.server.four13.dev/auth/callback",
-  "https://sage50-journal-entry-sync-prod.server.four13.dev/auth/shopify/callback"
+  "https://sage50-sync.four13.dev/auth/callback",
+  "https://sage50-sync.four13.dev/auth/shopify/callback"
 ]
