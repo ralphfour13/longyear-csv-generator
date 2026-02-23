@@ -135,6 +135,10 @@ function parseOrder(orderData: any): Order {
 /**
  * Fetch orders for a date range
  * Useful for reconciliation and reporting
+ *
+ * Note: Uses updated_at to find orders that were active during the date range.
+ * This is more inclusive than created_at and will catch orders that were
+ * processed, edited, or fulfilled during the target dates.
  */
 export async function fetchOrdersByDateRange(
   shop: string,
@@ -148,10 +152,16 @@ export async function fetchOrdersByDateRange(
 
   const baseUrl = `https://${shop}/admin/api/2024-10/orders.json`;
 
+  // Convert YYYY-MM-DD to ISO 8601 with full day range
+  const startDateTime = `${startDate}T00:00:00Z`;
+  const endDateTime = `${endDate}T23:59:59Z`;
+
+  console.log(`Fetching orders updated between ${startDateTime} and ${endDateTime}`);
+
   while (hasNextPage) {
     const params = new URLSearchParams({
-      created_at_min: startDate,
-      created_at_max: endDate,
+      updated_at_min: startDateTime,
+      updated_at_max: endDateTime,
       status: 'any',
       limit: '250',
     });
