@@ -278,21 +278,15 @@ function createOrderEntries(
     memo: `Order ${order.name}`,
   });
 
-  // Calculate GROSS sales from FULFILLED line items only
-  // CRITICAL: Exclude removed/cancelled items (edited orders bug)
-  // Only include items that were actually fulfilled/shipped
-  const grossSales = order.lineItems
-    .filter((item) => {
-      // If fulfillment_status exists, only include fulfilled items
-      // This excludes items removed after order was placed
-      return item.quantity > 0; // Removed items have quantity 0 or are excluded
-    })
-    .reduce(
-      (sum, item) => sum.plus(item.price.times(item.quantity)),
-      new Decimal(0)
-    );
+  // Calculate GROSS sales using CURRENT subtotal (handles edited orders)
+  // Use current_subtotal_price if available (reflects edits/removals)
+  // Otherwise calculate from line items
+  const grossSales = order.currentSubtotalPrice || order.lineItems.reduce(
+    (sum, item) => sum.plus(item.price.times(item.quantity)),
+    new Decimal(0)
+  );
 
-  console.log(`Order ${order.name}: Gross sales calculated from ${order.lineItems.length} line items = ${grossSales.toFixed(2)}`);
+  console.log(`Order ${order.name}: Gross sales = ${grossSales.toFixed(2)} (${order.currentSubtotalPrice ? 'from current_subtotal_price' : 'calculated from line items'})`);
 
   // Credit: Sales Revenue (GROSS - full catalog price)
   journalEntries.push({
@@ -305,8 +299,8 @@ function createOrderEntries(
     memo: `Sales - Order ${order.name}`,
   });
 
-  // Debit: Discounts (if any) - contra-revenue for visibility
-  const discountAmount = order.totalDiscounts;
+  // Debit: Discounts (if any) - use CURRENT discounts for edited orders
+  const discountAmount = order.currentTotalDiscounts || order.totalDiscounts;
   if (discountAmount && discountAmount.greaterThan(0)) {
     journalEntries.push({
       date: orderDate,

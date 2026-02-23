@@ -116,6 +116,9 @@ export interface Order {
   createdAt: string; // ISO timestamp
   totalPrice: Decimal; // Total including tax and shipping
   subtotalPrice: Decimal; // Subtotal before tax/shipping
+  currentSubtotalPrice?: Decimal; // Current subtotal (after edits/removals)
+  currentTotalDiscounts?: Decimal; // Current discounts (after edits)
+  currentTotalPrice?: Decimal; // Current total (after edits)
   totalTax: Decimal; // Total tax amount
   totalShipping: Decimal; // Shipping charges
   totalDiscounts: Decimal; // Discount amount

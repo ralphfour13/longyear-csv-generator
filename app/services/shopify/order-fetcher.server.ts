@@ -114,6 +114,15 @@ function parseOrder(orderData: any): Order {
     createdAt: orderData.created_at,
     totalPrice: new Decimal(orderData.total_price),
     subtotalPrice: new Decimal(orderData.subtotal_price),
+    currentSubtotalPrice: orderData.current_subtotal_price
+      ? new Decimal(orderData.current_subtotal_price)
+      : undefined,
+    currentTotalDiscounts: orderData.current_total_discounts
+      ? new Decimal(orderData.current_total_discounts)
+      : undefined,
+    currentTotalPrice: orderData.current_total_price
+      ? new Decimal(orderData.current_total_price)
+      : undefined,
     totalTax: new Decimal(orderData.total_tax || 0),
     totalShipping,
     totalDiscounts: new Decimal(orderData.total_discounts || 0),
