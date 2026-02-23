@@ -40,6 +40,12 @@ export interface AccountMappings {
   refunds_given: AccountMapping;
   cogs: AccountMapping;
   inventory: AccountMapping;
+  // Payment method specific accounts
+  gift_card_liability: AccountMapping; // 2320-00 - Gift Card Liability
+  store_credit_liability: AccountMapping; // 2340-00 - Store Credit Liability
+  cash_register: AccountMapping; // 1061-00 - Cash Register
+  cogs_inventory_writeoff: AccountMapping; // 1310-00 - COGS - Inventory Write-off (for Charge gateway)
+  undeposited_funds: AccountMapping; // 1051-00 - Undeposited Funds (for checks)
   [key: string]: AccountMapping; // Allow dynamic account types
 }
 
