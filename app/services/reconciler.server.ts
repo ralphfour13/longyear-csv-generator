@@ -82,27 +82,31 @@ export async function reconcilePayout(
       }
     }
 
-    // Add payout cash entry (final debit to bank account)
-    journalEntries.push({
-      date: formatDate(payout.date),
-      reference: `PO-${payout.id}`,
-      account: '1000-00',
-      accountName: 'Cash - Shopify Account',
-      debit: payout.amount,
-      credit: new Decimal(0),
-      memo: `Shopify Payout ${payout.id}`,
-    });
+    // Only add payout entries if there were filtered transactions
+    // When filtering by target date, skip payouts with zero matching transactions
+    if (!targetDate || filteredTransactions.length > 0) {
+      // Add payout cash entry (final debit to bank account)
+      journalEntries.push({
+        date: formatDate(payout.date),
+        reference: `PO-${payout.id}`,
+        account: '1000-00',
+        accountName: 'Cash - Shopify Account',
+        debit: payout.amount,
+        credit: new Decimal(0),
+        memo: `Shopify Payout ${payout.id}`,
+      });
 
-    // Add corresponding AR credit to clear the clearing account
-    journalEntries.push({
-      date: formatDate(payout.date),
-      reference: `PO-${payout.id}`,
-      account: '1250-00',
-      accountName: 'Shopify Clearing Account',
-      debit: new Decimal(0),
-      credit: payout.amount,
-      memo: `Payout Clearing`,
-    });
+      // Add corresponding AR credit to clear the clearing account
+      journalEntries.push({
+        date: formatDate(payout.date),
+        reference: `PO-${payout.id}`,
+        account: '1250-00',
+        accountName: 'Shopify Clearing Account',
+        debit: new Decimal(0),
+        credit: payout.amount,
+        memo: `Payout Clearing`,
+      });
+    }
 
     // Calculate totals and validate balance
     const totalDebit = journalEntries.reduce(
