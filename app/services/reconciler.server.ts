@@ -5,10 +5,12 @@ import type {
   Order,
   ReconciliationResult,
   JournalEntry,
+  EnrichedTransaction,
 } from '../types/journal-entry';
 import { fetchBalanceTransactions } from './shopify/balance-transaction-fetcher.server';
 import { fetchOrderById } from './shopify/order-fetcher.server';
 import { fetchOrderTransactions } from './shopify/transaction-fetcher.server';
+import { enrichOrderData } from './enrichment/order-enrichment.server';
 
 /**
  * Payout-First Reconciliation Engine
@@ -27,6 +29,7 @@ export async function reconcilePayout(
   const errors: string[] = [];
   const warnings: string[] = [];
   const journalEntries: JournalEntry[] = [];
+  const enrichedTransactions: EnrichedTransaction[] = []; // NEW: Collect enriched transactions
 
   try {
     console.log(`Fetching balance transactions for payout ${payout.id}...`);
@@ -63,7 +66,9 @@ export async function reconcilePayout(
           shop,
           accessToken,
           balanceTxn,
+          payout,
           journalEntries,
+          enrichedTransactions, // NEW: Pass enriched transactions array
           warnings,
           errors,
           processedOrderIds
@@ -132,6 +137,7 @@ export async function reconcilePayout(
     return {
       payout,
       journalEntries,
+      enrichedTransactions, // NEW: Include enriched transactions
       totalDebit,
       totalCredit,
       balanced,
@@ -146,6 +152,7 @@ export async function reconcilePayout(
     return {
       payout,
       journalEntries,
+      enrichedTransactions: [], // NEW: Empty array on failure
       totalDebit: new Decimal(0),
       totalCredit: new Decimal(0),
       balanced: false,
@@ -157,12 +164,15 @@ export async function reconcilePayout(
 
 /**
  * Process a single balance transaction and create journal entries
+ * Also builds EnrichedTransaction objects for multi-file exports
  */
 async function processBalanceTransaction(
   shop: string,
   accessToken: string,
   balanceTxn: BalanceTransaction,
+  payout: Payout,
   journalEntries: JournalEntry[],
+  enrichedTransactions: EnrichedTransaction[], // NEW: Collect enriched transactions
   warnings: string[],
   errors: string[],
   processedOrderIds: Set<string>
@@ -185,6 +195,43 @@ async function processBalanceTransaction(
         if (order) {
           createOrderEntries(order, balanceTxn, journalEntries, errors);
           createFeeEntries(balanceTxn, txnDate, journalEntries);
+
+          // NEW: Enrich order data and build EnrichedTransaction
+          try {
+            const enrichedData = await enrichOrderData(shop, accessToken, balanceTxn.sourceOrderId);
+
+            enrichedTransactions.push({
+              balanceTransaction: {
+                id: balanceTxn.id,
+                type: balanceTxn.type,
+                sourceOrderId: balanceTxn.sourceOrderId,
+                processedAt: balanceTxn.processedAt,
+                net: balanceTxn.net,
+                fee: balanceTxn.fee,
+                gross: balanceTxn.gross,
+              },
+              order: {
+                id: order.id,
+                name: order.name,
+                createdAt: order.createdAt,
+                currentTotalPrice: order.currentTotalPrice || order.totalPrice,
+                totalTax: order.totalTax,
+                totalShipping: order.totalShipping,
+                totalDiscounts: order.totalDiscounts,
+                financialStatus: order.financialStatus,
+              },
+              enrichedData: enrichedData || undefined,
+              payout: {
+                id: payout.id,
+                date: payout.date,
+                amount: payout.amount,
+              },
+            });
+          } catch (enrichError) {
+            console.error(`Failed to enrich order ${balanceTxn.sourceOrderId}:`, enrichError);
+            warnings.push(`Failed to enrich order ${balanceTxn.sourceOrderId} for export`);
+          }
+
           // Mark this order as processed
           processedOrderIds.add(balanceTxn.sourceOrderId);
         } else {
@@ -211,6 +258,24 @@ async function processBalanceTransaction(
             credit: balanceTxn.gross,
             memo: `Sale - Order ${balanceTxn.sourceOrderId || 'Unknown'}`,
           });
+
+          // NEW: Add enriched transaction even if order not found (minimal data)
+          enrichedTransactions.push({
+            balanceTransaction: {
+              id: balanceTxn.id,
+              type: balanceTxn.type,
+              sourceOrderId: balanceTxn.sourceOrderId,
+              processedAt: balanceTxn.processedAt,
+              net: balanceTxn.net,
+              fee: balanceTxn.fee,
+              gross: balanceTxn.gross,
+            },
+            payout: {
+              id: payout.id,
+              date: payout.date,
+              amount: payout.amount,
+            },
+          });
         }
       }
       break;
@@ -224,6 +289,42 @@ async function processBalanceTransaction(
 
         if (order) {
           createRefundEntries(order, balanceTxn, txnDate, journalEntries);
+
+          // NEW: Enrich order data for refund transaction
+          try {
+            const enrichedData = await enrichOrderData(shop, accessToken, balanceTxn.sourceOrderId);
+
+            enrichedTransactions.push({
+              balanceTransaction: {
+                id: balanceTxn.id,
+                type: balanceTxn.type,
+                sourceOrderId: balanceTxn.sourceOrderId,
+                processedAt: balanceTxn.processedAt,
+                net: balanceTxn.net,
+                fee: balanceTxn.fee,
+                gross: balanceTxn.gross,
+              },
+              order: {
+                id: order.id,
+                name: order.name,
+                createdAt: order.createdAt,
+                currentTotalPrice: order.currentTotalPrice || order.totalPrice,
+                totalTax: order.totalTax,
+                totalShipping: order.totalShipping,
+                totalDiscounts: order.totalDiscounts,
+                financialStatus: order.financialStatus,
+              },
+              enrichedData: enrichedData || undefined,
+              payout: {
+                id: payout.id,
+                date: payout.date,
+                amount: payout.amount,
+              },
+            });
+          } catch (enrichError) {
+            console.error(`Failed to enrich refund order ${balanceTxn.sourceOrderId}:`, enrichError);
+            warnings.push(`Failed to enrich refund order ${balanceTxn.sourceOrderId} for export`);
+          }
         } else {
           journalEntries.push({
             date: txnDate,
@@ -243,6 +344,24 @@ async function processBalanceTransaction(
             debit: new Decimal(0),
             credit: balanceTxn.gross.abs(),
             memo: `Refund Clearing - Order ${balanceTxn.sourceOrderId || 'Unknown'}`,
+          });
+
+          // NEW: Add enriched transaction even if order not found
+          enrichedTransactions.push({
+            balanceTransaction: {
+              id: balanceTxn.id,
+              type: balanceTxn.type,
+              sourceOrderId: balanceTxn.sourceOrderId,
+              processedAt: balanceTxn.processedAt,
+              net: balanceTxn.net,
+              fee: balanceTxn.fee,
+              gross: balanceTxn.gross,
+            },
+            payout: {
+              id: payout.id,
+              date: payout.date,
+              amount: payout.amount,
+            },
           });
         }
       }

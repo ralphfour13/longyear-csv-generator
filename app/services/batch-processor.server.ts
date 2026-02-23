@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import type { ExportHistoryEntry, ReconciliationResult, JournalEntry } from '../types/journal-entry';
+import type { ExportHistoryEntry, ReconciliationResult, JournalEntry, EnrichedTransaction, GeneratedFile } from '../types/journal-entry';
 import { fetchPayouts } from './shopify/payout-fetcher.server';
 import { fetchOrdersByDateRange } from './shopify/order-fetcher.server';
 import { reconcilePayout } from './reconciler.server';
@@ -9,6 +9,10 @@ import { getAccountMappings, getShopConfig } from './storage.server';
 import { randomUUID } from 'crypto';
 import { logError, logWarning, logInfo } from './error-logger.server';
 import { validateExportRequest, validateEntriesBalanceToPayout } from './validator.server';
+import { generateDailySalesReport } from './daily-sales-report-generator.server';
+import { generatePayoutsWithOrders } from './payouts-with-orders-generator.server';
+import { writeFile } from 'fs/promises';
+import { join } from 'path';
 
 /**
  * Process payouts and generate CSV export
@@ -53,6 +57,7 @@ export async function processExport(
     await logInfo(shop, 'Export', `Found ${payouts.length} payouts in wider range`);
 
     const allJournalEntries: JournalEntry[] = [];
+    const allEnrichedTransactions: EnrichedTransaction[] = []; // NEW: Collect enriched transactions
     const allErrors: string[] = [];
     const allWarnings: string[] = [];
 
@@ -72,6 +77,7 @@ export async function processExport(
         const result = await reconcilePayout(shop, accessToken, payout, targetDate);
 
         allJournalEntries.push(...result.journalEntries);
+        allEnrichedTransactions.push(...result.enrichedTransactions); // NEW: Collect enriched transactions
         allErrors.push(...result.errors);
         allWarnings.push(...result.warnings);
 
@@ -108,37 +114,103 @@ export async function processExport(
       allErrors.push(...validationErrors);
     }
 
-    // Step 5: Generate detailed journal entries CSV
-    await logInfo(shop, 'Export', 'Generating detailed journal entries CSV...');
-    const filename = generateFilename(targetDate, targetDate);
-    const filePath = await generateCSV(shop, mappedEntries, filename);
+    // Step 5: Generate three files with error isolation
+    await logInfo(shop, 'Export', 'Generating export files...');
+    const generatedFiles: GeneratedFile[] = [];
 
-    console.log(`✅ Detailed CSV created at: ${filePath}`);
-    await logInfo(shop, 'Export', `Detailed CSV saved to: ${filePath}`);
-
-    // Step 5b: Generate daily summary (always, since always single date)
-    await logInfo(shop, 'Export', 'Generating daily summary...');
-
-    const { generateDailySummary } = await import('./daily-summary-generator.server');
-
-    let summaryFilename: string | undefined;
+    // File #1: Daily Sales Report
+    await logInfo(shop, 'Export', 'Generating Daily Sales Report...');
     try {
-      const summaryPath = await generateDailySummary(
-        shop,
-        mappedEntries,
-        targetDate,
-        { includeFees: true, includePayouts: false }
-      );
+      const dailySalesFilename = `daily-sales-report_${targetDate}.csv`;
+      const dailySalesContent = generateDailySalesReport(allEnrichedTransactions, targetDate);
+      const dailySalesPath = await saveCSVFile(shop, dailySalesContent, dailySalesFilename);
 
-      summaryFilename = `daily-sales-report_${targetDate}.csv`;
-      console.log(`✅ Daily summary created: ${summaryFilename}`);
-      await logInfo(shop, 'Export', `Daily summary saved: ${summaryFilename}`);
+      const rowCount = dailySalesContent.split('\n').length - 2; // Subtract header and totals row
+      generatedFiles.push({
+        type: 'daily-sales',
+        filename: dailySalesFilename,
+        downloadUrl: `/api/download-csv?shop=${shop}&filename=${dailySalesFilename}`,
+        rowCount,
+      });
+
+      console.log(`✅ Daily Sales Report created: ${dailySalesFilename} (${rowCount} rows)`);
+      await logInfo(shop, 'Export', `Daily Sales Report saved: ${dailySalesFilename}`);
     } catch (error) {
-      const errorMsg = `Daily summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
-      console.error('❌ Daily summary error:', error);
+      const errorMsg = `Daily Sales Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('❌ Daily Sales Report error:', error);
       await logError(shop, 'Export', errorMsg);
-      // Add error to warnings so user sees it
       allWarnings.push(errorMsg);
+
+      generatedFiles.push({
+        type: 'daily-sales',
+        filename: `daily-sales-report_${targetDate}.csv`,
+        downloadUrl: '',
+        rowCount: 0,
+        error: errorMsg,
+      });
+    }
+
+    // File #2: Payouts with Orders
+    await logInfo(shop, 'Export', 'Generating Payouts with Orders...');
+    try {
+      const payoutsFilename = `payouts-with-orders_${targetDate}.txt`;
+      const payoutsContent = generatePayoutsWithOrders(allEnrichedTransactions);
+      const payoutsPath = await saveCSVFile(shop, payoutsContent, payoutsFilename);
+
+      const rowCount = payoutsContent.split('\n').length - 1; // Subtract header row
+      generatedFiles.push({
+        type: 'payouts-orders',
+        filename: payoutsFilename,
+        downloadUrl: `/api/download-csv?shop=${shop}&filename=${payoutsFilename}`,
+        rowCount,
+      });
+
+      console.log(`✅ Payouts with Orders created: ${payoutsFilename} (${rowCount} rows)`);
+      await logInfo(shop, 'Export', `Payouts with Orders saved: ${payoutsFilename}`);
+    } catch (error) {
+      const errorMsg = `Payouts with Orders generation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('❌ Payouts with Orders error:', error);
+      await logError(shop, 'Export', errorMsg);
+      allWarnings.push(errorMsg);
+
+      generatedFiles.push({
+        type: 'payouts-orders',
+        filename: `payouts-with-orders_${targetDate}.txt`,
+        downloadUrl: '',
+        rowCount: 0,
+        error: errorMsg,
+      });
+    }
+
+    // File #3: Journal Entries (existing format for Sage 50 import)
+    await logInfo(shop, 'Export', 'Generating Journal Entry Summary...');
+    const journalEntriesFilename = `journal-entries_${targetDate}.txt`;
+    let journalEntriesPath: string;
+    try {
+      journalEntriesPath = await generateCSV(shop, mappedEntries, journalEntriesFilename);
+
+      generatedFiles.push({
+        type: 'journal-entries',
+        filename: journalEntriesFilename,
+        downloadUrl: `/api/download-csv?shop=${shop}&filename=${journalEntriesFilename}`,
+        rowCount: mappedEntries.length,
+      });
+
+      console.log(`✅ Journal Entry Summary created: ${journalEntriesFilename} (${mappedEntries.length} rows)`);
+      await logInfo(shop, 'Export', `Journal Entry Summary saved: ${journalEntriesFilename}`);
+    } catch (error) {
+      const errorMsg = `Journal Entry Summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('❌ Journal Entry Summary error:', error);
+      await logError(shop, 'Export', errorMsg);
+      allErrors.push(errorMsg);
+
+      generatedFiles.push({
+        type: 'journal-entries',
+        filename: journalEntriesFilename,
+        downloadUrl: '',
+        rowCount: 0,
+        error: errorMsg,
+      });
     }
 
     // Step 6: Calculate totals
@@ -155,24 +227,21 @@ export async function processExport(
     const exportEntry: ExportHistoryEntry = {
       id: randomUUID(),
       date: targetDate,
-      filename,
+      filename: journalEntriesFilename, // Keep for backward compatibility
+      files: generatedFiles, // NEW: Include all generated files
       entryCount: mappedEntries.length,
       totalDebit,
       totalCredit,
       balanced: totalDebit.equals(totalCredit),
       createdAt: new Date().toISOString(),
-      downloadUrl: `/api/download-csv?shop=${shop}&filename=${filename}`,
+      downloadUrl: `/api/download-csv?shop=${shop}&filename=${journalEntriesFilename}`, // Keep for backward compatibility
     };
 
-    // Add summary filename to metadata if generated
-    if (summaryFilename) {
-      (exportEntry as any).summaryFilename = summaryFilename;
-    }
-
-    await logInfo(shop, 'Export', `Export complete: ${filename}`, {
+    await logInfo(shop, 'Export', `Export complete: ${generatedFiles.length} files generated`, {
       entryCount: mappedEntries.length,
       balanced: totalDebit.equals(totalCredit),
       targetDate,
+      files: generatedFiles.map(f => f.filename),
     });
 
     if (allErrors.length > 0) {
@@ -385,4 +454,30 @@ function formatDate(isoDate: string): string {
   const year = date.getFullYear();
 
   return `${month}/${day}/${year}`;
+}
+
+/**
+ * Save CSV content to file
+ *
+ * @param shop - Shop domain
+ * @param content - CSV content
+ * @param filename - Filename for the CSV
+ * @returns File path
+ */
+async function saveCSVFile(
+  shop: string,
+  content: string,
+  filename: string
+): Promise<string> {
+  // Use the same storage location as existing CSV generator
+  const exportDir = process.env.EXPORT_DIR || join(process.cwd(), 'exports', shop);
+
+  // Create directory if it doesn't exist
+  const fs = await import('fs/promises');
+  await fs.mkdir(exportDir, { recursive: true });
+
+  const filePath = join(exportDir, filename);
+  await writeFile(filePath, content, 'utf-8');
+
+  return filePath;
 }

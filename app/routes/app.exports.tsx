@@ -51,8 +51,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return Response.json({
         success: true,
         message: 'Export completed successfully',
-        filename: result.filename,
-        summaryFilename: (result as any).summaryFilename,
+        filename: result.filename, // Keep for backward compatibility
+        files: result.files, // NEW: Include all generated files
         entryCount: result.entryCount,
         balanced: result.balanced,
       });
@@ -94,51 +94,51 @@ export default function Exports() {
         <s-banner tone="success" style={{ marginBottom: '20px' }}>
           <s-stack direction="block" gap="base">
             <s-text variant="headingSm">{actionData.message}</s-text>
-            {actionData.filename && (
+            {actionData.files && actionData.files.length > 0 && (
               <s-stack direction="block" gap="tight">
-                <s-stack direction="inline" gap="tight" alignItems="center">
-                  <s-text variant="bodySm"><strong>Detailed Journal Entries:</strong></s-text>
-                  <button
-                    onClick={() => handleDownload(actionData.filename)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--p-color-text-link)',
-                      textDecoration: 'underline',
-                      cursor: 'pointer',
-                      padding: 0,
-                      font: 'inherit',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {actionData.filename}
-                  </button>
-                  <s-text>
-                    ({actionData.entryCount} entries, {actionData.balanced ? '✓ balanced' : '✗ unbalanced'})
-                  </s-text>
-                </s-stack>
+                {actionData.files.map((file: any) => {
+                  // Get file type label
+                  let label = '';
+                  let description = '';
+                  if (file.type === 'daily-sales') {
+                    label = 'Daily Sales Report';
+                    description = `${file.rowCount} transaction rows`;
+                  } else if (file.type === 'payouts-orders') {
+                    label = 'Payouts with Orders';
+                    description = `${file.rowCount} order rows`;
+                  } else if (file.type === 'journal-entries') {
+                    label = 'Journal Entry Summary';
+                    description = `${file.rowCount} entries, ${actionData.balanced ? '✓ balanced' : '✗ unbalanced'}`;
+                  }
 
-                {actionData.summaryFilename && (
-                  <s-stack direction="inline" gap="tight" alignItems="center">
-                    <s-text variant="bodySm"><strong>Daily Summary:</strong></s-text>
-                    <button
-                      onClick={() => handleDownload(actionData.summaryFilename)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--p-color-text-link)',
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                        padding: 0,
-                        font: 'inherit',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {actionData.summaryFilename}
-                    </button>
-                    <s-text>(rolled up by account)</s-text>
-                  </s-stack>
-                )}
+                  return (
+                    <s-stack key={file.type} direction="inline" gap="tight" alignItems="center">
+                      <s-text variant="bodySm"><strong>{label}:</strong></s-text>
+                      {file.error ? (
+                        <s-text tone="critical">{file.error}</s-text>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleDownload(file.filename)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--p-color-text-link)',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              padding: 0,
+                              font: 'inherit',
+                              fontWeight: 500,
+                            }}
+                          >
+                            {file.filename}
+                          </button>
+                          <s-text>({description})</s-text>
+                        </>
+                      )}
+                    </s-stack>
+                  );
+                })}
               </s-stack>
             )}
           </s-stack>
@@ -193,9 +193,11 @@ export default function Exports() {
               <s-text variant="headingSm">How it works</s-text>
               <s-stack direction="block" gap="tight">
                 <s-text>1. Select the date (transactions captured on this day)</s-text>
-                <s-text>2. Click "Generate CSV" to create journal entries</s-text>
-                <s-text>3. Download both files: detailed entries + daily summary</s-text>
-                <s-text>4. Import into Sage 50 using Journal Entry import feature</s-text>
+                <s-text>2. Click "Generate CSV" to create three export files:</s-text>
+                <s-text style={{ paddingLeft: '20px' }}>• Daily Sales Report - Transaction-level detail for bookkeeping</s-text>
+                <s-text style={{ paddingLeft: '20px' }}>• Payouts with Orders - Reconciliation view of payout breakdown</s-text>
+                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry Summary - Import into Sage 50</s-text>
+                <s-text>3. Download all three files for complete audit trail</s-text>
               </s-stack>
             </s-stack>
           </s-box>
