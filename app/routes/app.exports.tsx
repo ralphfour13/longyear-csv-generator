@@ -28,15 +28,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const action = formData.get('action');
 
   if (action === 'export') {
-    const startDate = formData.get('startDate') as string;
-    const endDate = formData.get('endDate') as string;
+    const dateParam = formData.get('date');
 
-    if (!startDate || !endDate) {
+    if (!dateParam || typeof dateParam !== 'string') {
       return Response.json(
-        { success: false, error: 'Start and end dates are required' },
+        { success: false, error: 'Export date is required' },
         { status: 400 }
       );
     }
+
+    const date = dateParam;
 
     try {
       const { processExport } = await import('../services/batch-processor.server');
@@ -44,8 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const result = await processExport(
         shop,
         session.accessToken,
-        startDate,
-        endDate
+        date
       );
 
       return Response.json({
@@ -154,52 +154,31 @@ export default function Exports() {
       <s-section heading="Generate New Export">
         <s-stack direction="block" gap="large">
           <s-paragraph>
-            Select a date range to export journal entries. The export uses payout-first reconciliation to ensure perfect balance.
+            Select a date to export journal entries for charges captured on that day.
           </s-paragraph>
 
           <Form method="post">
             <input type="hidden" name="action" value="export" />
 
             <s-stack direction="block" gap="base">
-              <s-stack direction="inline" gap="base" style={{ width: '100%' }}>
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                  <s-stack direction="block" gap="tight">
-                    <s-text variant="bodySm">Start Date</s-text>
-                    <input
-                      type="date"
-                      name="startDate"
-                      defaultValue={defaultDate}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        border: '1px solid var(--p-color-border)',
-                        borderRadius: 'var(--p-border-radius-200)',
-                        fontSize: '14px',
-                      }}
-                    />
-                  </s-stack>
-                </div>
-
-                <div style={{ flex: 1, minWidth: '200px' }}>
-                  <s-stack direction="block" gap="tight">
-                    <s-text variant="bodySm">End Date</s-text>
-                    <input
-                      type="date"
-                      name="endDate"
-                      defaultValue={defaultDate}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        border: '1px solid var(--p-color-border)',
-                        borderRadius: 'var(--p-border-radius-200)',
-                        fontSize: '14px',
-                      }}
-                    />
-                  </s-stack>
-                </div>
-              </s-stack>
+              <div style={{ maxWidth: '300px' }}>
+                <s-stack direction="block" gap="tight">
+                  <s-text variant="bodySm">Export Date</s-text>
+                  <input
+                    type="date"
+                    name="date"
+                    defaultValue={defaultDate}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid var(--p-color-border)',
+                      borderRadius: 'var(--p-border-radius-200)',
+                      fontSize: '14px',
+                    }}
+                  />
+                </s-stack>
+              </div>
 
               <div>
                 <s-button type="submit" variant="primary" loading={isExporting ? true : undefined}>
@@ -213,9 +192,9 @@ export default function Exports() {
             <s-stack direction="block" gap="base">
               <s-text variant="headingSm">How it works</s-text>
               <s-stack direction="block" gap="tight">
-                <s-text>1. Select date range (payouts that hit your bank during this period)</s-text>
-                <s-text>2. Click "Generate CSV" to start payout-first reconciliation</s-text>
-                <s-text>3. Download the generated CSV file</s-text>
+                <s-text>1. Select the date (transactions captured on this day)</s-text>
+                <s-text>2. Click "Generate CSV" to create journal entries</s-text>
+                <s-text>3. Download both files: detailed entries + daily summary</s-text>
                 <s-text>4. Import into Sage 50 using Journal Entry import feature</s-text>
               </s-stack>
             </s-stack>

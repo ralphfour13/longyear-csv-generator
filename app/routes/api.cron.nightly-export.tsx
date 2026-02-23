@@ -42,13 +42,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         if (config.syncEnabled && config.syncSchedule === 'nightly') {
           await logInfo(shop, 'Cron', 'Processing nightly export');
 
-          const { startDate, endDate } = calculateExportDates(config.autoExportDate);
+          const { startDate } = calculateExportDates(config.autoExportDate);
 
           const result = await processExport(
             shop,
             session.accessToken!,
-            startDate,
-            endDate
+            startDate
           );
 
           results.push({

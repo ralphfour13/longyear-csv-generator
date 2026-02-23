@@ -5,7 +5,7 @@ import { processExport } from '../services/batch-processor.server';
 /**
  * API endpoint for manual CSV export
  *
- * POST or GET /api/manual-export?startDate=2024-01-15&endDate=2024-01-15
+ * POST or GET /api/manual-export?date=2024-01-15
  */
 
 // Handle both GET and POST
@@ -17,31 +17,30 @@ async function handleExport(request: Request) {
     // Get access token
     const accessToken = session.accessToken;
 
-    // Get date parameters from URL
+    // Get date parameter from URL
     const url = new URL(request.url);
-    const startDate = url.searchParams.get('startDate');
-    const endDate = url.searchParams.get('endDate');
+    const date = url.searchParams.get('date');
 
-    if (!startDate || !endDate) {
+    if (!date) {
       return Response.json(
-        { error: 'Missing required parameters: startDate and endDate' },
+        { error: 'Missing required parameter: date' },
         { status: 400 }
       );
     }
 
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+    if (!dateRegex.test(date)) {
       return Response.json(
         { error: 'Invalid date format. Use YYYY-MM-DD' },
         { status: 400 }
       );
     }
 
-    console.log(`Manual export requested for ${shop} from ${startDate} to ${endDate}`);
+    console.log(`Manual export requested for ${shop} for date ${date}`);
 
     // Process export
-    const result = await processExport(shop, accessToken, startDate, endDate);
+    const result = await processExport(shop, accessToken, date);
 
     return Response.json({
       success: true,

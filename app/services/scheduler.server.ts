@@ -130,12 +130,12 @@ async function executeScheduledExport(
     const accessToken = await getAccessToken(shop);
 
     // Calculate export dates based on config
-    const { startDate, endDate } = calculateExportDates(config.autoExportDate);
+    const { startDate } = calculateExportDates(config.autoExportDate);
 
-    console.log(`Exporting data for ${shop} from ${startDate} to ${endDate}`);
+    console.log(`Exporting data for ${shop} for date ${startDate}`);
 
     // Process export
-    const result = await processExport(shop, accessToken, startDate, endDate);
+    const result = await processExport(shop, accessToken, startDate);
 
     const endTime = new Date();
     const duration = (endTime.getTime() - startTime.getTime()) / 1000;

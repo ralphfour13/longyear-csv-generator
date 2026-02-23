@@ -15,11 +15,14 @@ import { fetchOrderTransactions } from './shopify/transaction-fetcher.server';
  *
  * CRITICAL: Each SO- reference MUST balance internally (debits = credits)
  * AR debit MUST equal the sum of Sales + Tax + Shipping credits
+ *
+ * @param targetDate - Optional: filter transactions to this capture date (YYYY-MM-DD)
  */
 export async function reconcilePayout(
   shop: string,
   accessToken: string,
-  payout: Payout
+  payout: Payout,
+  targetDate?: string
 ): Promise<ReconciliationResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -35,11 +38,26 @@ export async function reconcilePayout(
 
     console.log(`Found ${balanceTransactions.length} balance transactions`);
 
+    // Filter by target date if provided (filter by capture date)
+    const filteredTransactions = targetDate
+      ? balanceTransactions.filter((txn) => {
+          const txnDate = formatDateOnly(txn.processedAt);
+          return txnDate === targetDate;
+        })
+      : balanceTransactions;
+
+    if (targetDate && filteredTransactions.length < balanceTransactions.length) {
+      console.log(
+        `Filtered to ${filteredTransactions.length} transactions matching ${targetDate} ` +
+        `(${balanceTransactions.length - filteredTransactions.length} excluded)`
+      );
+    }
+
     // Track processed orders to prevent duplicates
     // (multiple balance transactions can reference the same order)
     const processedOrderIds = new Set<string>();
 
-    for (const balanceTxn of balanceTransactions) {
+    for (const balanceTxn of filteredTransactions) {
       try {
         await processBalanceTransaction(
           shop,
@@ -547,4 +565,16 @@ function formatDate(isoDate: string): string {
   const year = date.getFullYear();
 
   return `${month}/${day}/${year}`;
+}
+
+/**
+ * Extract date-only portion from ISO timestamp (YYYY-MM-DD)
+ * Used for filtering transactions by capture date
+ */
+function formatDateOnly(isoTimestamp: string): string {
+  const date = new Date(isoTimestamp);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }

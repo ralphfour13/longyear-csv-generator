@@ -14,108 +14,76 @@ import { validateExportRequest, validateEntriesBalanceToPayout } from './validat
  * Process payouts and generate CSV export
  *
  * This is the main orchestration function that:
- * 1. Fetches payouts for the date range
- * 2. Reconciles each payout (payout-first)
- * 3. Applies account mappings
- * 4. Generates CSV file
+ * 1. Fetches payouts from wider date range (target date +/- 60 days)
+ * 2. Filters balance transactions by processedAt matching target date
+ * 3. Reconciles filtered transactions (capture-date based)
+ * 4. Applies account mappings
+ * 5. Generates CSV file
  *
  * @param shop - Shop domain
  * @param accessToken - Shopify access token
- * @param startDate - Start date (YYYY-MM-DD)
- * @param endDate - End date (YYYY-MM-DD)
+ * @param targetDate - Target date (YYYY-MM-DD) - exports charges captured on this date
  * @returns Export history entry with download info
  */
 export async function processExport(
   shop: string,
   accessToken: string,
-  startDate: string,
-  endDate: string
+  targetDate: string
 ): Promise<ExportHistoryEntry> {
-  await logInfo(shop, 'Export', `Starting export from ${startDate} to ${endDate}`);
+  await logInfo(shop, 'Export', `Starting export for ${targetDate} (by capture date)`);
 
   try {
     // Step 0: Validate request
     const config = await getShopConfig(shop);
     const mappings = await getAccountMappings(shop);
 
-    const validation = validateExportRequest(startDate, endDate, config, mappings);
+    const validation = validateExportRequest(targetDate, targetDate, config, mappings);
     if (!validation.valid) {
       const errorMsg = `Validation failed: ${validation.errors.map(e => e.message).join(', ')}`;
       await logError(shop, 'Export Validation', errorMsg, validation.errors);
       throw new Error(errorMsg);
     }
 
-    // Step 1: Fetch all payouts for date range
-    await logInfo(shop, 'Export', 'Fetching payouts...');
-    const payouts = await fetchPayouts(shop, accessToken, startDate, endDate);
-    await logInfo(shop, 'Export', `Found ${payouts.length} payouts`);
+    // Step 1: Fetch payouts from wider date range (target +/- 60 days)
+    const lookbackDate = calculateDateOffset(targetDate, -60);
+    const lookforwardDate = calculateDateOffset(targetDate, +60);
+
+    await logInfo(shop, 'Export', `Fetching payouts from ${lookbackDate} to ${lookforwardDate}...`);
+    const payouts = await fetchPayouts(shop, accessToken, lookbackDate, lookforwardDate);
+    await logInfo(shop, 'Export', `Found ${payouts.length} payouts in wider range`);
 
     const allJournalEntries: JournalEntry[] = [];
     const allErrors: string[] = [];
     const allWarnings: string[] = [];
 
     if (payouts.length === 0) {
-      // No payouts found - fall back to order-based export
-      await logWarning(shop, 'Export', `No payouts found for ${startDate} to ${endDate}, using order-based export`);
+      const errorMsg = `No payouts found in range ${lookbackDate} to ${lookforwardDate}. Cannot generate entries for ${targetDate}.`;
+      await logError(shop, 'Export', errorMsg);
+      throw new Error(errorMsg);
+    }
 
-      await logInfo(shop, 'Export', 'Fetching orders directly...');
-      const orders = await fetchOrdersByDateRange(shop, accessToken, startDate, endDate);
-      await logInfo(shop, 'Export', `Found ${orders.length} orders`);
+    // Step 2: Reconcile each payout, filtering transactions by target date
+    await logInfo(shop, 'Export', `Filtering transactions to ${targetDate} capture date...`);
 
-      if (orders.length === 0) {
-        const errorMsg = `No orders found for date range ${startDate} to ${endDate}`;
-        await logWarning(shop, 'Export', errorMsg);
-        throw new Error(errorMsg);
-      }
+    for (const payout of payouts) {
+      try {
+        await logInfo(shop, 'Reconcile', `Processing payout ${payout.id} (${payout.amount.toFixed(2)} ${payout.currency})`);
 
-      // Create SO- entries for each order
-      for (const order of orders) {
-        try {
-          const entries = createOrderEntriesFromOrder(order, allErrors);
-          allJournalEntries.push(...entries);
-        } catch (error) {
-          const errorMsg = `Failed to create entries for order ${order.name}: ${
-            error instanceof Error ? error.message : String(error)
-          }`;
-          await logError(shop, 'Export', errorMsg);
-          allErrors.push(errorMsg);
+        const result = await reconcilePayout(shop, accessToken, payout, targetDate);
+
+        allJournalEntries.push(...result.journalEntries);
+        allErrors.push(...result.errors);
+        allWarnings.push(...result.warnings);
+
+        if (!result.balanced) {
+          await logWarning(shop, 'Reconcile', `Filtered entries from payout ${payout.id} not balanced`);
         }
-      }
-    } else {
-      // Step 2: Reconcile each payout (normal payout-based export)
-      await logInfo(shop, 'Export', 'Reconciling payouts...');
-
-      for (const payout of payouts) {
-        try {
-          await logInfo(shop, 'Reconcile', `Processing payout ${payout.id} (${payout.amount.toFixed(2)} ${payout.currency})`);
-
-          const result = await reconcilePayout(shop, accessToken, payout);
-
-          // Validate that entries balance to payout
-          const balanceValidation = validateEntriesBalanceToPayout(
-            result.journalEntries,
-            payout.amount
-          );
-
-          if (!balanceValidation.valid) {
-            await logWarning(shop, 'Reconcile', `Payout ${payout.id} validation failed`, balanceValidation.errors);
-            allWarnings.push(...balanceValidation.errors.map(e => e.message));
-          }
-
-          allJournalEntries.push(...result.journalEntries);
-          allErrors.push(...result.errors);
-          allWarnings.push(...result.warnings);
-
-          if (!result.balanced) {
-            await logWarning(shop, 'Reconcile', `Payout ${payout.id} is not balanced!`);
-          }
-        } catch (error) {
-          const errorMsg = `Failed to reconcile payout ${payout.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`;
-          await logError(shop, 'Reconcile', errorMsg);
-          allErrors.push(errorMsg);
-        }
+      } catch (error) {
+        const errorMsg = `Failed to reconcile payout ${payout.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        await logError(shop, 'Reconcile', errorMsg);
+        allErrors.push(errorMsg);
       }
     }
 
@@ -142,37 +110,35 @@ export async function processExport(
 
     // Step 5: Generate detailed journal entries CSV
     await logInfo(shop, 'Export', 'Generating detailed journal entries CSV...');
-    const filename = generateFilename(startDate, endDate);
+    const filename = generateFilename(targetDate, targetDate);
     const filePath = await generateCSV(shop, mappedEntries, filename);
 
     console.log(`✅ Detailed CSV created at: ${filePath}`);
     await logInfo(shop, 'Export', `Detailed CSV saved to: ${filePath}`);
 
-    // Step 5b: Generate daily summary (if single date)
+    // Step 5b: Generate daily summary (always, since always single date)
+    await logInfo(shop, 'Export', 'Generating daily summary...');
+
+    const { generateDailySummary } = await import('./daily-summary-generator.server');
+
     let summaryFilename: string | undefined;
-    if (startDate === endDate) {
-      await logInfo(shop, 'Export', 'Generating daily summary...');
+    try {
+      const summaryPath = await generateDailySummary(
+        shop,
+        mappedEntries,
+        targetDate,
+        { includeFees: true, includePayouts: false }
+      );
 
-      const { generateDailySummary } = await import('./daily-summary-generator.server');
-
-      try {
-        const summaryPath = await generateDailySummary(
-          shop,
-          mappedEntries,
-          startDate,
-          { includeFees: true, includePayouts: true }
-        );
-
-        summaryFilename = `daily-sales-report_${startDate}.csv`;
-        console.log(`✅ Daily summary created: ${summaryFilename}`);
-        await logInfo(shop, 'Export', `Daily summary saved: ${summaryFilename}`);
-      } catch (error) {
-        const errorMsg = `Daily summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
-        console.error('❌ Daily summary error:', error);
-        await logError(shop, 'Export', errorMsg);
-        // Add error to warnings so user sees it
-        allWarnings.push(errorMsg);
-      }
+      summaryFilename = `daily-sales-report_${targetDate}.csv`;
+      console.log(`✅ Daily summary created: ${summaryFilename}`);
+      await logInfo(shop, 'Export', `Daily summary saved: ${summaryFilename}`);
+    } catch (error) {
+      const errorMsg = `Daily summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.error('❌ Daily summary error:', error);
+      await logError(shop, 'Export', errorMsg);
+      // Add error to warnings so user sees it
+      allWarnings.push(errorMsg);
     }
 
     // Step 6: Calculate totals
@@ -188,7 +154,7 @@ export async function processExport(
     // Step 7: Create export history entry
     const exportEntry: ExportHistoryEntry = {
       id: randomUUID(),
-      date: startDate,
+      date: targetDate,
       filename,
       entryCount: mappedEntries.length,
       totalDebit,
@@ -206,6 +172,7 @@ export async function processExport(
     await logInfo(shop, 'Export', `Export complete: ${filename}`, {
       entryCount: mappedEntries.length,
       balanced: totalDebit.equals(totalCredit),
+      targetDate,
     });
 
     if (allErrors.length > 0) {
@@ -284,6 +251,18 @@ function formatDateISO(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Calculate date offset (add/subtract days)
+ * @param dateStr - Date string in YYYY-MM-DD format
+ * @param days - Number of days to add (positive) or subtract (negative)
+ * @returns New date string in YYYY-MM-DD format
+ */
+function calculateDateOffset(dateStr: string, days: number): string {
+  const date = new Date(dateStr);
+  date.setDate(date.getDate() + days);
+  return formatDateISO(date);
 }
 
 /**
