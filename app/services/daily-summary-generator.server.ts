@@ -147,12 +147,10 @@ export async function generateDailySummary(
 
 /**
  * Generate CSV string from summary lines
+ * Note: No header row - Sage 50 expects data rows only
  */
 function generateSummaryCSV(lines: DailySummaryLine[]): string {
-  // Header
-  const header = 'seq,date,GEN,INV,,account,amount\n';
-
-  // Rows
+  // No header - Sage 50 import format doesn't use headers
   const rows = lines
     .map((line) => {
       return [
@@ -167,7 +165,7 @@ function generateSummaryCSV(lines: DailySummaryLine[]): string {
     })
     .join('\n');
 
-  return header + rows;
+  return rows;
 }
 
 /**

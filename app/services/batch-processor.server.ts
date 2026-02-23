@@ -167,8 +167,11 @@ export async function processExport(
         console.log(`✅ Daily summary created: ${summaryFilename}`);
         await logInfo(shop, 'Export', `Daily summary saved: ${summaryFilename}`);
       } catch (error) {
-        console.warn('Failed to generate daily summary:', error);
-        await logWarning(shop, 'Export', `Daily summary generation failed: ${error instanceof Error ? error.message : String(error)}`);
+        const errorMsg = `Daily summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error('❌ Daily summary error:', error);
+        await logError(shop, 'Export', errorMsg);
+        // Add error to warnings so user sees it
+        allWarnings.push(errorMsg);
       }
     }
 
