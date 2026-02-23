@@ -29,11 +29,11 @@ RUN npm run build
 RUN mkdir -p /app/data && chmod 777 /app/data
 
 # Expose port
-EXPOSE 3000
+EXPOSE 80
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s \
-  CMD node -e "require('http').get('http://localhost:3000/healthz', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"
+  CMD node -e "require('http').get('http://localhost:80/healthz', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"
 
 # Start the server
 CMD ["npm", "run", "docker-start"]
