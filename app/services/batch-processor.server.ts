@@ -1,6 +1,7 @@
 import { Decimal } from 'decimal.js';
-import type { ExportHistoryEntry, ReconciliationResult } from '../types/journal-entry';
+import type { ExportHistoryEntry, ReconciliationResult, JournalEntry } from '../types/journal-entry';
 import { fetchPayouts } from './shopify/payout-fetcher.server';
+import { fetchOrdersByDateRange } from './shopify/order-fetcher.server';
 import { reconcilePayout } from './reconciler.server';
 import { applyAccountMappings } from './account-mapper.server';
 import { generateCSV, generateFilename, validateEntries } from './csv-generator.server';
@@ -49,48 +50,72 @@ export async function processExport(
     const payouts = await fetchPayouts(shop, accessToken, startDate, endDate);
     await logInfo(shop, 'Export', `Found ${payouts.length} payouts`);
 
-    if (payouts.length === 0) {
-      const errorMsg = `No payouts found for date range ${startDate} to ${endDate}`;
-      await logWarning(shop, 'Export', errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    // Step 2: Reconcile each payout
-    await logInfo(shop, 'Export', 'Reconciling payouts...');
-    const allJournalEntries = [];
+    const allJournalEntries: JournalEntry[] = [];
     const allErrors: string[] = [];
     const allWarnings: string[] = [];
 
-    for (const payout of payouts) {
-      try {
-        await logInfo(shop, 'Reconcile', `Processing payout ${payout.id} (${payout.amount.toFixed(2)} ${payout.currency})`);
+    if (payouts.length === 0) {
+      // No payouts found - fall back to order-based export
+      await logWarning(shop, 'Export', `No payouts found for ${startDate} to ${endDate}, using order-based export`);
 
-        const result = await reconcilePayout(shop, accessToken, payout);
+      await logInfo(shop, 'Export', 'Fetching orders directly...');
+      const orders = await fetchOrdersByDateRange(shop, accessToken, startDate, endDate);
+      await logInfo(shop, 'Export', `Found ${orders.length} orders`);
 
-        // Validate that entries balance to payout
-        const balanceValidation = validateEntriesBalanceToPayout(
-          result.journalEntries,
-          payout.amount
-        );
+      if (orders.length === 0) {
+        const errorMsg = `No orders found for date range ${startDate} to ${endDate}`;
+        await logWarning(shop, 'Export', errorMsg);
+        throw new Error(errorMsg);
+      }
 
-        if (!balanceValidation.valid) {
-          await logWarning(shop, 'Reconcile', `Payout ${payout.id} validation failed`, balanceValidation.errors);
-          allWarnings.push(...balanceValidation.errors.map(e => e.message));
+      // Create SO- entries for each order
+      for (const order of orders) {
+        try {
+          const entries = createOrderEntriesFromOrder(order, allErrors);
+          allJournalEntries.push(...entries);
+        } catch (error) {
+          const errorMsg = `Failed to create entries for order ${order.name}: ${
+            error instanceof Error ? error.message : String(error)
+          }`;
+          await logError(shop, 'Export', errorMsg);
+          allErrors.push(errorMsg);
         }
+      }
+    } else {
+      // Step 2: Reconcile each payout (normal payout-based export)
+      await logInfo(shop, 'Export', 'Reconciling payouts...');
 
-        allJournalEntries.push(...result.journalEntries);
-        allErrors.push(...result.errors);
-        allWarnings.push(...result.warnings);
+      for (const payout of payouts) {
+        try {
+          await logInfo(shop, 'Reconcile', `Processing payout ${payout.id} (${payout.amount.toFixed(2)} ${payout.currency})`);
 
-        if (!result.balanced) {
-          await logWarning(shop, 'Reconcile', `Payout ${payout.id} is not balanced!`);
+          const result = await reconcilePayout(shop, accessToken, payout);
+
+          // Validate that entries balance to payout
+          const balanceValidation = validateEntriesBalanceToPayout(
+            result.journalEntries,
+            payout.amount
+          );
+
+          if (!balanceValidation.valid) {
+            await logWarning(shop, 'Reconcile', `Payout ${payout.id} validation failed`, balanceValidation.errors);
+            allWarnings.push(...balanceValidation.errors.map(e => e.message));
+          }
+
+          allJournalEntries.push(...result.journalEntries);
+          allErrors.push(...result.errors);
+          allWarnings.push(...result.warnings);
+
+          if (!result.balanced) {
+            await logWarning(shop, 'Reconcile', `Payout ${payout.id} is not balanced!`);
+          }
+        } catch (error) {
+          const errorMsg = `Failed to reconcile payout ${payout.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`;
+          await logError(shop, 'Reconcile', errorMsg);
+          allErrors.push(errorMsg);
         }
-      } catch (error) {
-        const errorMsg = `Failed to reconcile payout ${payout.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`;
-        await logError(shop, 'Reconcile', errorMsg);
-        allErrors.push(errorMsg);
       }
     }
 
@@ -256,4 +281,124 @@ function formatDateISO(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Create journal entries directly from an order (without balance transaction)
+ * Used when generating order-based exports without payouts
+ */
+function createOrderEntriesFromOrder(
+  order: any,
+  errors: string[]
+): JournalEntry[] {
+  const entries: JournalEntry[] = [];
+  const orderDate = formatDate(order.createdAt);
+  const reference = `SO-${order.name}`;
+
+  // AR Debit: What customer actually paid (use CURRENT total for edited orders)
+  const arAmount = order.currentTotalPrice || order.totalPrice;
+
+  entries.push({
+    date: orderDate,
+    reference,
+    account: '1250-00',
+    accountName: 'Shopify Clearing Account',
+    debit: arAmount,
+    credit: new Decimal(0),
+    memo: `Order ${order.name}`,
+  });
+
+  // Calculate GROSS sales (before discounts)
+  const discountAmount = order.currentTotalDiscounts || order.totalDiscounts || new Decimal(0);
+
+  let grossSales: Decimal;
+  if (order.currentSubtotalPrice) {
+    // For edited orders: NET + Discount = GROSS
+    grossSales = order.currentSubtotalPrice.plus(discountAmount);
+  } else {
+    // For standard orders: sum line item prices (GROSS per item)
+    grossSales = order.lineItems.reduce(
+      (sum: Decimal, item: any) => sum.plus(new Decimal(item.price).times(item.quantity)),
+      new Decimal(0)
+    );
+  }
+
+  // Credit: Sales Revenue (GROSS)
+  entries.push({
+    date: orderDate,
+    reference,
+    account: '4000-00',
+    accountName: 'Sales Revenue',
+    debit: new Decimal(0),
+    credit: grossSales,
+    memo: `Sales - Order ${order.name}`,
+  });
+
+  // Debit: Discounts (if any)
+  if (discountAmount.greaterThan(0)) {
+    entries.push({
+      date: orderDate,
+      reference,
+      account: '4050-00',
+      accountName: 'Discounts Given',
+      debit: discountAmount,
+      credit: new Decimal(0),
+      memo: `Discount - Order ${order.name}`,
+    });
+  }
+
+  // Credit: Sales Tax (only if > 0)
+  const taxAmount = order.totalTax || new Decimal(0);
+  if (taxAmount.greaterThan(0)) {
+    entries.push({
+      date: orderDate,
+      reference,
+      account: '2200-00',
+      accountName: 'Sales Tax Payable',
+      debit: new Decimal(0),
+      credit: taxAmount,
+      memo: `Sales Tax - Order ${order.name}`,
+    });
+  }
+
+  // Credit: Shipping Revenue (only if > 0)
+  const shippingAmount = order.totalShipping || new Decimal(0);
+  if (shippingAmount.greaterThan(0)) {
+    entries.push({
+      date: orderDate,
+      reference,
+      account: '4100-00',
+      accountName: 'Shipping Revenue',
+      debit: new Decimal(0),
+      credit: shippingAmount,
+      memo: `Shipping - Order ${order.name}`,
+    });
+  }
+
+  // Validation
+  const totalDebits = arAmount.plus(discountAmount);
+  const totalCredits = grossSales.plus(taxAmount).plus(shippingAmount);
+  const diff = totalDebits.minus(totalCredits).abs();
+  const isBalanced = diff.lessThanOrEqualTo(new Decimal('0.01'));
+
+  if (!isBalanced) {
+    const errorMsg = `Order ${order.name} IMBALANCE: ` +
+      `Debits=${totalDebits.toFixed(2)}, Credits=${totalCredits.toFixed(2)} ` +
+      `(diff=${totalDebits.minus(totalCredits).toFixed(2)})`;
+    errors.push(errorMsg);
+  }
+
+  return entries;
+}
+
+/**
+ * Format date for journal entries (MM/DD/YYYY)
+ */
+function formatDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+
+  return `${month}/${day}/${year}`;
 }
