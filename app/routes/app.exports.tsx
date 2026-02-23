@@ -106,7 +106,7 @@ export default function Exports() {
           {actionData.filename && (
             <div style={{ marginTop: '8px' }}>
               <a
-                href={`/app/api/download-csv?shop=${shop}&filename=${actionData.filename}`}
+                href={`/api/download-csv?shop=${shop}&filename=${actionData.filename}`}
                 download
                 style={{
                   color: '#155724',
@@ -271,7 +271,7 @@ export default function Exports() {
                   </td>
                   <td style={{ padding: '12px', textAlign: 'center' }}>
                     <a
-                      href={`/app/api/download-csv?shop=${shop}&filename=${exp.filename}`}
+                      href={`/api/download-csv?shop=${shop}&filename=${exp.filename}`}
                       download
                       style={{
                         padding: '6px 12px',
