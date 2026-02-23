@@ -18,8 +18,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return new Response('Missing shop or filename parameter', { status: 400 });
     }
 
-    // Validate filename (only allow CSV files, no path traversal)
-    if (!filename.endsWith('.csv') || filename.includes('..') || filename.includes('/')) {
+    // Validate filename (only allow CSV and TXT files, no path traversal)
+    const validExtensions = ['.csv', '.txt'];
+    const hasValidExtension = validExtensions.some(ext => filename.endsWith(ext));
+
+    if (!hasValidExtension || filename.includes('..') || filename.includes('/')) {
       return new Response('Invalid filename', { status: 400 });
     }
 
