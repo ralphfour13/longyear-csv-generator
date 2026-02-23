@@ -177,13 +177,26 @@ export interface TransactionFee {
 export interface ExportHistoryEntry {
   id: string; // Unique ID
   date: string; // Export date (ISO)
-  filename: string; // CSV filename
+  filename: string; // CSV filename (DEPRECATED: use files array)
+  files: GeneratedFile[]; // NEW: Array of generated files
   entryCount: number; // Number of journal entries
   totalDebit: Decimal; // Total debit amount
   totalCredit: Decimal; // Total credit amount
   balanced: boolean; // Whether debits = credits
   createdAt: string; // ISO timestamp
-  downloadUrl: string; // URL to download CSV
+  downloadUrl: string; // URL to download CSV (DEPRECATED: use files array)
+}
+
+/**
+ * Generated File
+ * Metadata for a single generated file in multi-file export
+ */
+export interface GeneratedFile {
+  type: 'daily-sales' | 'payouts-orders' | 'journal-entries';
+  filename: string;
+  downloadUrl: string;
+  rowCount: number;
+  error?: string; // If generation failed
 }
 
 /**
@@ -203,11 +216,73 @@ export interface ExportRequest {
 export interface ReconciliationResult {
   payout: Payout;
   journalEntries: JournalEntry[];
+  enrichedTransactions: EnrichedTransaction[]; // NEW: For multi-file export
   totalDebit: Decimal;
   totalCredit: Decimal;
   balanced: boolean; // true if totalDebit === totalCredit === payout.amount
   errors: string[];
   warnings: string[];
+}
+
+/**
+ * Enriched Transaction
+ * Combines balance transaction, order, and enriched data for multi-file exports
+ */
+export interface EnrichedTransaction {
+  // From balance transaction
+  balanceTransaction: {
+    id: string;
+    type: string;
+    sourceOrderId?: string;
+    processedAt: string; // Capture date
+    net: Decimal;
+    fee: Decimal;
+    gross: Decimal;
+  };
+
+  // From order (if applicable)
+  order?: {
+    id: string;
+    name: string;
+    createdAt: string;
+    currentTotalPrice: Decimal;
+    totalTax: Decimal;
+    totalShipping: Decimal;
+    totalDiscounts: Decimal;
+    financialStatus: string;
+  };
+
+  // Enriched data for Daily Sales Report
+  enrichedData?: {
+    tags: string;
+    taxLines: Array<{ title: string; rate: string; price: Decimal }>;
+    shippingAddress: { address1: string; address2: string; zip: string; city: string };
+    transactions: Array<{
+      kind: string;
+      processedAt: string;
+      amount: Decimal;
+      gateway: string;
+      paymentMethod?: string;
+    }>;
+    paymentBreakdown: {
+      cash: Decimal;
+      charge: Decimal;
+      giftCard: Decimal;
+      storeCredit: Decimal;
+      check: Decimal;
+      card: Decimal;
+    };
+    fulfillmentStatus: string;
+    financialStatus: string;
+    totalRefunded: Decimal;
+  };
+
+  // Payout context
+  payout: {
+    id: string;
+    date: string;
+    amount: Decimal;
+  };
 }
 
 /**
