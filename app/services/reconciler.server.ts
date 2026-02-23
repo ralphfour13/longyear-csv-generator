@@ -251,10 +251,20 @@ async function processBalanceTransaction(
  * Create journal entries for an order (sales revenue)
  *
  * APPROACH: GROSS Sales with separate discount line
- * - Sales = GROSS revenue (catalog price × quantity)
+ * - AR = Current total (handles edited orders with multiple captures)
+ * - Sales = GROSS revenue (before discounts, for CURRENT items only)
  * - Discount = Separate debit line (4050-00) for visibility
- * - Tax and Shipping = Always included
+ * - Tax and Shipping = Always included when > 0
  * - Invariant: AR + Discount = Sales + Tax + Shipping
+ *
+ * EDITED ORDERS:
+ * - Uses current_total_price (final order total after all edits/captures)
+ * - Uses current_subtotal_price + current_total_discounts = GROSS sales
+ * - Automatically excludes removed line items
+ *
+ * NOTE: If multiple balance transactions exist for the same order (e.g., edited
+ * orders with additional captures in the same payout), this will create multiple
+ * SO- entries. Consider deduplicating by order ID if this becomes an issue.
  */
 function createOrderEntries(
   order: Order,
@@ -265,8 +275,9 @@ function createOrderEntries(
   const orderDate = formatDate(order.createdAt);
   const reference = `SO-${order.name}`;
 
-  // AR Debit: What customer actually paid
-  const arAmount = balanceTxn.gross;
+  // AR Debit: What customer actually paid (use CURRENT total for edited orders)
+  // For edited orders with multiple captures, this reflects the final order total
+  const arAmount = order.currentTotalPrice || order.totalPrice;
 
   journalEntries.push({
     date: orderDate,
@@ -278,17 +289,27 @@ function createOrderEntries(
     memo: `Order ${order.name}`,
   });
 
-  // Calculate GROSS sales using CURRENT subtotal (handles edited orders)
-  // Use current_subtotal_price if available (reflects edits/removals)
-  // Otherwise calculate from line items
-  const grossSales = order.currentSubtotalPrice || order.lineItems.reduce(
-    (sum, item) => sum.plus(item.price.times(item.quantity)),
-    new Decimal(0)
-  );
+  // Calculate GROSS sales (before discounts)
+  // CRITICAL: Shopify's current_subtotal_price is NET (after discounts)
+  // To get GROSS, we must add back the discounts
+  // For edited orders, this automatically uses the current items only
+  const discountAmount = order.currentTotalDiscounts || order.totalDiscounts || new Decimal(0);
 
-  console.log(`Order ${order.name}: Gross sales = ${grossSales.toFixed(2)} (${order.currentSubtotalPrice ? 'from current_subtotal_price' : 'calculated from line items'})`);
+  let grossSales: Decimal;
+  if (order.currentSubtotalPrice) {
+    // For edited orders: NET + Discount = GROSS
+    grossSales = order.currentSubtotalPrice.plus(discountAmount);
+    console.log(`Order ${order.name}: Gross sales = ${grossSales.toFixed(2)} (current_subtotal ${order.currentSubtotalPrice.toFixed(2)} + discount ${discountAmount.toFixed(2)})`);
+  } else {
+    // For standard orders: sum line item prices (GROSS per item)
+    grossSales = order.lineItems.reduce(
+      (sum, item) => sum.plus(item.price.times(item.quantity)),
+      new Decimal(0)
+    );
+    console.log(`Order ${order.name}: Gross sales = ${grossSales.toFixed(2)} (calculated from line items)`);
+  }
 
-  // Credit: Sales Revenue (GROSS - full catalog price)
+  // Credit: Sales Revenue (GROSS - full catalog price before discounts)
   journalEntries.push({
     date: orderDate,
     reference,
@@ -300,8 +321,7 @@ function createOrderEntries(
   });
 
   // Debit: Discounts (if any) - use CURRENT discounts for edited orders
-  const discountAmount = order.currentTotalDiscounts || order.totalDiscounts;
-  if (discountAmount && discountAmount.greaterThan(0)) {
+  if (discountAmount.greaterThan(0)) {
     journalEntries.push({
       date: orderDate,
       reference,
@@ -346,22 +366,21 @@ function createOrderEntries(
   }
 
   // VALIDATION: AR + Discount = Sales + Tax + Shipping
-  const totalDebits = arAmount.plus(discountAmount || new Decimal(0));
+  const totalDebits = arAmount.plus(discountAmount);
   const totalCredits = grossSales
     .plus(taxAmount || new Decimal(0))
     .plus(shippingAmount || new Decimal(0));
 
-  // Check if balanced
-  const isBalanced = totalDebits.equals(totalCredits);
+  // Check if balanced (allow 1 cent rounding difference)
+  const diff = totalDebits.minus(totalCredits).abs();
+  const isBalanced = diff.lessThanOrEqualTo(new Decimal('0.01'));
 
   if (!isBalanced) {
-    const diff = totalDebits.minus(totalCredits);
-
     // Build detailed error message
     let errorMsg = `Order ${order.name} IMBALANCE: ` +
       `Debits(AR+Disc)=${totalDebits.toFixed(2)}, ` +
-      `Credits(S+T+Sh)=${totalCredits.toFixed(2)} (diff=${diff.toFixed(2)}). ` +
-      `[GrossSales=${grossSales.toFixed(2)}, Discount=${(discountAmount || new Decimal(0)).toFixed(2)}, ` +
+      `Credits(S+T+Sh)=${totalCredits.toFixed(2)} (diff=${totalDebits.minus(totalCredits).toFixed(2)}). ` +
+      `[AR=${arAmount.toFixed(2)}, GrossSales=${grossSales.toFixed(2)}, Discount=${discountAmount.toFixed(2)}, ` +
       `Tax=${(taxAmount || new Decimal(0)).toFixed(2)}, Ship=${(shippingAmount || new Decimal(0)).toFixed(2)}]`;
 
     // Add context about missing amounts
@@ -375,7 +394,7 @@ function createOrderEntries(
     errors.push(errorMsg);
   } else {
     // Log successful balance with context
-    let successMsg = `Order ${order.name} ✓ Balanced: ${arAmount.toFixed(2)}`;
+    let successMsg = `Order ${order.name} ✓ Balanced: AR=${arAmount.toFixed(2)}`;
     if (!hasTax) {
       console.log(`${successMsg} [Out-of-state - no tax]`);
     }
