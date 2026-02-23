@@ -115,13 +115,37 @@ export async function processExport(
       allErrors.push(...validationErrors);
     }
 
-    // Step 5: Generate CSV
-    await logInfo(shop, 'Export', 'Generating CSV...');
+    // Step 5: Generate detailed journal entries CSV
+    await logInfo(shop, 'Export', 'Generating detailed journal entries CSV...');
     const filename = generateFilename(startDate, endDate);
     const filePath = await generateCSV(shop, mappedEntries, filename);
 
-    console.log(`✅ CSV file created at: ${filePath}`);
-    await logInfo(shop, 'Export', `CSV file saved to: ${filePath}`);
+    console.log(`✅ Detailed CSV created at: ${filePath}`);
+    await logInfo(shop, 'Export', `Detailed CSV saved to: ${filePath}`);
+
+    // Step 5b: Generate daily summary (if single date)
+    let summaryFilename: string | undefined;
+    if (startDate === endDate) {
+      await logInfo(shop, 'Export', 'Generating daily summary...');
+
+      const { generateDailySummary } = await import('./daily-summary-generator.server');
+
+      try {
+        const summaryPath = await generateDailySummary(
+          shop,
+          mappedEntries,
+          startDate,
+          { includeFees: true, includePayouts: true }
+        );
+
+        summaryFilename = `daily-sales-report_${startDate}.csv`;
+        console.log(`✅ Daily summary created: ${summaryFilename}`);
+        await logInfo(shop, 'Export', `Daily summary saved: ${summaryFilename}`);
+      } catch (error) {
+        console.warn('Failed to generate daily summary:', error);
+        await logWarning(shop, 'Export', `Daily summary generation failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
 
     // Step 6: Calculate totals
     const totalDebit = mappedEntries.reduce(
@@ -143,8 +167,13 @@ export async function processExport(
       totalCredit,
       balanced: totalDebit.equals(totalCredit),
       createdAt: new Date().toISOString(),
-      downloadUrl: `/app/api/download-csv?shop=${shop}&filename=${filename}`,
+      downloadUrl: `/api/download-csv?shop=${shop}&filename=${filename}`,
     };
+
+    // Add summary filename to metadata if generated
+    if (summaryFilename) {
+      (exportEntry as any).summaryFilename = summaryFilename;
+    }
 
     await logInfo(shop, 'Export', `Export complete: ${filename}`, {
       entryCount: mappedEntries.length,
