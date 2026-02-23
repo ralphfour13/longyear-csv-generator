@@ -129,11 +129,12 @@ export default function Exports() {
                               padding: 0,
                               font: 'inherit',
                               fontWeight: 500,
+                              marginLeft: '4px',
                             }}
                           >
                             {file.filename}
                           </button>
-                          <s-text>({description})</s-text>
+                          <s-text style={{ marginLeft: '4px' }}>({description})</s-text>
                         </>
                       )}
                     </s-stack>
