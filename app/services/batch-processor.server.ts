@@ -214,7 +214,7 @@ export async function processExport(
 
     // File #4: Journal Entry Summary (one line per account for Sage 50 import)
     await logInfo(shop, 'Export', 'Generating Journal Entry Summary...');
-    const journalEntrySummaryFilename = `journal-entry_${targetDate}.txt`;
+    const journalEntrySummaryFilename = `journal-entry_${targetDate}.csv`;
     try {
       // Format date for summary (MM/DD/YYYY)
       const [year, month, day] = targetDate.split('-');
