@@ -1,14 +1,15 @@
-import type { ActionFunctionArgs } from 'react-router';
-// import { json } from 'react-router';
+import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { authenticate } from '../shopify.server';
 import { processExport } from '../services/batch-processor.server';
 
 /**
  * API endpoint for manual CSV export
  *
- * POST /app/api/manual-export?startDate=2024-01-15&endDate=2024-01-15
+ * POST or GET /api/manual-export?startDate=2024-01-15&endDate=2024-01-15
  */
-export const action = async ({ request }: ActionFunctionArgs) => {
+
+// Handle both GET and POST
+async function handleExport(request: Request) {
   try {
     const { session, admin } = await authenticate.admin(request);
     const shop = session.shop;
@@ -62,4 +63,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { status: 500 }
     );
   }
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  return handleExport(request);
+};
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+  return handleExport(request);
 };
