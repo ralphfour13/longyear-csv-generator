@@ -6,7 +6,8 @@ import { writeExport } from './storage.server';
 /**
  * Generate CSV file in Sage 50 format
  *
- * Format: Date, Reference, Account, Debit, Credit, Memo
+ * Format: Date, Reference, Account, Amount, Memo
+ * Amount convention: Positive = Debit, Negative = Credit
  *
  * @param shop - Shop domain
  * @param entries - Journal entries to export
@@ -18,15 +19,21 @@ export async function generateCSV(
   entries: JournalEntry[],
   filename: string
 ): Promise<string> {
-  // Convert entries to CSV format
-  const csvRecords = entries.map((entry) => ({
-    Date: entry.date,
-    Reference: entry.reference,
-    Account: entry.account,
-    Debit: formatAmount(entry.debit),
-    Credit: formatAmount(entry.credit),
-    Memo: entry.memo,
-  }));
+  // Convert entries to CSV format with signed amounts
+  const csvRecords = entries.map((entry) => {
+    // Calculate signed amount: positive for debit, negative for credit
+    const amount = entry.debit.greaterThan(0)
+      ? entry.debit
+      : entry.credit.neg();
+
+    return {
+      Date: entry.date,
+      Reference: entry.reference,
+      Account: entry.account,
+      Amount: formatAmount(amount),
+      Memo: entry.memo,
+    };
+  });
 
   // Generate CSV string
   const csvContent = await generateCSVString(csvRecords);
@@ -45,13 +52,12 @@ async function generateCSVString(
     Date: string;
     Reference: string;
     Account: string;
-    Debit: string;
-    Credit: string;
+    Amount: string;
     Memo: string;
   }>
 ): Promise<string> {
   // Build CSV manually for simple format
-  const header = 'Date,Reference,Account,Debit,Credit,Memo\n';
+  const header = 'Date,Reference,Account,Amount,Memo\n';
 
   const rows = records
     .map((record) => {
@@ -59,8 +65,7 @@ async function generateCSVString(
         record.Date,
         escapeCsvValue(record.Reference),
         record.Account,
-        record.Debit,
-        record.Credit,
+        record.Amount,
         escapeCsvValue(record.Memo),
       ].join(',');
     })
@@ -117,20 +122,19 @@ export function validateEntries(entries: JournalEntry[]): string[] {
     return errors;
   }
 
-  // Calculate totals
-  const totalDebit = entries.reduce(
-    (sum, entry) => sum.plus(entry.debit),
-    new Decimal(0)
-  );
-  const totalCredit = entries.reduce(
-    (sum, entry) => sum.plus(entry.credit),
-    new Decimal(0)
-  );
+  // Calculate total signed amount (positive=debit, negative=credit)
+  const totalAmount = entries.reduce((sum, entry) => {
+    const amount = entry.debit.greaterThan(0)
+      ? entry.debit
+      : entry.credit.neg();
+    return sum.plus(amount);
+  }, new Decimal(0));
 
-  // Check if balanced
-  if (!totalDebit.equals(totalCredit)) {
+  // Check if balanced (sum of signed amounts should equal zero)
+  const tolerance = new Decimal('0.02'); // Allow 2 cent tolerance for rounding
+  if (totalAmount.abs().greaterThan(tolerance)) {
     errors.push(
-      `Journal entries do not balance: Debit ${totalDebit.toFixed(2)} != Credit ${totalCredit.toFixed(2)}`
+      `Journal entries do not balance: Total amount = ${totalAmount.toFixed(2)} (should be 0.00)`
     );
   }
 
