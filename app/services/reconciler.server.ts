@@ -225,10 +225,11 @@ async function processBalanceTransaction(
 /**
  * Create journal entries for an order (sales revenue)
  *
- * APPROACH: NET Sales (Option A from feedback)
- * - Sales = Net revenue (after discounts)
- * - NO separate discount line
- * - AR = Sales + Tax + Shipping (simple and always balances)
+ * APPROACH: GROSS Sales with separate discount line
+ * - Sales = GROSS revenue (catalog price × quantity)
+ * - Discount = Separate debit line (4050-00) for visibility
+ * - Tax and Shipping = Always included
+ * - Invariant: AR + Discount = Sales + Tax + Shipping
  */
 function createOrderEntries(
   order: Order,
@@ -239,7 +240,7 @@ function createOrderEntries(
   const orderDate = formatDate(order.createdAt);
   const reference = `SO-${order.name}`;
 
-  // AR Debit: What customer actually paid (from balance transaction gross)
+  // AR Debit: What customer actually paid
   const arAmount = balanceTxn.gross;
 
   journalEntries.push({
@@ -252,21 +253,39 @@ function createOrderEntries(
     memo: `Order ${order.name}`,
   });
 
-  // Credit: Sales Revenue (NET - after discounts)
-  // This is the revenue amount that actually matters for accounting
-  const netSales = order.subtotalPrice.minus(order.totalDiscounts);
+  // Calculate GROSS sales from line items (catalog price × quantity)
+  // This is BEFORE any discounts are applied
+  const grossSales = order.lineItems.reduce(
+    (sum, item) => sum.plus(item.price.times(item.quantity)),
+    new Decimal(0)
+  );
+
+  // Credit: Sales Revenue (GROSS - full catalog price)
   journalEntries.push({
     date: orderDate,
     reference,
     account: '4000-00',
     accountName: 'Sales Revenue',
     debit: new Decimal(0),
-    credit: netSales,
+    credit: grossSales,
     memo: `Sales - Order ${order.name}`,
   });
 
-  // Credit: Sales Tax (from order.totalTax)
-  // ALWAYS create if amount exists, even if zero
+  // Debit: Discounts (if any) - contra-revenue for visibility
+  const discountAmount = order.totalDiscounts;
+  if (discountAmount && discountAmount.greaterThan(0)) {
+    journalEntries.push({
+      date: orderDate,
+      reference,
+      account: '4050-00',
+      accountName: 'Discounts Given',
+      debit: discountAmount,
+      credit: new Decimal(0),
+      memo: `Discount - Order ${order.name}`,
+    });
+  }
+
+  // Credit: Sales Tax (ALWAYS create if > 0)
   const taxAmount = order.totalTax;
   if (taxAmount && taxAmount.greaterThan(0)) {
     journalEntries.push({
@@ -280,8 +299,7 @@ function createOrderEntries(
     });
   }
 
-  // Credit: Shipping Revenue (from order.totalShipping)
-  // ALWAYS create if amount exists, even if zero
+  // Credit: Shipping Revenue (ALWAYS create if > 0)
   const shippingAmount = order.totalShipping;
   if (shippingAmount && shippingAmount.greaterThan(0)) {
     journalEntries.push({
@@ -295,22 +313,19 @@ function createOrderEntries(
     });
   }
 
-  // NO DISCOUNT LINE - discounts are already subtracted from sales above
-  // This implements NET sales approach (Option A)
-
-  // VALIDATION: AR should equal Net Sales + Tax + Shipping
-  const salesTaxShipping = netSales
+  // VALIDATION: AR + Discount = Sales + Tax + Shipping
+  const totalDebits = arAmount.plus(discountAmount || new Decimal(0));
+  const totalCredits = grossSales
     .plus(taxAmount || new Decimal(0))
     .plus(shippingAmount || new Decimal(0));
 
-  if (!arAmount.equals(salesTaxShipping)) {
-    const diff = arAmount.minus(salesTaxShipping);
+  if (!totalDebits.equals(totalCredits)) {
+    const diff = totalDebits.minus(totalCredits);
     errors.push(
-      `Order ${order.name} IMBALANCE: AR=${arAmount.toFixed(2)}, ` +
-      `Sales+Tax+Ship=${salesTaxShipping.toFixed(2)} (diff=${diff.toFixed(2)}). ` +
-      `[NetSales=${netSales.toFixed(2)}, Tax=${(taxAmount || new Decimal(0)).toFixed(2)}, ` +
-      `Ship=${(shippingAmount || new Decimal(0)).toFixed(2)}, ` +
-      `Discount=${order.totalDiscounts.toFixed(2)} already subtracted from sales]`
+      `Order ${order.name} IMBALANCE: ` +
+      `AR+Disc=${totalDebits.toFixed(2)}, Sales+Tax+Ship=${totalCredits.toFixed(2)} (diff=${diff.toFixed(2)}). ` +
+      `[GrossSales=${grossSales.toFixed(2)}, Discount=${(discountAmount || new Decimal(0)).toFixed(2)}, ` +
+      `Tax=${(taxAmount || new Decimal(0)).toFixed(2)}, Ship=${(shippingAmount || new Decimal(0)).toFixed(2)}]`
     );
   }
 }
