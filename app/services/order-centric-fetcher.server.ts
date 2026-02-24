@@ -128,6 +128,19 @@ export async function fetchOrdersByCaptureDateRange(
   }
 
   console.log(`Fetched ${orders.length} total orders with activity in date range`);
+  console.log(`\nFetched order details:`);
+  for (const order of orders) {
+    const captureCount = order.transactions?.filter(
+      (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
+    ).length || 0;
+    const refundCount = order.transactions?.filter(
+      (txn) => txn.kind === 'refund' && txn.status === 'success'
+    ).length || 0;
+    console.log(
+      `  ${order.name}: ${captureCount} capture(s), ${refundCount} refund(s), ` +
+      `created: ${order.createdAt}, financial: ${order.financialStatus}`
+    );
+  }
 
   return orders;
 }
@@ -402,12 +415,17 @@ export function filterOrderTransactionsByDate(
  */
 export function getOrderCaptureDate(order: Order): string | null {
   if (!order.transactions || order.transactions.length === 0) {
+    console.log(`    [getOrderCaptureDate] No transactions for order ${order.name}`);
     return null;
   }
 
   // Find all successful capture/sale transactions
   const captureTransactions = order.transactions.filter(
     (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
+  );
+
+  console.log(
+    `    [getOrderCaptureDate] Order ${order.name}: ${captureTransactions.length} capture(s) out of ${order.transactions.length} total txns`
   );
 
   if (captureTransactions.length === 0) {
@@ -421,7 +439,12 @@ export function getOrderCaptureDate(order: Order): string | null {
     return txnDate > latestDate ? txn : latest;
   });
 
-  return formatDateOnly(latestCapture.processedAt);
+  const captureDate = formatDateOnly(latestCapture.processedAt);
+  console.log(
+    `    [getOrderCaptureDate] Latest capture: ${latestCapture.processedAt} → ${captureDate} (Pacific)`
+  );
+
+  return captureDate;
 }
 
 /**

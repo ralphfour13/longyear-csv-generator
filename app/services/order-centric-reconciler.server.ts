@@ -74,6 +74,7 @@ export async function reconcileOrdersByDate(
     );
 
     console.log(`Found ${orders.length} orders with activity in date range`);
+    console.log(`Order names: ${orders.slice(0, 10).map(o => o.name).join(', ')}${orders.length > 10 ? '...' : ''}`);
 
     let ordersProcessed = 0;
     let capturesProcessed = 0;
@@ -82,18 +83,22 @@ export async function reconcileOrdersByDate(
     // Process each order
     for (const order of orders) {
       try {
+        console.log(`\n--- Evaluating order ${order.name} (ID: ${order.id}) ---`);
+
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
         // Check this BEFORE capture logic to catch refund-only transactions
         const allCaptureTransactions = order.transactions?.filter(
           (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
         ) || [];
 
+        console.log(`  Capture transactions found: ${allCaptureTransactions.length}`);
+
         if (allCaptureTransactions.length === 0) {
           // No captures - check if this is a refund-only order
           const refundTransactions = filterRefundTransactions(order, targetDate);
           if (refundTransactions.length > 0) {
             console.log(
-              `Processing refund-only order ${order.name} with ${refundTransactions.length} refund(s)`
+              `  ✓ Processing refund-only order ${order.name} with ${refundTransactions.length} refund(s)`
             );
 
             await processOrderRefunds(
@@ -109,6 +114,8 @@ export async function reconcileOrdersByDate(
 
             processedOrderIds.add(order.id);
             ordersProcessed++;
+          } else {
+            console.log(`  ✗ SKIP: No captures and no refunds on target date`);
           }
           // Skip to next order (either processed refunds or nothing to do)
           continue;
@@ -118,14 +125,18 @@ export async function reconcileOrdersByDate(
         // This ensures split-payment orders post as a complete unit (all legs balance)
         const lastCaptureDate = getOrderCaptureDate(order);
 
+        console.log(`  Last capture date: ${lastCaptureDate}, Target date: ${targetDate}`);
+
         if (!lastCaptureDate) {
           // Should not happen since we checked for captures above, but safety check
+          console.log(`  ✗ SKIP: Could not determine last capture date`);
           continue;
         }
 
         if (lastCaptureDate !== targetDate) {
           // This order's last capture is on a different date, skip for now
           // It will be processed when we run reconciliation for that date
+          console.log(`  ✗ SKIP: Last capture date (${lastCaptureDate}) doesn't match target (${targetDate})`);
           continue;
         }
 
@@ -135,7 +146,7 @@ export async function reconcileOrdersByDate(
 
         // Check if we've already processed this order
         if (processedOrderIds.has(order.id)) {
-          console.log(`Skipping duplicate order ${order.name} (already processed)`);
+          console.log(`  ✗ SKIP: Already processed this order`);
           continue;
         }
 
@@ -149,7 +160,7 @@ export async function reconcileOrdersByDate(
         });
 
         console.log(
-          `Processing order ${order.name} with ${captureTransactions.length} capture(s) ` +
+          `  ✓ PROCESSING order ${order.name} with ${captureTransactions.length} capture(s) ` +
           `(last capture: ${lastCaptureDate}, first capture UTC: ${firstCaptureUTC}, Pacific: ${firstCapturePacific})`
         );
 
