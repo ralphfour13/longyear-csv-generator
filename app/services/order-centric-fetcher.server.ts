@@ -21,18 +21,40 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Add days to a date string (YYYY-MM-DD format)
+ */
+function addDays(dateString: string, days: number): string {
+  const date = new Date(dateString);
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Retry configuration for API calls
  */
 const MAX_RETRIES = 5;
 const BASE_RETRY_DELAY = 500; // Start with 500ms delay
 
 /**
- * Fetch orders by capture date range
+ * Fetch orders by capture date range using dual-query strategy
+ *
+ * Uses BOTH created_at and updated_at queries to ensure comprehensive coverage:
+ * - Query 1 (created_at): Catches orders created near target date (uses full buffer)
+ * - Query 2 (updated_at): Catches orders with recent updates/edits/refunds (tighter window)
+ * - Results are combined and deduplicated by order ID
+ *
+ * This fixes edge cases like order #80819 where:
+ * - Created: 2026-01-18 (Jan 18)
+ * - Captured: 2026-01-18 (Jan 18)
+ * - Updated: 2026-01-21 (Jan 21) - outside single-query window
  *
  * @param shop - Shop domain
  * @param accessToken - Shopify access token
- * @param startDate - Start date (YYYY-MM-DD format)
- * @param endDate - End date (YYYY-MM-DD format)
+ * @param startDate - Start date for created_at buffer (YYYY-MM-DD format, typically targetDate - 2 days)
+ * @param endDate - End date for created_at buffer (YYYY-MM-DD format, typically targetDate + 2 days)
  * @returns Array of orders that had captures in this date range
  */
 export async function fetchOrdersByCaptureDateRange(
@@ -41,25 +63,89 @@ export async function fetchOrdersByCaptureDateRange(
   startDate: string,
   endDate: string
 ): Promise<Order[]> {
-  const orders: Order[] = [];
-  let hasNextPage = true;
-  let pageInfo: string | null = null;
-
+  const orderMap = new Map<string, Order>(); // Deduplicate by order ID
   const baseUrl = `https://${shop}/admin/api/2024-10/orders.json`;
 
-  // Convert YYYY-MM-DD to ISO 8601 with full day range
-  // Using updated_at to ensure we catch all orders that might have been
-  // processed, edited, or have transactions within our date range
-  const startDateTime = `${startDate}T00:00:00Z`;
-  const endDateTime = `${endDate}T23:59:59Z`;
+  // Calculate the midpoint (target date) from the provided range
+  const startTime = new Date(startDate).getTime();
+  const endTime = new Date(endDate).getTime();
+  const midpointTime = (startTime + endTime) / 2;
+  const midpointDate = new Date(midpointTime);
+  const targetDateStr = midpointDate.toISOString().split('T')[0];
 
-  console.log(`Fetching orders with activity between ${startDateTime} and ${endDateTime}`);
+  // Query 1: created_at with full buffer (use provided range)
+  const createdStartDateTime = `${startDate}T00:00:00Z`;
+  const createdEndDateTime = `${endDate}T23:59:59Z`;
+
+  // Query 2: updated_at with ±1 day from target (tighter window)
+  const updatedStartDate = addDays(targetDateStr, -1);
+  const updatedEndDate = addDays(targetDateStr, 1);
+  const updatedStartDateTime = `${updatedStartDate}T00:00:00Z`;
+  const updatedEndDateTime = `${updatedEndDate}T23:59:59Z`;
+
+  console.log(`Fetching orders with activity between ${startDate} and ${endDate}`);
+
+  // QUERY 1: Fetch by created_at (for orders created near target date)
+  await fetchOrdersByDate(
+    baseUrl,
+    shop,
+    accessToken,
+    'created_at_min',
+    'created_at_max',
+    createdStartDateTime,
+    createdEndDateTime,
+    orderMap
+  );
+
+  // QUERY 2: Fetch by updated_at (for orders updated near target date)
+  await fetchOrdersByDate(
+    baseUrl,
+    shop,
+    accessToken,
+    'updated_at_min',
+    'updated_at_max',
+    updatedStartDateTime,
+    updatedEndDateTime,
+    orderMap
+  );
+
+  const orders = Array.from(orderMap.values());
+  console.log(`Fetched ${orders.length} total orders with activity in date range`);
+
+  return orders;
+}
+
+/**
+ * Helper function to fetch orders by a specific date parameter and add to map
+ *
+ * @param baseUrl - Base API URL
+ * @param shop - Shop domain
+ * @param accessToken - Shopify access token
+ * @param minParam - Minimum date parameter name (e.g., 'created_at_min')
+ * @param maxParam - Maximum date parameter name (e.g., 'created_at_max')
+ * @param startDateTime - Start datetime ISO string
+ * @param endDateTime - End datetime ISO string
+ * @param orderMap - Map to store orders (deduplicated by ID)
+ */
+async function fetchOrdersByDate(
+  baseUrl: string,
+  shop: string,
+  accessToken: string,
+  minParam: string,
+  maxParam: string,
+  startDateTime: string,
+  endDateTime: string,
+  orderMap: Map<string, Order>
+): Promise<void> {
+  let hasNextPage = true;
+  let pageInfo: string | null = null;
+  let fetchedCount = 0;
 
   while (hasNextPage) {
     const params = new URLSearchParams({
-      updated_at_min: startDateTime,
-      updated_at_max: endDateTime,
-      status: 'any', // Include all order statuses
+      [minParam]: startDateTime,
+      [maxParam]: endDateTime,
+      status: 'any',
       limit: '250',
     });
 
@@ -87,28 +173,33 @@ export async function fetchOrdersByCaptureDateRange(
       const data = await response.json();
 
       if (data.orders && Array.isArray(data.orders)) {
-        // Fetch transactions for each order and parse
-        // Add rate limiting to stay under Shopify's 4 calls/second limit
+        // Fetch transactions for each order and add to map (deduplicate)
         for (let i = 0; i < data.orders.length; i++) {
           const orderData = data.orders[i];
+
+          // Skip if already in map (deduplicate)
+          if (orderMap.has(orderData.id.toString())) {
+            continue;
+          }
+
           const order = await parseOrderWithTransactions(
             shop,
             accessToken,
             orderData
           );
-          orders.push(order);
 
-          // Rate limiting: Wait 250ms between calls (ensures max 4 calls/second)
-          // Skip delay after last order in batch
+          orderMap.set(order.id, order);
+          fetchedCount++;
+
+          // Rate limiting: Wait 250ms between calls
           if (i < data.orders.length - 1) {
             await sleep(250);
           }
         }
 
-        // Check for Link header for pagination
+        // Check for pagination
         const linkHeader = response.headers.get('Link');
         if (linkHeader && linkHeader.includes('rel="next"')) {
-          // Extract page_info from Link header
           const match = linkHeader.match(/page_info=([^&>]+)/);
           if (match) {
             pageInfo = match[1];
@@ -122,27 +213,15 @@ export async function fetchOrdersByCaptureDateRange(
         hasNextPage = false;
       }
     } catch (error) {
-      console.error('Error fetching orders by capture date range:', error);
+      console.error(`Error fetching orders by ${minParam}:`, error);
       throw error;
     }
   }
 
-  console.log(`Fetched ${orders.length} total orders with activity in date range`);
-  console.log(`\nFetched order details:`);
-  for (const order of orders) {
-    const captureCount = order.transactions?.filter(
-      (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
-    ).length || 0;
-    const refundCount = order.transactions?.filter(
-      (txn) => txn.kind === 'refund' && txn.status === 'success'
-    ).length || 0;
-    console.log(
-      `  ${order.name}: ${captureCount} capture(s), ${refundCount} refund(s), ` +
-      `created: ${order.createdAt}, financial: ${order.financialStatus}`
-    );
+  // Only log if we actually fetched new orders (not duplicates)
+  if (fetchedCount > 0) {
+    console.log(`  + ${fetchedCount} orders from ${minParam.replace('_min', '')} query`);
   }
-
-  return orders;
 }
 
 /**
@@ -415,17 +494,12 @@ export function filterOrderTransactionsByDate(
  */
 export function getOrderCaptureDate(order: Order): string | null {
   if (!order.transactions || order.transactions.length === 0) {
-    console.log(`    [getOrderCaptureDate] No transactions for order ${order.name}`);
     return null;
   }
 
   // Find all successful capture/sale transactions
   const captureTransactions = order.transactions.filter(
     (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
-  );
-
-  console.log(
-    `    [getOrderCaptureDate] Order ${order.name}: ${captureTransactions.length} capture(s) out of ${order.transactions.length} total txns`
   );
 
   if (captureTransactions.length === 0) {
@@ -440,9 +514,6 @@ export function getOrderCaptureDate(order: Order): string | null {
   });
 
   const captureDate = formatDateOnly(latestCapture.processedAt);
-  console.log(
-    `    [getOrderCaptureDate] Latest capture: ${latestCapture.processedAt} → ${captureDate} (Pacific)`
-  );
 
   return captureDate;
 }

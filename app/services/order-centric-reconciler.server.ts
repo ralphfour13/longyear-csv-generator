@@ -61,9 +61,12 @@ export async function reconcileOrdersByDate(
   console.log(`\n=== Order-Centric Reconciliation for ${targetDate} ===`);
 
   try {
-    // Fetch orders with activity in the date range (±1 day buffer)
-    const startDate = addDays(targetDate, -1);
-    const endDate = addDays(targetDate, 1);
+    // Fetch orders with activity in the date range (±2 day buffer for created_at query)
+    // The fetcher uses dual-query strategy:
+    // - created_at: Uses full ±2 day buffer to catch orders created near target date
+    // - updated_at: Uses ±1 day buffer to catch recently modified orders
+    const startDate = addDays(targetDate, -2);
+    const endDate = addDays(targetDate, 2);
 
     console.log(`Fetching orders between ${startDate} and ${endDate}...`);
     const orders = await fetchOrdersByCaptureDateRange(
@@ -74,7 +77,6 @@ export async function reconcileOrdersByDate(
     );
 
     console.log(`Found ${orders.length} orders with activity in date range`);
-    console.log(`Order names: ${orders.slice(0, 10).map(o => o.name).join(', ')}${orders.length > 10 ? '...' : ''}`);
 
     let ordersProcessed = 0;
     let capturesProcessed = 0;
@@ -83,23 +85,17 @@ export async function reconcileOrdersByDate(
     // Process each order
     for (const order of orders) {
       try {
-        console.log(`\n--- Evaluating order ${order.name} (ID: ${order.id}) ---`);
-
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
         // Check this BEFORE capture logic to catch refund-only transactions
         const allCaptureTransactions = order.transactions?.filter(
           (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
         ) || [];
 
-        console.log(`  Capture transactions found: ${allCaptureTransactions.length}`);
-
         if (allCaptureTransactions.length === 0) {
           // No captures - check if this is a refund-only order
           const refundTransactions = filterRefundTransactions(order, targetDate);
           if (refundTransactions.length > 0) {
-            console.log(
-              `  ✓ Processing refund-only order ${order.name} with ${refundTransactions.length} refund(s)`
-            );
+            console.log(`Processing refund-only order ${order.name} (${refundTransactions.length} refund(s))`);
 
             await processOrderRefunds(
               shop,
@@ -114,8 +110,6 @@ export async function reconcileOrdersByDate(
 
             processedOrderIds.add(order.id);
             ordersProcessed++;
-          } else {
-            console.log(`  ✗ SKIP: No captures and no refunds on target date`);
           }
           // Skip to next order (either processed refunds or nothing to do)
           continue;
@@ -125,18 +119,14 @@ export async function reconcileOrdersByDate(
         // This ensures split-payment orders post as a complete unit (all legs balance)
         const lastCaptureDate = getOrderCaptureDate(order);
 
-        console.log(`  Last capture date: ${lastCaptureDate}, Target date: ${targetDate}`);
-
         if (!lastCaptureDate) {
           // Should not happen since we checked for captures above, but safety check
-          console.log(`  ✗ SKIP: Could not determine last capture date`);
           continue;
         }
 
         if (lastCaptureDate !== targetDate) {
           // This order's last capture is on a different date, skip for now
           // It will be processed when we run reconciliation for that date
-          console.log(`  ✗ SKIP: Last capture date (${lastCaptureDate}) doesn't match target (${targetDate})`);
           continue;
         }
 
@@ -146,23 +136,10 @@ export async function reconcileOrdersByDate(
 
         // Check if we've already processed this order
         if (processedOrderIds.has(order.id)) {
-          console.log(`  ✗ SKIP: Already processed this order`);
           continue;
         }
 
-        // Log timezone-aware capture information for debugging
-        const firstCapture = captureTransactions[0];
-        const firstCaptureUTC = new Date(firstCapture.processedAt).toISOString();
-        const firstCapturePacific = new Date(firstCapture.processedAt).toLocaleString('en-US', {
-          timeZone: 'America/Los_Angeles',
-          dateStyle: 'short',
-          timeStyle: 'short',
-        });
-
-        console.log(
-          `  ✓ PROCESSING order ${order.name} with ${captureTransactions.length} capture(s) ` +
-          `(last capture: ${lastCaptureDate}, first capture UTC: ${firstCaptureUTC}, Pacific: ${firstCapturePacific})`
-        );
+        console.log(`Processing order ${order.name} (${captureTransactions.length} capture(s))`);
 
         // Process captures
         await processOrderCaptures(
@@ -386,8 +363,6 @@ async function processOrderRefunds(
   enrichedTransactions: EnrichedTransaction[],
   warnings: string[]
 ): Promise<void> {
-  console.log(`  Processing ${refundTransactions.length} refund(s) for order ${order.name}`);
-
   const formattedDate = formatDate(targetDate);
   const entries = await createRefundJournalEntries(
     shop,
