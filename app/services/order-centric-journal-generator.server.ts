@@ -44,10 +44,7 @@ export async function createOrderJournalEntries(
   const accountMappings = await getAccountMappings(shop);
 
   // DEBITS: One entry per payment method
-  // Calculate total payment amount
-  let totalPayment = new Decimal(0);
   for (const breakdown of paymentBreakdowns) {
-    totalPayment = totalPayment.plus(breakdown.amount);
     entries.push({
       date: targetDate,
       reference,
@@ -59,26 +56,48 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // Calculate sales as: Total Payment - Tax - Shipping
-  // This is the ACTUAL amount that should be recorded as sales revenue
-  // We don't use Shopify's discount fields because they can be stale/incorrect
-  const taxAmount = order.totalTax || new Decimal(0);
-  const shippingAmount = order.totalShipping || new Decimal(0);
-  const salesAmount = totalPayment.minus(taxAmount).minus(shippingAmount);
+  // Calculate GROSS sales (before discounts)
+  const discountAmount = order.currentTotalDiscounts || order.totalDiscounts || new Decimal(0);
 
-  // CREDIT: Sales Revenue (calculated from actual payment)
+  let grossSales: Decimal;
+  if (order.currentSubtotalPrice) {
+    // For edited orders: NET + Discount = GROSS
+    grossSales = order.currentSubtotalPrice.plus(discountAmount);
+  } else {
+    // For standard orders: sum line item prices (GROSS per item)
+    grossSales = order.lineItems.reduce(
+      (sum, item) => sum.plus(item.price.times(item.quantity)),
+      new Decimal(0)
+    );
+  }
+
+  // CREDIT: Sales Revenue (GROSS - full catalog price before discounts)
   entries.push({
     date: targetDate,
     reference,
     account: accountMappings.sales_revenue.accountCode,
     accountName: accountMappings.sales_revenue.accountName,
     debit: new Decimal(0),
-    credit: salesAmount,
+    credit: grossSales,
     memo: `Sales - Order ${order.name}`,
   });
 
+  // DEBIT: Discounts (if any)
+  if (discountAmount.greaterThan(0)) {
+    entries.push({
+      date: targetDate,
+      reference,
+      account: accountMappings.discounts.accountCode,
+      accountName: accountMappings.discounts.accountName,
+      debit: discountAmount,
+      credit: new Decimal(0),
+      memo: `Discount - Order ${order.name}`,
+    });
+  }
+
   // CREDIT: Sales Tax (only if > 0)
-  if (taxAmount.greaterThan(0)) {
+  const taxAmount = order.totalTax;
+  if (taxAmount && taxAmount.greaterThan(0)) {
     entries.push({
       date: targetDate,
       reference,
@@ -91,7 +110,8 @@ export async function createOrderJournalEntries(
   }
 
   // CREDIT: Shipping Revenue (only if > 0)
-  if (shippingAmount.greaterThan(0)) {
+  const shippingAmount = order.totalShipping;
+  if (shippingAmount && shippingAmount.greaterThan(0)) {
     entries.push({
       date: targetDate,
       reference,
