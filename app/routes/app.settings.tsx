@@ -4,18 +4,23 @@ import { authenticate } from '../shopify.server';
 import { getShopConfig, saveShopConfig } from '../services/storage.server';
 import { updateShopSchedule } from '../services/scheduler.server';
 import type { SyncConfig } from '../types/journal-entry';
+import type { Cin7Config } from '../types/cin7';
 import { PrismaSessionStorage } from '@shopify/shopify-app-session-storage-prisma';
 import prisma from '../db.server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getCin7Config, saveCin7Config, testCin7Connection } from '../services/cin7/cin7-credential-manager.server';
+import { cin7Cache } from '../services/cin7/cin7-cache.server';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
   const config = await getShopConfig(shop);
+  const cin7Config = await getCin7Config(shop);
+  const cin7CacheStats = cin7Cache.getStats(shop);
 
-  return Response.json({ shop, config });
+  return Response.json({ shop, config, cin7Config, cin7CacheStats });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -24,6 +29,77 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const formData = await request.formData();
   const actionType = formData.get('actionType') as string;
+
+  // Handle Cin7 test connection
+  if (actionType === 'testCin7Connection') {
+    try {
+      const accountId = formData.get('cin7AccountId') as string;
+      const apiKey = formData.get('cin7ApiKey') as string;
+
+      if (!accountId || !apiKey) {
+        return Response.json(
+          { success: false, error: 'Account ID and API Key are required' },
+          { status: 400 }
+        );
+      }
+
+      const testResult = await testCin7Connection(accountId, apiKey);
+
+      return Response.json({
+        success: testResult.success,
+        message: testResult.message,
+      });
+    } catch (error) {
+      return Response.json(
+        { success: false, error: `Connection test failed: ${error instanceof Error ? error.message : String(error)}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Handle Cin7 clear cache
+  if (actionType === 'clearCin7Cache') {
+    try {
+      cin7Cache.clearShop(shop);
+      return Response.json({
+        success: true,
+        message: 'Cin7 cache cleared successfully',
+      });
+    } catch (error) {
+      return Response.json(
+        { success: false, error: `Failed to clear cache: ${error instanceof Error ? error.message : String(error)}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Handle Cin7 settings save
+  if (actionType === 'saveCin7Settings') {
+    try {
+      const cin7Config: Cin7Config = {
+        enabled: formData.get('cin7Enabled') === 'true',
+        accountId: (formData.get('cin7AccountId') as string) || '',
+        apiKey: (formData.get('cin7ApiKey') as string) || '',
+        cacheEnabled: formData.get('cin7CacheEnabled') === 'true',
+        cacheDurationHours: parseInt(formData.get('cin7CacheDuration') as string) || 24,
+        useFallback: formData.get('cin7UseFallback') === 'true',
+        fallbackCost: (formData.get('cin7FallbackCost') as string) || undefined,
+        lastTested: new Date().toISOString(),
+      };
+
+      await saveCin7Config(shop, cin7Config);
+
+      return Response.json({
+        success: true,
+        message: 'Cin7 settings saved successfully',
+      });
+    } catch (error) {
+      return Response.json(
+        { success: false, error: `Failed to save Cin7 settings: ${error instanceof Error ? error.message : String(error)}` },
+        { status: 500 }
+      );
+    }
+  }
 
   // Handle order debug action
   if (actionType === 'debugOrder') {
@@ -149,7 +225,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Settings() {
-  const { shop, config } = useLoaderData<typeof loader>();
+  const { shop, config, cin7Config, cin7CacheStats } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   const handleDownload = () => {
@@ -343,6 +419,189 @@ export default function Settings() {
           </s-button>
         </div>
       </Form>
+
+      <s-section heading="Cin7 Integration (COGS)">
+        <s-stack direction="block" gap="large">
+          <s-paragraph>
+            Connect to Cin7 Core (Dear Systems) to automatically fetch Cost of Goods Sold (COGS) data for products.
+            Two files will be generated: detailed COGS breakdown and summary entries in journal file.
+          </s-paragraph>
+
+          <Form method="post">
+            <input type="hidden" name="actionType" value="saveCin7Settings" />
+
+            <s-stack direction="block" gap="base">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="cin7Enabled"
+                  value="true"
+                  defaultChecked={cin7Config.enabled}
+                />
+                <s-text>Enable Cin7 COGS integration</s-text>
+              </label>
+
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySm">Cin7 Account ID</s-text>
+                <input
+                  type="text"
+                  name="cin7AccountId"
+                  defaultValue={cin7Config.accountId}
+                  placeholder="Your Cin7 Account ID"
+                  style={{
+                    width: '100%',
+                    maxWidth: '400px',
+                    padding: '10px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-200)',
+                    fontSize: '14px',
+                  }}
+                />
+                <s-text tone="subdued" variant="bodySm">
+                  Found in Cin7 Settings → Integrations → API
+                </s-text>
+              </s-stack>
+
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySm">Cin7 API Key</s-text>
+                <input
+                  type="password"
+                  name="cin7ApiKey"
+                  defaultValue={cin7Config.apiKey}
+                  placeholder="Your Cin7 API Application Key"
+                  style={{
+                    width: '100%',
+                    maxWidth: '400px',
+                    padding: '10px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-200)',
+                    fontSize: '14px',
+                  }}
+                />
+                <s-text tone="subdued" variant="bodySm">
+                  API key is encrypted at rest using AES-256
+                </s-text>
+              </s-stack>
+
+              <div style={{ marginTop: '12px' }}>
+                <s-button type="submit" variant="primary">
+                  Save Cin7 Settings
+                </s-button>
+              </div>
+            </s-stack>
+          </Form>
+
+          <s-divider />
+
+          <s-text variant="headingSm">Test Connection</s-text>
+          <Form method="post">
+            <input type="hidden" name="actionType" value="testCin7Connection" />
+            <input type="hidden" name="cin7AccountId" value={cin7Config.accountId} />
+            <input type="hidden" name="cin7ApiKey" value={cin7Config.apiKey} />
+
+            <s-stack direction="inline" gap="base" align="center">
+              <s-button type="submit">Test Cin7 Connection</s-button>
+              <s-text tone="subdued" variant="bodySm">
+                Last tested: {cin7Config.lastTested ? new Date(cin7Config.lastTested).toLocaleString() : 'Never'}
+              </s-text>
+            </s-stack>
+          </Form>
+
+          <s-divider />
+
+          <s-text variant="headingSm">Advanced Settings</s-text>
+          <Form method="post">
+            <input type="hidden" name="actionType" value="saveCin7Settings" />
+            <input type="hidden" name="cin7Enabled" value={cin7Config.enabled ? 'true' : 'false'} />
+            <input type="hidden" name="cin7AccountId" value={cin7Config.accountId} />
+            <input type="hidden" name="cin7ApiKey" value={cin7Config.apiKey} />
+
+            <s-stack direction="block" gap="base">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="cin7CacheEnabled"
+                  value="true"
+                  defaultChecked={cin7Config.cacheEnabled}
+                />
+                <s-text>Enable COGS caching (24 hours)</s-text>
+              </label>
+
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySm">Cache Duration (hours)</s-text>
+                <input
+                  type="number"
+                  name="cin7CacheDuration"
+                  defaultValue={cin7Config.cacheDurationHours}
+                  min="1"
+                  max="168"
+                  style={{
+                    width: '150px',
+                    padding: '10px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-200)',
+                    fontSize: '14px',
+                  }}
+                />
+              </s-stack>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="cin7UseFallback"
+                  value="true"
+                  defaultChecked={cin7Config.useFallback}
+                />
+                <s-text>Use fallback cost when product not found</s-text>
+              </label>
+
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySm">Fallback COGS (optional)</s-text>
+                <input
+                  type="number"
+                  name="cin7FallbackCost"
+                  defaultValue={cin7Config.fallbackCost || ''}
+                  placeholder="0.00"
+                  step="0.01"
+                  style={{
+                    width: '150px',
+                    padding: '10px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-200)',
+                    fontSize: '14px',
+                  }}
+                />
+                <s-text tone="subdued" variant="bodySm">
+                  Default cost to use when product not found in Cin7
+                </s-text>
+              </s-stack>
+
+              <div style={{ marginTop: '12px' }}>
+                <s-button type="submit">Save Advanced Settings</s-button>
+              </div>
+            </s-stack>
+          </Form>
+
+          <s-divider />
+
+          <s-text variant="headingSm">Cache Statistics</s-text>
+          <s-stack direction="block" gap="tight">
+            <s-text variant="bodySm">
+              Cache Hits: {cin7CacheStats.hits} | Misses: {cin7CacheStats.misses} | Hit Rate: {cin7CacheStats.hitRate}%
+            </s-text>
+            <s-text variant="bodySm">
+              Cached Items: {cin7CacheStats.size}
+            </s-text>
+          </s-stack>
+
+          <Form method="post">
+            <input type="hidden" name="actionType" value="clearCin7Cache" />
+            <s-button type="submit" variant="secondary">
+              Clear COGS Cache
+            </s-button>
+          </Form>
+        </s-stack>
+      </s-section>
 
       <s-section heading="Developer Tools">
         <s-stack direction="block" gap="large">

@@ -3,7 +3,7 @@ import type { ExportHistoryEntry, ReconciliationResult, JournalEntry, EnrichedTr
 import { fetchPayouts } from './shopify/payout-fetcher.server';
 import { fetchOrdersByDateRange } from './shopify/order-fetcher.server';
 import { reconcilePayout } from './reconciler.server';
-import { reconcileOrdersByDate } from './order-centric-reconciler.server'; // NEW: Order-centric reconciler
+import { reconcileOrdersByDate, collectCogsData } from './order-centric-reconciler.server'; // NEW: Order-centric reconciler
 import { applyAccountMappings } from './account-mapper.server';
 import { generateCSV, generateFilename, validateEntries } from './csv-generator.server';
 import { getAccountMappings, getShopConfig, writeExport } from './storage.server';
@@ -13,6 +13,9 @@ import { validateExportRequest, validateEntriesBalanceToPayout } from './validat
 import { generateDailySalesReport } from './daily-sales-report-generator.server';
 import { generatePayoutsWithOrders } from './payouts-with-orders-generator.server';
 import { generateJournalEntrySummary } from './journal-entry-summary-generator.server';
+import { generateCogsDetailCSV } from './cogs/cogs-detail-exporter.server';
+import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
+import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
 
 /**
  * File generation options
@@ -75,8 +78,30 @@ export async function processExport(
     const allEnrichedTransactions: EnrichedTransaction[] = result.enrichedTransactions;
     const allErrors: string[] = result.errors;
     const allWarnings: string[] = result.warnings;
+    const cogsWarnings: string[] = result.cogsWarnings || [];
 
     await logInfo(shop, 'Export', `Reconciled ${result.orderCount} orders with ${result.captureCount} captures`)
+
+    // Step 1.5: Collect COGS data (if Cin7 enabled)
+    const cin7Enabled = await isCin7Enabled(shop);
+    let cogsDataMap = new Map();
+
+    if (cin7Enabled) {
+      await logInfo(shop, 'Export', 'Collecting COGS data from Cin7...');
+      try {
+        // Fetch orders again to get full data (with SKUs)
+        const startDate = addDays(targetDate, -2);
+        const endDate = addDays(targetDate, 2);
+        const orders = await fetchOrdersByCaptureDateRange(shop, accessToken, startDate, endDate);
+
+        cogsDataMap = await collectCogsData(shop, orders);
+        await logInfo(shop, 'Export', `Collected COGS data for ${cogsDataMap.size} orders`);
+      } catch (error) {
+        const errorMsg = `COGS data collection failed: ${error instanceof Error ? error.message : String(error)}`;
+        await logWarning(shop, 'Export', errorMsg);
+        allWarnings.push(errorMsg);
+      }
+    }
 
     if (allJournalEntries.length === 0) {
       const errorMsg = 'No journal entries generated';
@@ -242,6 +267,38 @@ export async function processExport(
     }
     }
 
+    // File #5: COGS Details (if Cin7 enabled and has data)
+    if (cin7Enabled && cogsDataMap.size > 0) {
+      await logInfo(shop, 'Export', 'Generating COGS Details...');
+      try {
+        const cogsDetailsFilename = `cogs-details_${targetDate}.csv`;
+
+        // Get orders for COGS export
+        const startDate = addDays(targetDate, -2);
+        const endDate = addDays(targetDate, 2);
+        const orders = await fetchOrdersByCaptureDateRange(shop, accessToken, startDate, endDate);
+
+        const cogsDetailsContent = generateCogsDetailCSV(orders, cogsDataMap);
+        const cogsDetailsPath = await writeExport(shop, cogsDetailsFilename, cogsDetailsContent);
+
+        const rowCount = cogsDetailsContent.split('\n').length - 1; // Subtract header row
+        generatedFiles.push({
+          type: 'journal-entries-details', // Reuse type or add new 'cogs-details' type
+          filename: cogsDetailsFilename,
+          downloadUrl: `/api/download-csv?shop=${shop}&filename=${cogsDetailsFilename}`,
+          rowCount,
+        });
+
+        console.log(`✅ COGS Details created: ${cogsDetailsFilename} (${rowCount} rows)`);
+        await logInfo(shop, 'Export', `COGS Details saved: ${cogsDetailsFilename}`);
+      } catch (error) {
+        const errorMsg = `COGS Details generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error('❌ COGS Details error:', error);
+        await logError(shop, 'Export', errorMsg);
+        allWarnings.push(errorMsg);
+      }
+    }
+
     // Step 6: Calculate totals
     const totalDebit = mappedEntries.reduce(
       (sum, entry) => sum.plus(entry.debit),
@@ -281,11 +338,27 @@ export async function processExport(
       await logWarning(shop, 'Export', 'Export completed with warnings', allWarnings);
     }
 
+    if (cogsWarnings.length > 0) {
+      await logWarning(shop, 'COGS', 'COGS warnings detected', cogsWarnings);
+    }
+
     return exportEntry;
   } catch (error) {
     await logError(shop, 'Export', error as Error);
     throw error;
   }
+}
+
+/**
+ * Add days to a date string (YYYY-MM-DD format)
+ */
+function addDays(dateString: string, days: number): string {
+  const date = new Date(dateString);
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**

@@ -2,6 +2,9 @@ import { Decimal } from 'decimal.js';
 import type { Order, JournalEntry, Transaction } from '../types/journal-entry';
 import type { PaymentMethodBreakdown } from './payment-method-analyzer.server';
 import { getAccountMappings } from './storage.server';
+import { calculateOrderCogs } from './cogs/cogs-calculator.server';
+import { createCogsJournalEntries, createCogsRefundEntries } from './cogs/cogs-journal-generator.server';
+import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 
 /**
  * Order-Centric Journal Entry Generator
@@ -13,6 +16,7 @@ import { getAccountMappings } from './storage.server';
  * - Debit: One entry per payment method (e.g., Card, Gift Card, Cash)
  * - Credit: Single block for sales/tax/shipping
  * - Debit: Discounts (if any) for visibility
+ * - NEW: COGS entries (if Cin7 enabled)
  *
  * Example split payment (Card $7.03 + Gift Card $20.00 = $27.03 total):
  * SO-81302: Order #81302
@@ -20,6 +24,8 @@ import { getAccountMappings } from './storage.server';
  *   2320-00 (Gift Card)       +20.00 Dr
  *   4000-00 (Sales)           -25.20 Cr
  *   2200-00 (Tax)              -1.83 Cr
+ *   4000-00 (COGS)            +15.37 Dr  [NEW]
+ *   1310-00 (Inventory)       -15.37 Cr  [NEW]
  *
  * Total: 0.00 ✓ Balanced
  */
@@ -123,6 +129,34 @@ export async function createOrderJournalEntries(
     });
   }
 
+  // NEW: Add COGS entries (if Cin7 enabled)
+  try {
+    const cin7Enabled = await isCin7Enabled(shop);
+    if (cin7Enabled) {
+      const cogsCalculation = await calculateOrderCogs(shop, order);
+
+      if (cogsCalculation.totalCogs.greaterThan(0)) {
+        const cogsEntries = await createCogsJournalEntries(
+          shop,
+          order.name,
+          cogsCalculation,
+          targetDate
+        );
+        entries.push(...cogsEntries);
+      }
+
+      // Log warnings if any
+      if (cogsCalculation.warnings.length > 0) {
+        for (const warning of cogsCalculation.warnings) {
+          console.warn(warning);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to calculate COGS for ${order.name}:`, error);
+    // Non-blocking: Continue without COGS entries
+  }
+
   return entries;
 }
 
@@ -179,6 +213,34 @@ export async function createRefundJournalEntries(
       credit: refundAmount,
       memo: `Refund ${accountName} - Order ${order.name}`,
     });
+  }
+
+  // NEW: Add reverse COGS entries (if Cin7 enabled)
+  try {
+    const cin7Enabled = await isCin7Enabled(shop);
+    if (cin7Enabled) {
+      const cogsCalculation = await calculateOrderCogs(shop, order);
+
+      if (cogsCalculation.totalCogs.greaterThan(0)) {
+        const cogsRefundEntries = await createCogsRefundEntries(
+          shop,
+          order.name,
+          cogsCalculation,
+          targetDate
+        );
+        entries.push(...cogsRefundEntries);
+      }
+
+      // Log warnings if any
+      if (cogsCalculation.warnings.length > 0) {
+        for (const warning of cogsCalculation.warnings) {
+          console.warn(warning);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Failed to reverse COGS for ${order.name}:`, error);
+    // Non-blocking: Continue without COGS entries
   }
 
   return entries;

@@ -1,0 +1,143 @@
+import { Decimal } from 'decimal.js';
+import { Cin7Client } from './cin7-client.server';
+import { cin7Cache } from './cin7-cache.server';
+import { getCin7Config } from './cin7-credential-manager.server';
+
+/**
+ * Cin7 Product Service
+ *
+ * High-level service for fetching product costs from Cin7.
+ * Implements cache-first strategy with fallback cost support.
+ */
+
+export class Cin7ProductService {
+  private shop: string;
+  private client: Cin7Client | null = null;
+  private config: Awaited<ReturnType<typeof getCin7Config>> | null = null;
+  private initialized = false;
+
+  constructor(shop: string) {
+    this.shop = shop;
+  }
+
+  /**
+   * Initialize the service by loading config and creating client
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    this.config = await getCin7Config(this.shop);
+
+    if (!this.config.enabled) {
+      this.initialized = true;
+      return;
+    }
+
+    if (!this.config.accountId || !this.config.apiKey) {
+      throw new Error('Cin7 is enabled but credentials are not configured');
+    }
+
+    this.client = new Cin7Client(this.config.accountId, this.config.apiKey);
+    this.initialized = true;
+  }
+
+  /**
+   * Get product cost by SKU
+   *
+   * @param sku - Product SKU
+   * @returns Product cost, or null if not found and no fallback
+   */
+  async getProductCost(sku: string): Promise<Decimal | null> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    // Return null if Cin7 is not enabled
+    if (!this.config?.enabled || !this.client) {
+      return null;
+    }
+
+    // Check cache first
+    if (this.config.cacheEnabled) {
+      const cachedCost = cin7Cache.get(this.shop, sku);
+      if (cachedCost !== null) {
+        return cachedCost;
+      }
+    }
+
+    // Fetch from Cin7 API
+    try {
+      const product = await this.client.getProduct(sku);
+
+      if (product && product.AverageCost !== undefined) {
+        const cost = new Decimal(product.AverageCost);
+
+        // Cache the result
+        if (this.config.cacheEnabled) {
+          cin7Cache.set(this.shop, sku, cost, this.config.cacheDurationHours);
+        }
+
+        return cost;
+      }
+
+      // Product not found - check for fallback
+      if (this.config.useFallback && this.config.fallbackCost) {
+        const fallbackCost = new Decimal(this.config.fallbackCost);
+
+        // Cache fallback cost too
+        if (this.config.cacheEnabled) {
+          cin7Cache.set(this.shop, sku, fallbackCost, this.config.cacheDurationHours);
+        }
+
+        return fallbackCost;
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`Failed to fetch cost for SKU ${sku}:`, error);
+
+      // On error, use fallback if configured
+      if (this.config.useFallback && this.config.fallbackCost) {
+        return new Decimal(this.config.fallbackCost);
+      }
+
+      return null;
+    }
+  }
+
+  /**
+   * Batch get product costs
+   *
+   * @param skus - Array of SKUs
+   * @returns Map of SKU to cost (null if not found)
+   */
+  async batchGetCosts(skus: string[]): Promise<Map<string, Decimal | null>> {
+    const results = new Map<string, Decimal | null>();
+
+    // Process in parallel (rate limiter will handle throttling)
+    const promises = skus.map(async (sku) => {
+      const cost = await this.getProductCost(sku);
+      results.set(sku, cost);
+    });
+
+    await Promise.all(promises);
+
+    return results;
+  }
+
+  /**
+   * Clear cache for this shop
+   */
+  clearCache(): void {
+    cin7Cache.clearShop(this.shop);
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return cin7Cache.getStats(this.shop);
+  }
+}

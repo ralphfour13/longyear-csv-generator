@@ -4,7 +4,9 @@ import type {
   JournalEntry,
   EnrichedTransaction,
   Transaction,
+  OrderCentricReconciliationResult,
 } from '../types/journal-entry';
+import type { CogsCalculation } from '../types/cin7';
 import {
   fetchOrdersByCaptureDateRange,
   filterOrderTransactionsByDate,
@@ -22,19 +24,8 @@ import {
   validateOrderEntries,
 } from './order-centric-journal-generator.server';
 import { enrichOrderData } from './enrichment/order-enrichment.server';
-
-/**
- * Order-Centric Reconciliation Result
- */
-export interface OrderCentricReconciliationResult {
-  journalEntries: JournalEntry[];
-  enrichedTransactions: EnrichedTransaction[];
-  balanced: boolean;
-  errors: string[];
-  warnings: string[];
-  orderCount: number;
-  captureCount: number;
-}
+import { calculateOrderCogs } from './cogs/cogs-calculator.server';
+import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 
 /**
  * Reconcile orders by capture date
@@ -55,6 +46,7 @@ export async function reconcileOrdersByDate(
 ): Promise<OrderCentricReconciliationResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const cogsWarnings: string[] = [];
   const journalEntries: JournalEntry[] = [];
   const enrichedTransactions: EnrichedTransaction[] = [];
 
@@ -236,6 +228,7 @@ export async function reconcileOrdersByDate(
       balanced,
       errors,
       warnings,
+      cogsWarnings,
       orderCount: ordersProcessed,
       captureCount: capturesProcessed,
     };
@@ -250,10 +243,44 @@ export async function reconcileOrdersByDate(
       balanced: false,
       errors,
       warnings,
+      cogsWarnings,
       orderCount: 0,
       captureCount: 0,
     };
   }
+}
+
+/**
+ * Collect COGS data for orders
+ * Used to generate COGS detail CSV file
+ *
+ * @param shop - Shop domain
+ * @param orders - Array of orders
+ * @returns Map of order ID to COGS calculation
+ */
+export async function collectCogsData(
+  shop: string,
+  orders: Order[]
+): Promise<Map<string, CogsCalculation>> {
+  const cogsDataMap = new Map<string, CogsCalculation>();
+
+  // Check if Cin7 is enabled
+  const cin7Enabled = await isCin7Enabled(shop);
+  if (!cin7Enabled) {
+    return cogsDataMap;
+  }
+
+  // Calculate COGS for each order
+  for (const order of orders) {
+    try {
+      const cogsCalculation = await calculateOrderCogs(shop, order);
+      cogsDataMap.set(order.id, cogsCalculation);
+    } catch (error) {
+      console.error(`Failed to calculate COGS for order ${order.name}:`, error);
+    }
+  }
+
+  return cogsDataMap;
 }
 
 /**

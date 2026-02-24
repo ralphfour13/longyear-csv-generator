@@ -142,6 +142,7 @@ export interface OrderLineItem {
   productId: string;
   variantId: string;
   title: string;
+  sku?: string; // Product SKU (for COGS lookup)
   quantity: number;
   price: Decimal;
   totalDiscount: Decimal;
@@ -314,4 +315,19 @@ export interface ExportJob {
   completedAt?: string;
   error?: string;
   resultFilename?: string;
+}
+
+/**
+ * Order-Centric Reconciliation Result
+ * Extended with COGS warnings
+ */
+export interface OrderCentricReconciliationResult {
+  journalEntries: JournalEntry[];
+  enrichedTransactions: EnrichedTransaction[];
+  balanced: boolean;
+  errors: string[];
+  warnings: string[];
+  cogsWarnings?: string[]; // COGS-specific warnings
+  orderCount: number;
+  captureCount: number;
 }

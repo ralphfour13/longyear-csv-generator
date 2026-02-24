@@ -89,6 +89,7 @@ function parseOrder(orderData: any): Order {
     productId: item.product_id?.toString() || '',
     variantId: item.variant_id?.toString() || '',
     title: item.title,
+    sku: item.sku || undefined, // Add SKU for COGS lookup
     quantity: item.quantity,
     price: new Decimal(item.price),
     totalDiscount: new Decimal(item.total_discount || 0),
