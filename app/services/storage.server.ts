@@ -202,16 +202,33 @@ export async function saveAccountMappings(
 
 /**
  * List all export files for a shop
+ * Sorted by file creation time (newest first)
  */
 export async function listExports(shop: string): Promise<string[]> {
   try {
     const exportsDir = path.join(DATA_DIR, shop, 'exports');
     const files = await fs.readdir(exportsDir);
 
-    // Filter for CSV and TXT files and sort by date (newest first)
-    return files
-      .filter(file => file.endsWith('.csv') || file.endsWith('.txt'))
-      .sort((a, b) => b.localeCompare(a));
+    // Filter for CSV and TXT files
+    const csvFiles = files.filter(file => file.endsWith('.csv') || file.endsWith('.txt'));
+
+    // Get file stats for sorting by creation time
+    const filesWithStats = await Promise.all(
+      csvFiles.map(async (file) => {
+        const filePath = path.join(exportsDir, file);
+        const stats = await fs.stat(filePath);
+        return {
+          filename: file,
+          birthtime: stats.birthtime.getTime(),
+          mtime: stats.mtime.getTime(),
+        };
+      })
+    );
+
+    // Sort by modification time (newest first) - mtime changes when file is written
+    return filesWithStats
+      .sort((a, b) => b.mtime - a.mtime)
+      .map(f => f.filename);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return [];
