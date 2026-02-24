@@ -86,18 +86,6 @@ export default function Index() {
               <li><strong>Import to Sage 50:</strong> Use the Journal Entry import feature</li>
             </ol>
           </div>
-
-          <s-stack direction="inline" gap="base">
-            <s-button href="/app/settings">
-              Configure Settings
-            </s-button>
-            <s-button href="/app/mappings" variant="secondary">
-              Account Mappings
-            </s-button>
-            <s-button href="/app/exports" variant="primary">
-              Export Center
-            </s-button>
-          </s-stack>
         </s-stack>
       </s-section>
 
