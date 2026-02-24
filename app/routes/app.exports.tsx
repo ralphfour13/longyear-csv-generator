@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useLoaderData, useNavigation, useFetcher } from 'react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats } from '../services/storage.server';
 import { format } from 'date-fns';
@@ -178,20 +178,28 @@ export default function Exports() {
     window.open(url, '_blank');
   };
 
+  // Store polling interval ref so we can clear it when job completes
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Poll for job status when job is created
   useEffect(() => {
     if (actionData?.processing && actionData?.jobId) {
       setCurrentJob(actionData.jobId);
       setJobStatus('Processing...');
 
-      const pollInterval = setInterval(() => {
+      pollIntervalRef.current = setInterval(() => {
         const formData = new FormData();
         formData.append('action', 'checkJob');
         formData.append('jobId', actionData.jobId);
         fetcher.submit(formData, { method: 'post' });
       }, 15000); // Poll every 15 seconds
 
-      return () => clearInterval(pollInterval);
+      return () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+      };
     }
   }, [actionData, fetcher]);
 
@@ -203,6 +211,12 @@ export default function Exports() {
       if (job.status === 'completed') {
         setJobStatus('Completed!');
         setCurrentJob(null);
+
+        // Stop polling when job completes
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
 
         // Trigger auto-download if enabled
         if (autoDownload && job.result?.files) {
@@ -220,6 +234,12 @@ export default function Exports() {
       } else if (job.status === 'failed') {
         setJobStatus(`Failed: ${job.error || 'Unknown error'}`);
         setCurrentJob(null);
+
+        // Stop polling when job fails
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
       } else if (job.status === 'processing') {
         setJobStatus('Processing export...');
       }
