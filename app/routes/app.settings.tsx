@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useLoaderData } from 'react-router';
 import { authenticate } from '../shopify.server';
-import { getShopConfig, saveShopConfig } from '../services/storage.server';
+import { getShopConfig, saveShopConfig, listExports, deleteExport } from '../services/storage.server';
 import { updateShopSchedule } from '../services/scheduler.server';
 import type { SyncConfig } from '../types/journal-entry';
 import type { Cin7Config } from '../types/cin7';
@@ -96,6 +96,53 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch (error) {
       return Response.json(
         { success: false, error: `Failed to save Cin7 settings: ${error instanceof Error ? error.message : String(error)}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Handle clear all exports
+  if (actionType === 'clearAllExports') {
+    try {
+      const exportFiles = await listExports(shop);
+
+      if (exportFiles.length === 0) {
+        return Response.json({
+          success: true,
+          message: 'No exports to delete',
+          deletedCount: 0,
+        });
+      }
+
+      // Delete all export files
+      let deletedCount = 0;
+      const errors: string[] = [];
+
+      for (const filename of exportFiles) {
+        try {
+          await deleteExport(shop, filename);
+          deletedCount++;
+        } catch (error) {
+          errors.push(`Failed to delete ${filename}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        return Response.json({
+          success: false,
+          error: `Deleted ${deletedCount} files, but ${errors.length} failed: ${errors.join(', ')}`,
+          deletedCount,
+        });
+      }
+
+      return Response.json({
+        success: true,
+        message: `Successfully deleted ${deletedCount} export file${deletedCount !== 1 ? 's' : ''}`,
+        deletedCount,
+      });
+    } catch (error) {
+      return Response.json(
+        { success: false, error: `Failed to clear exports: ${error instanceof Error ? error.message : String(error)}` },
         { status: 500 }
       );
     }
@@ -669,6 +716,48 @@ export default function Settings() {
               </s-stack>
             </s-banner>
           )}
+        </s-stack>
+      </s-section>
+
+      <s-section heading="Danger Zone">
+        <s-stack direction="block" gap="large">
+          <s-banner tone="critical">
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodySm">
+                <strong>⚠️ Warning:</strong> The actions below are permanent and cannot be undone.
+              </s-text>
+            </s-stack>
+          </s-banner>
+
+          <s-stack direction="block" gap="base">
+            <s-text variant="headingSm">Clear All Export Files</s-text>
+            <s-text variant="bodySm">
+              Permanently delete all export files (CSV and TXT) from the server.
+              This will remove all historical export data.
+            </s-text>
+
+            <Form
+              method="post"
+              onSubmit={(e) => {
+                if (!confirm('⚠️ Are you sure you want to DELETE ALL export files? This action cannot be undone!')) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              <input type="hidden" name="actionType" value="clearAllExports" />
+              <s-button
+                type="submit"
+                variant="primary"
+                style={{
+                  backgroundColor: 'var(--p-color-bg-critical)',
+                  borderColor: 'var(--p-color-border-critical)',
+                  color: 'white',
+                }}
+              >
+                Delete All Exports
+              </s-button>
+            </Form>
+          </s-stack>
         </s-stack>
       </s-section>
 
