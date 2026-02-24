@@ -14,18 +14,19 @@ import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
  *
  * Entry structure:
  * - Debit: One entry per payment method (e.g., Card, Gift Card, Cash)
- * - Credit: Single block for sales/tax/shipping
- * - Debit: Discounts (if any) for visibility
- * - NEW: COGS entries (if Cin7 enabled)
+ * - Credit: Sales Revenue (NET - post-discount amount)
+ * - Credit: Sales Tax
+ * - Credit: Shipping Revenue
+ * - Debit/Credit: COGS entries (if Cin7 enabled)
  *
  * Example split payment (Card $7.03 + Gift Card $20.00 = $27.03 total):
  * SO-81302: Order #81302
  *   1250-00 (AR - Card)        +7.03 Dr
  *   2320-00 (Gift Card)       +20.00 Dr
- *   4000-00 (Sales)           -25.20 Cr
+ *   4000-00 (Sales)           -25.20 Cr  [NET amount, post-discount]
  *   2200-00 (Tax)              -1.83 Cr
- *   4000-00 (COGS)            +15.37 Dr  [NEW]
- *   1310-00 (Inventory)       -15.37 Cr  [NEW]
+ *   4000-00 (COGS)            +15.37 Dr
+ *   1310-00 (Inventory)       -15.37 Cr
  *
  * Total: 0.00 ✓ Balanced
  */
@@ -62,44 +63,31 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // Calculate GROSS sales (before discounts)
-  const discountAmount = order.currentTotalDiscounts || order.totalDiscounts || new Decimal(0);
-
-  let grossSales: Decimal;
+  // Calculate NET sales (post-discount)
+  let netSales: Decimal;
   if (order.currentSubtotalPrice) {
-    // For edited orders: NET + Discount = GROSS
-    grossSales = order.currentSubtotalPrice.plus(discountAmount);
+    // currentSubtotalPrice is already NET (after discounts applied)
+    netSales = order.currentSubtotalPrice;
   } else {
-    // For standard orders: sum line item prices (GROSS per item)
-    grossSales = order.lineItems.reduce(
-      (sum, item) => sum.plus(item.price.times(item.quantity)),
-      new Decimal(0)
-    );
+    // Fallback: Calculate NET from total payment minus tax and shipping
+    // NET Sales = Total Payment - Tax - Shipping
+    netSales = order.totalPrice
+      .minus(order.totalTax || new Decimal(0))
+      .minus(order.totalShipping || new Decimal(0));
   }
 
-  // CREDIT: Sales Revenue (GROSS - full catalog price before discounts)
+  // CREDIT: Sales Revenue (NET - post-discount amount)
   entries.push({
     date: targetDate,
     reference,
     account: accountMappings.sales_revenue.accountCode,
     accountName: accountMappings.sales_revenue.accountName,
     debit: new Decimal(0),
-    credit: grossSales,
+    credit: netSales,
     memo: `Sales - Order ${order.name}`,
   });
 
-  // DEBIT: Discounts (if any)
-  if (discountAmount.greaterThan(0)) {
-    entries.push({
-      date: targetDate,
-      reference,
-      account: accountMappings.discounts.accountCode,
-      accountName: accountMappings.discounts.accountName,
-      debit: discountAmount,
-      credit: new Decimal(0),
-      memo: `Discount - Order ${order.name}`,
-    });
-  }
+  // NO DISCOUNT ENTRY - discounts are already reflected in NET sales amount
 
   // CREDIT: Sales Tax (only if > 0)
   const taxAmount = order.totalTax;
@@ -129,12 +117,14 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // NEW: Add COGS entries (if Cin7 enabled)
+  // Add COGS entries (if Cin7 enabled and order has line items)
   try {
     const cin7Enabled = await isCin7Enabled(shop);
-    if (cin7Enabled) {
+    if (cin7Enabled && order.lineItems.length > 0) {
       const cogsCalculation = await calculateOrderCogs(shop, order);
 
+      // Always create COGS entries if order has products, even if calculation is $0
+      // This ensures journal completeness and highlights missing COGS data
       if (cogsCalculation.totalCogs.greaterThan(0)) {
         const cogsEntries = await createCogsJournalEntries(
           shop,
@@ -143,9 +133,15 @@ export async function createOrderJournalEntries(
           targetDate
         );
         entries.push(...cogsEntries);
+      } else if (order.lineItems.length > 0) {
+        // Log warning if order has products but COGS is $0
+        console.warn(
+          `⚠️ Order ${order.name} has ${order.lineItems.length} line items but COGS is $0. ` +
+          `Check Cin7 product cost data.`
+        );
       }
 
-      // Log warnings if any
+      // Log all COGS warnings
       if (cogsCalculation.warnings.length > 0) {
         for (const warning of cogsCalculation.warnings) {
           console.warn(warning);
@@ -153,8 +149,13 @@ export async function createOrderJournalEntries(
       }
     }
   } catch (error) {
-    console.error(`Failed to calculate COGS for ${order.name}:`, error);
-    // Non-blocking: Continue without COGS entries
+    // Critical error: COGS calculation failed completely
+    console.error(
+      `❌ Failed to calculate COGS for ${order.name}:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    // Still continue - journal will be incomplete but won't block export
+    // Operator should review warnings and investigate missing COGS
   }
 
   return entries;
