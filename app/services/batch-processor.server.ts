@@ -16,6 +16,7 @@ import { generateJournalEntrySummary } from './journal-entry-summary-generator.s
 import { generateCogsDetailCSV } from './cogs/cogs-detail-exporter.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
+import { sendExportEmail, type ExportEmailData } from './email.server';
 
 /**
  * File generation options
@@ -340,6 +341,37 @@ export async function processExport(
 
     if (cogsWarnings.length > 0) {
       await logWarning(shop, 'COGS', 'COGS warnings detected', cogsWarnings);
+    }
+
+    // Step 8: Send email notification if enabled
+    const config = await getShopConfig(shop);
+    if (config.emailEnabled && config.emailRecipients) {
+      const recipients = config.emailRecipients
+        .split(',')
+        .map(email => email.trim())
+        .filter(email => email.length > 0);
+
+      if (recipients.length > 0) {
+        const emailData: ExportEmailData = {
+          shop,
+          exportDate: targetDate,
+          files: generatedFiles,
+          orderCount: result.orderCount,
+          captureCount: result.captureCount,
+          warnings: [...allWarnings, ...cogsWarnings].filter(w => w.length > 0),
+        };
+
+        try {
+          const emailResult = await sendExportEmail(recipients, emailData);
+          if (emailResult.success) {
+            await logInfo(shop, 'Email', `Export notification sent to ${recipients.join(', ')}`);
+          } else {
+            await logError(shop, 'Email', new Error(`Failed to send email: ${emailResult.error}`));
+          }
+        } catch (error) {
+          await logError(shop, 'Email', error as Error);
+        }
+      }
     }
 
     return exportEntry;

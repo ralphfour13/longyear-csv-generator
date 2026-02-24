@@ -34,6 +34,8 @@ function getDefaultConfig(shop: string): SyncConfig {
       inventory: false,
     },
     csvFormat: 'standard',
+    emailEnabled: false,
+    emailRecipients: '',
   };
 }
 

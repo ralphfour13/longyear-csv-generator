@@ -11,6 +11,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { getCin7Config, saveCin7Config, testCin7Connection } from '../services/cin7/cin7-credential-manager.server';
 import { cin7Cache } from '../services/cin7/cin7-cache.server';
+import { testEmailConnection } from '../services/email.server';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -96,6 +97,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch (error) {
       return Response.json(
         { success: false, error: `Failed to save Cin7 settings: ${error instanceof Error ? error.message : String(error)}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Handle test email
+  if (actionType === 'testEmail') {
+    try {
+      const testRecipient = formData.get('testEmailRecipient') as string;
+
+      if (!testRecipient) {
+        return Response.json(
+          { success: false, error: 'Email address is required' },
+          { status: 400 }
+        );
+      }
+
+      const result = await testEmailConnection(testRecipient);
+
+      return Response.json({
+        success: result.success,
+        message: result.success
+          ? `Test email sent successfully to ${testRecipient}`
+          : result.error,
+        messageId: result.messageId,
+      });
+    } catch (error) {
+      return Response.json(
+        { success: false, error: `Failed to send test email: ${error instanceof Error ? error.message : String(error)}` },
         { status: 500 }
       );
     }
@@ -247,6 +277,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         inventory: formData.get('inventory') === 'true',
       },
       csvFormat: (formData.get('csvFormat') as 'standard' | 'extended') || 'standard',
+      emailEnabled: formData.get('emailEnabled') === 'true',
+      emailRecipients: (formData.get('emailRecipients') as string) || '',
     };
 
     await saveShopConfig(shop, config);
@@ -459,6 +491,76 @@ export default function Settings() {
             </s-stack>
           </s-stack>
         </s-section>
+
+        <s-section heading="Email Notifications">
+          <s-stack direction="block" gap="base">
+            <s-paragraph>
+              Automatically send export files via email when scheduled exports complete.
+              Multiple recipients can be specified (comma-separated).
+            </s-paragraph>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="checkbox"
+                name="emailEnabled"
+                defaultChecked={config.emailEnabled}
+              />
+              <s-text>Enable email notifications for scheduled exports</s-text>
+            </label>
+
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodySm">Email Recipients</s-text>
+              <input
+                type="text"
+                name="emailRecipients"
+                defaultValue={config.emailRecipients || ''}
+                placeholder="accounting@example.com, manager@example.com"
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  border: '1px solid var(--p-color-border)',
+                  borderRadius: 'var(--p-border-radius-200)',
+                  fontSize: '14px',
+                }}
+              />
+              <s-text variant="bodySm" tone="subdued">
+                Comma-separated email addresses. Files will be attached to the email.
+              </s-text>
+            </s-stack>
+
+            <s-divider />
+
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodySm"><strong>Test Email Configuration</strong></s-text>
+              <s-text variant="bodySm" tone="subdued">
+                Send a test email to verify your configuration is working.
+              </s-text>
+            </s-stack>
+          </s-stack>
+        </s-section>
+
+        <Form method="post" style={{ marginTop: '16px' }}>
+          <input type="hidden" name="actionType" value="testEmail" />
+          <s-stack direction="block" gap="base">
+            <input
+              type="email"
+              name="testEmailRecipient"
+              placeholder="test@example.com"
+              required
+              style={{
+                width: '100%',
+                maxWidth: '400px',
+                padding: '10px',
+                border: '1px solid var(--p-color-border)',
+                borderRadius: 'var(--p-border-radius-200)',
+                fontSize: '14px',
+              }}
+            />
+            <s-button type="submit" variant="secondary">
+              Send Test Email
+            </s-button>
+          </s-stack>
+        </Form>
 
         <div style={{ marginTop: '24px' }}>
           <s-button type="submit" variant="primary">

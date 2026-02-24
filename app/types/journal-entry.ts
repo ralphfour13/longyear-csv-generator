@@ -67,6 +67,8 @@ export interface SyncConfig {
   };
   csvFormat: 'standard' | 'extended';
   lastExportDate?: string; // ISO date string (optional tracking)
+  emailEnabled?: boolean; // Enable email notifications for scheduled exports
+  emailRecipients?: string; // Comma-separated email addresses
 }
 
 /**
