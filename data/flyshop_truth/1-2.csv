@@ -1,0 +1,17 @@
+Name,Tax 1: Title,Tax 1: Rate,Tax 1: Price,Tax 2: Title,Tax 2: Rate,Tax 2: Price,Tax 3: Title,Tax 3: Rate,Tax 3: Price,Tax: Total,Price: Total Shipping,Price: Total Refund,Price: Current Total,Payment: Status,Order Fulfillment Status,Shipping: City,Transaction: Kind,Transaction: Processed At
+#80027,,,,,,,,,,0,0,,129.99,paid,fulfilled,Gansevoort,capture,2026-01-02 13:57:29 -0800
+#80029,,,,,,,,,,0,0,,70.2,paid,fulfilled,Woodstock,capture,2026-01-02 11:59:02 -0800
+#80030,California State Tax,0.06,1.11,Shasta County Tax,0.0025,0.04,Fortuna City Tax,0.0075,0.14,1.76,6.5,,26.71,paid,fulfilled,Fortuna,capture,2026-01-02 13:10:08 -0800
+#80031,,,,,,,,,,0,0,,177.3,paid,fulfilled,Waxhaw,capture,2026-01-02 13:28:42 -0800
+#80032,,,,,,,,,,0,0,,57.95,paid,fulfilled,Oxford,capture,2026-01-02 13:37:11 -0800
+#80033,,,,,,,,,,0,6.5,,30.35,paid,fulfilled,Redmond,capture,2026-01-02 13:41:03 -0800
+#80034,,,,,,,,,,0,6.5,,41.45,paid,fulfilled,WARRENTON,capture,2026-01-02 13:44:07 -0800
+#80035,,,,,,,,,,0,0,,63.76,paid,fulfilled,Mount Pleasant,capture,2026-01-02 13:50:05 -0800
+#80037,,,,,,,,,,0,0,,50,paid,fulfilled,,capture,2026-01-02 13:52:00 -0800
+#80038,California State Tax,0.06,10.2,Shasta County Tax,0.0025,0.43,Sausalito City Tax,0.01,1.7,15.73,0,51,185.73,partially_refunded,fulfilled,Sausalito,refund,2026-01-02 14:53:35 -0800
+#80040,,,,,,,,,,0,0,,9.9,paid,fulfilled,Bolivar,sale,2026-01-02 11:11:33 -0800
+#80041,California State Tax,0.06,0.43,Shasta County Tax,0.0025,0.02,Shasta Co Local Tax Sl,0.01,0.07,0.52,0,,7.84,paid,fulfilled,,capture,2026-01-02 11:43:01 -0800
+#80042,California State Tax,0.06,3.47,Shasta County Tax,0.0025,0.14,Los Angeles County District Tax Sp,0.025,1.43,5.63,0,,63.08,paid,fulfilled,RANCHO PALOS VERDES,sale,2026-01-02 11:47:30 -0800
+#80043,California State Tax,0.06,0.12,Shasta Co Local Tax Sl,0.01,0.02,,,,0.14,6.5,8.74,0,refunded,fulfilled,REDDING,refund,2026-01-02 13:27:10 -0800
+,,,,,,,,,,,,,,,,,,
+,,,,,,,,,,23.78,26,59.74,914.2600000000001,,,,,

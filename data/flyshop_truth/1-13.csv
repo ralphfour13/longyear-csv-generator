@@ -1,0 +1,37 @@
+Name,Tags,Tax 1: Title,Tax 1: Rate,Tax 1: Price,Tax 2: Title,Tax 2: Rate,Tax 2: Price,Tax 3: Title,Tax 3: Rate,Tax 3: Price,Tax: Total,Price: Total Shipping,Price: Total Refund,Price: Current Total,CASH ,CHARGE,GIFT CARD,STORE CREDIT,CHECK,Payment: Status,Order Fulfillment Status,Shipping: Address 1,Shipping: Address 2,Shipping: Zip,Shipping: City,Transaction: Kind,Transaction: Processed At,Transaction: Amount,Transaction: Gateway,Transaction: Payment Method
+#80508,,California State Tax,0.06,0.9,Shasta County Tax,0.0025,0.04,Shasta Co Local Tax Sl,0.01,0.15,1.09,0,,26.33,,,,,,paid,fulfilled,,,,,capture,2026-01-13 08:41:00 -0800,26.33,shopify_payments,card
+#80509,,California State Tax,0.06,0.78,Shasta County Tax,0.0025,0.03,Shasta Co Local Tax Sl,0.01,0.13,0.94,0,,13.89,,,,,,paid,fulfilled,,,,,capture,2026-01-13 09:37:09 -0800,13.89,shopify_payments,card
+#80510,,,,,,,,,,,0,0,,877.05,,,,,,paid,fulfilled,N7737 PANORAMA RD,,53508-8909,BELLEVILLE,sale,2026-01-13 10:15:50 -0800,877.05,shopify_payments,card
+#80514,,California State Tax,0.06,22.57,Shasta County Tax,0.0025,0.96,Napa City Tax,0.01,3.75,32.96,0,,408.26,,,,,,paid,partial,2112 CAMENSON ST,,94558-2274,NAPA,sale,2026-01-13 10:32:49 -0800,408.26,shopify_payments,card
+#80511,,California State Tax,0.06,4.8,Shasta County Tax,0.0025,0.2,Shasta Co Local Tax Sl,0.01,0.8,5.8,0,,160.58,,,,,,paid,fulfilled,,,,,capture,2026-01-13 10:43:26 -0800,160.58,shopify_payments,card
+#80513,,California State Tax,0.06,0.18,Shasta County Tax,0.0025,0.01,Shasta Co Local Tax Sl,0.01,0.03,0.22,0,,3.17,,,,,,paid,fulfilled,,,,,capture,2026-01-13 10:46:57 -0800,3.17,shopify_payments,card
+#80516,,California State Tax,0.06,0.7,Shasta County Tax,0.0025,0.04,Shasta Co Local Tax Sl,0.01,0.12,0.86,0,,,12.48,,,,,paid,fulfilled,,,,,sale,2026-01-13 10:52:52 -0800,12.48,cash,
+#80515,,,,,,,,,,,0,0,,74.83,,,,,,paid,fulfilled,,,,,capture,2026-01-13 11:07:53 -0800,74.83,shopify_payments,card
+#80517,,California State Tax,0.06,2.84,Shasta County Tax,0.0025,0.12,Napa City Tax,0.01,0.47,4.14,6.5,,57.59,,,,,,paid,fulfilled,2112 CAMENSON ST,,94558-2274,NAPA,sale,2026-01-13 11:34:45 -0800,57.59,shopify_payments,card
+#80519,,,,,,,,,,,0,0,,27.93,,,,,,paid,fulfilled,,,,,sale,2026-01-13 11:52:04 -0800,27.93,shopify_payments,card
+#80520,,,,,,,,,,,0,6.5,,34,,,,,,paid,fulfilled,1272 CAMPGROUND CIR,,35769,SCOTTSBORO,sale,2026-01-13 12:01:33 -0800,34,shopify_payments,card
+#80521,,California State Tax,0.06,8.58,Shasta County Tax,0.0025,0.36,Shasta Co Local Tax Sl,0.01,1.44,10.38,0,,153.48,,,,,,partially_refunded,fulfilled,,,,,sale,2026-01-13 12:16:01 -0800,153.48,shopify_payments,card
+#80522,,,,,,,,,,,0,0,,136,,,,,,paid,fulfilled,18996 N HAWTHORN DR,,85387,SURPRISE,sale,2026-01-13 12:20:06 -0800,136,shopify_payments,card
+#80521,,California State Tax,0.06,8.58,Shasta County Tax,0.0025,0.36,Shasta Co Local Tax Sl,0.01,1.44,10.38,0,25.58,,,,,,,partially_refunded,fulfilled,,,,,refund,2026-01-13 12:21:36 -0800,-25.58,shopify_payments,card
+#80523,,California State Tax,0.06,2.13,Shasta County Tax,0.0025,0.09,Shasta Co Local Tax Sl,0.01,0.35,2.57,0,,,38.15,,,,,paid,fulfilled,,,,,sale,2026-01-13 12:25:25 -0800,38.15,cash,
+#80524,,California State Tax,0.06,1.31,Shasta County Tax,0.0025,0.05,Shasta Co Local Tax Sl,0.01,0.22,1.58,0,,,23.48,,,,,paid,fulfilled,,,,,sale,2026-01-13 12:26:30 -0800,23.48,cash,
+#80528,,California State Tax,0.06,0.65,Shasta County Tax,0.0025,0.03,Shasta Co Local Tax Sl,0.01,0.11,0.79,0,,,11.55,,,,,paid,fulfilled,,,,,sale,2026-01-13 12:55:14 -0800,11.55,cash,
+#80526,,California State Tax,0.06,0.84,Shasta County Tax,0.0025,0.05,Shasta Co Local Tax Sl,0.01,0.14,1.03,0,,14.9,,,,,,paid,fulfilled,,,,,capture,2026-01-13 13:07:21 -0800,14.9,shopify_payments,card
+#80527,,California State Tax,0.06,1.08,Shasta County Tax,0.0025,0.04,Shasta Co Local Tax Sl,0.01,0.18,1.3,0,,19.2,,,,,,paid,fulfilled,,,,,capture,2026-01-13 13:07:29 -0800,19.2,shopify_payments,card
+#80529,,California State Tax,0.06,1.32,Shasta County Tax,0.0025,0.06,Shasta Co Local Tax Sl,0.01,0.22,1.6,0,,,23.58,,,,,paid,fulfilled,,,,,sale,2026-01-13 13:25:14 -0800,23.58,cash,
+#80532,,California State Tax,0.06,50.9,Shasta County Tax,0.0025,2.12,Shasta Co Local Tax Sl,0.01,8.48,61.5,0,,454.9,,,,,,paid,fulfilled,,,,,sale,2026-01-13 14:03:20 -0800,454.9,shopify_payments,card
+#80531,,California State Tax,0.06,3.56,Shasta County Tax,0.0025,0.14,Shasta Co Local Tax Sl,0.01,0.59,4.29,0,,63.53,,,,,,paid,fulfilled,,,,,capture,2026-01-13 14:14:17 -0800,63.53,shopify_payments,card
+#80534,,California State Tax,0.06,3.79,Shasta County Tax,0.0025,0.16,Shasta Co Local Tax Sl,0.01,0.65,4.6,0,,67.3,,,,,,paid,fulfilled,,,,,capture,2026-01-13 15:02:33 -0800,67.3,shopify_payments,card
+#80538,,California State Tax,0.06,0.37,Shasta County Tax,0.0025,0.02,Shasta Co Local Tax Sl,0.01,0.06,0.45,0,,,6.66,,,,,paid,fulfilled,,,,,sale,2026-01-13 15:23:53 -0800,6.66,cash,
+#80536,,California State Tax,0.06,0.92,Shasta County Tax,0.0025,0.05,Shasta Co Local Tax Sl,0.01,0.15,1.12,0,,91.13,,,,,,paid,fulfilled,,,,,capture,2026-01-13 15:35:30 -0800,91.13,shopify_payments,card
+#80537,,California State Tax,0.06,1.46,Shasta County Tax,0.0025,0.08,Shasta Co Local Tax Sl,0.01,0.24,1.78,0,,26.2,,,,,,paid,fulfilled,,,,,capture,2026-01-13 15:38:06 -0800,26.2,shopify_payments,card
+#80540,,California State Tax,0.06,3.39,Shasta County Tax,0.0025,0.14,Shasta Co Local Tax Sl,0.01,0.58,4.11,0,,,60.56,,,,,paid,fulfilled,,,,,sale,2026-01-13 15:46:08 -0800,60.56,cash,
+#80541,,,,,,,,,,,0,0,,,63.78,,,,,paid,fulfilled,,,,,sale,2026-01-13 15:55:33 -0800,63.78,cash,
+#80539,,California State Tax,0.06,0.53,Shasta County Tax,0.0025,0.02,Shasta Co Local Tax Sl,0.01,0.09,0.64,0,,9.49,,,,,,paid,fulfilled,,,,,capture,2026-01-13 15:58:14 -0800,9.49,shopify_payments,card
+#80542,,,,,,,,,,,0,0,,956.21,,,,,,paid,fulfilled,,,,,sale,2026-01-13 15:59:26 -0800,956.21,shopify_payments,card
+#80543,,California State Tax,0.06,12.72,Shasta County Tax,0.0025,0.49,Shasta Co Local Tax Sl,0.01,2.14,15.35,0,,236.99,,,,,,paid,fulfilled,,,,,capture,2026-01-13 16:15:35 -0800,236.99,shopify_payments,card
+#80544,,California State Tax,0.06,0.63,Shasta County Tax,0.0025,0.03,Shasta Co Local Tax Sl,0.01,0.11,0.77,0,,21.56,,,,,,paid,fulfilled,,,,,capture,2026-01-13 16:30:00 -0800,21.56,shopify_payments,card
+#80545,,California State Tax,0.06,1.19,Shasta County Tax,0.0025,0.05,Shasta Co Local Tax Sl,0.01,0.2,1.44,0,,21.34,,,,,,paid,fulfilled,,,,,capture,2026-01-13 16:50:03 -0800,21.34,shopify_payments,card
+#80549,Packing Slips Printed,,,,,,,,,,0,0,,,,,100,,,partially_refunded,fulfilled,2209 S Atlantic Ave,,32118,Daytona Beach,sale,2026-01-13 23:41:49 -0800,100,gift_card,
+,,,,,,,,,,,,,,,,,-3.9,For order 80549,,,,,,,,,,,,
+,,,,,,,,,,,171.68999999999997,13,25.58,3955.86,240.23999999999998,,96.1,,,,,,,,,,,,,

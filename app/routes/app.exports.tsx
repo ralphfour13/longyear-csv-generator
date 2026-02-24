@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
-import { Form, useActionData, useLoaderData, useNavigation } from 'react-router';
+import { Form, useActionData, useLoaderData, useNavigation, useFetcher } from 'react-router';
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats } from '../services/storage.server';
@@ -28,6 +28,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const action = formData.get('action');
 
+  // Check job status
+  if (action === 'checkJob') {
+    const jobId = formData.get('jobId');
+    if (!jobId || typeof jobId !== 'string') {
+      return Response.json({ success: false, error: 'Job ID required' }, { status: 400 });
+    }
+
+    const { getJobStatus } = await import('../services/background-jobs.server');
+    const job = await getJobStatus(jobId);
+
+    if (!job) {
+      return Response.json({ success: false, error: 'Job not found' }, { status: 404 });
+    }
+
+    return Response.json({
+      success: true,
+      job,
+    });
+  }
+
   if (action === 'export') {
     const useRange = formData.get('useRange') === 'true';
     const fileOptions = {
@@ -38,7 +58,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     };
 
     try {
-      const { processExport } = await import('../services/batch-processor.server');
+      const { createExportJob } = await import('../services/background-jobs.server');
+      const { processPendingJobs } = await import('../services/job-processor.server');
 
       if (useRange) {
         // Date range mode
@@ -63,48 +84,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           );
         }
 
-        // Generate exports for each date in range
-        const allFiles: any[] = [];
-        let totalEntries = 0;
-        let allBalanced = true;
-        const dates: string[] = [];
+        // Create background job
+        const jobId = await createExportJob(
+          shop,
+          startDateParam,
+          endDateParam,
+          fileOptions
+        );
 
-        let currentDate = new Date(startDate);
-        while (currentDate <= endDate) {
-          const dateStr = format(currentDate, 'yyyy-MM-dd');
-          dates.push(dateStr);
+        // Start processing in background (don't await)
+        processPendingJobs(shop, session.accessToken).catch((error) => {
+          console.error('Background job processing error:', error);
+        });
 
-          const result = await processExport(
-            shop,
-            session.accessToken,
-            dateStr,
-            fileOptions
-          );
-
-          // Append date to filenames for clarity
-          const dateLabel = format(currentDate, 'MMM-dd');
-          result.files.forEach((file: any) => {
-            const nameParts = file.filename.split('.');
-            const ext = nameParts.pop();
-            const baseName = nameParts.join('.');
-            file.filename = `${baseName}_${dateLabel}.${ext}`;
-            file.date = dateStr;
-          });
-
-          allFiles.push(...result.files);
-          totalEntries += result.entryCount;
-          if (!result.balanced) allBalanced = false;
-
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
+        const dayCount = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
         return Response.json({
           success: true,
-          message: `Export completed for ${dates.length} days (${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')})`,
-          files: allFiles,
-          entryCount: totalEntries,
-          balanced: allBalanced,
-          dateRange: { start: startDateParam, end: endDateParam, count: dates.length },
+          processing: true,
+          jobId,
+          message: `Export started for ${dayCount} days (${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}). Processing in background...`,
+          dateRange: { start: startDateParam, end: endDateParam, count: dayCount },
         });
       } else {
         // Single date mode
@@ -117,20 +117,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           );
         }
 
-        const result = await processExport(
+        // Create background job
+        const jobId = await createExportJob(
           shop,
-          session.accessToken,
           dateParam,
+          undefined,
           fileOptions
         );
 
+        // Start processing in background (don't await)
+        processPendingJobs(shop, session.accessToken).catch((error) => {
+          console.error('Background job processing error:', error);
+        });
+
         return Response.json({
           success: true,
-          message: 'Export completed successfully',
-          filename: result.filename, // Keep for backward compatibility
-          files: result.files,
-          entryCount: result.entryCount,
-          balanced: result.balanced,
+          processing: true,
+          jobId,
+          message: `Export started for ${dateParam}. Processing in background...`,
         });
       }
     } catch (error) {
@@ -160,6 +164,9 @@ export default function Exports() {
   const [generatePayoutsOrders, setGeneratePayoutsOrders] = useState(true);
   const [generateJournalDetails, setGenerateJournalDetails] = useState(true);
   const [generateJournalSummary, setGenerateJournalSummary] = useState(true);
+  const [currentJob, setCurrentJob] = useState<any>(null);
+  const [jobStatus, setJobStatus] = useState<string>('');
+  const fetcher = useFetcher();
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -171,9 +178,57 @@ export default function Exports() {
     window.open(url, '_blank');
   };
 
-  // Auto-download all files when export completes (if enabled)
+  // Poll for job status when job is created
   useEffect(() => {
-    if (actionData?.success && actionData?.files && autoDownload) {
+    if (actionData?.processing && actionData?.jobId) {
+      setCurrentJob(actionData.jobId);
+      setJobStatus('Processing...');
+
+      const pollInterval = setInterval(() => {
+        const formData = new FormData();
+        formData.append('action', 'checkJob');
+        formData.append('jobId', actionData.jobId);
+        fetcher.submit(formData, { method: 'post' });
+      }, 3000); // Poll every 3 seconds
+
+      return () => clearInterval(pollInterval);
+    }
+  }, [actionData, fetcher]);
+
+  // Handle job status updates
+  useEffect(() => {
+    if (fetcher.data?.job) {
+      const job = fetcher.data.job;
+
+      if (job.status === 'completed') {
+        setJobStatus('Completed!');
+        setCurrentJob(null);
+
+        // Trigger auto-download if enabled
+        if (autoDownload && job.result?.files) {
+          setTimeout(() => {
+            job.result.files.forEach((file: any, index: number) => {
+              if (!file.error) {
+                setTimeout(() => {
+                  const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${file.filename}`;
+                  window.open(url, '_blank');
+                }, index * 300);
+              }
+            });
+          }, 500);
+        }
+      } else if (job.status === 'failed') {
+        setJobStatus(`Failed: ${job.error || 'Unknown error'}`);
+        setCurrentJob(null);
+      } else if (job.status === 'processing') {
+        setJobStatus('Processing export...');
+      }
+    }
+  }, [fetcher.data, autoDownload, shop]);
+
+  // Legacy: Auto-download all files when export completes immediately (backward compatibility)
+  useEffect(() => {
+    if (actionData?.success && actionData?.files && !actionData?.processing && autoDownload) {
       // Small delay to ensure UI updates before downloads start
       setTimeout(() => {
         actionData.files.forEach((file: any, index: number) => {
@@ -191,7 +246,87 @@ export default function Exports() {
 
   return (
     <s-page heading="Export Center">
-      {actionData?.success && (
+      {currentJob && (
+        <s-banner tone="info" style={{ marginBottom: '20px' }}>
+          <s-stack direction="block" gap="tight">
+            <s-text variant="headingSm">Export in Progress</s-text>
+            <s-text>{jobStatus}</s-text>
+            <s-text variant="bodySm">This may take several minutes for large date ranges. You can refresh the page to check progress, or wait here.</s-text>
+          </s-stack>
+        </s-banner>
+      )}
+
+      {fetcher.data?.job?.status === 'completed' && fetcher.data?.job?.result && (
+        <s-banner tone="success" style={{ marginBottom: '20px' }}>
+          <s-stack direction="block" gap="base">
+            <s-text variant="headingSm">{fetcher.data.job.result.message}</s-text>
+            {fetcher.data.job.result.files && fetcher.data.job.result.files.length > 0 && (
+              <s-stack direction="block" gap="tight">
+                {fetcher.data.job.result.files.map((file: any) => {
+                  let label = '';
+                  let description = '';
+                  if (file.type === 'daily-sales') {
+                    label = 'Detailed Sales Report';
+                    description = `${file.rowCount} transaction rows`;
+                  } else if (file.type === 'payouts-orders') {
+                    label = 'Payouts with Orders';
+                    description = `${file.rowCount} order rows`;
+                  } else if (file.type === 'journal-entries-details') {
+                    label = 'Journal Entry Details';
+                    description = `${file.rowCount} detailed entries`;
+                  } else if (file.type === 'journal-entry-summary') {
+                    label = 'Journal Entry';
+                    description = `${file.rowCount} accounts, ${fetcher.data.job.result.balanced ? '✓ balanced' : '✗ unbalanced'}`;
+                  }
+
+                  return (
+                    <s-stack key={file.type} direction="inline" gap="tight" alignItems="center">
+                      <s-text variant="bodySm"><strong>{label}:</strong></s-text>
+                      {file.error ? (
+                        <s-text tone="critical">{file.error}</s-text>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleDownload(file.filename)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: 'var(--p-color-text-link)',
+                              textDecoration: 'underline',
+                              cursor: 'pointer',
+                              padding: 0,
+                              font: 'inherit',
+                              fontWeight: 500,
+                              marginLeft: '4px',
+                            }}
+                          >
+                            {file.filename}
+                          </button>
+                          <s-text style={{ marginLeft: '4px' }}>({description})</s-text>
+                        </>
+                      )}
+                    </s-stack>
+                  );
+                })}
+              </s-stack>
+            )}
+          </s-stack>
+        </s-banner>
+      )}
+
+      {fetcher.data?.job?.status === 'failed' && (
+        <s-banner tone="critical" style={{ marginBottom: '20px' }}>
+          <s-text>Export failed: {fetcher.data.job.error || 'Unknown error'}</s-text>
+        </s-banner>
+      )}
+
+      {actionData?.success && actionData?.processing && (
+        <s-banner tone="info" style={{ marginBottom: '20px' }}>
+          <s-text>{actionData.message}</s-text>
+        </s-banner>
+      )}
+
+      {actionData?.success && !actionData?.processing && (
         <s-banner tone="success" style={{ marginBottom: '20px' }}>
           <s-stack direction="block" gap="base">
             <s-text variant="headingSm">{actionData.message}</s-text>
