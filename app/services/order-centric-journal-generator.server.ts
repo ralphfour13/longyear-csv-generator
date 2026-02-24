@@ -3,7 +3,7 @@ import type { Order, JournalEntry, Transaction } from '../types/journal-entry';
 import type { PaymentMethodBreakdown } from './payment-method-analyzer.server';
 import { getAccountMappings } from './storage.server';
 import { calculateOrderCogs } from './cogs/cogs-calculator.server';
-import { createCogsJournalEntries, createCogsRefundEntries } from './cogs/cogs-journal-generator.server';
+import { createCogsJournalEntries } from './cogs/cogs-journal-generator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 
 /**
@@ -215,33 +215,10 @@ export async function createRefundJournalEntries(
     });
   }
 
-  // NEW: Add reverse COGS entries (if Cin7 enabled)
-  try {
-    const cin7Enabled = await isCin7Enabled(shop);
-    if (cin7Enabled) {
-      const cogsCalculation = await calculateOrderCogs(shop, order);
-
-      if (cogsCalculation.totalCogs.greaterThan(0)) {
-        const cogsRefundEntries = await createCogsRefundEntries(
-          shop,
-          order.name,
-          cogsCalculation,
-          targetDate
-        );
-        entries.push(...cogsRefundEntries);
-      }
-
-      // Log warnings if any
-      if (cogsCalculation.warnings.length > 0) {
-        for (const warning of cogsCalculation.warnings) {
-          console.warn(warning);
-        }
-      }
-    }
-  } catch (error) {
-    console.error(`Failed to reverse COGS for ${order.name}:`, error);
-    // Non-blocking: Continue without COGS entries
-  }
+  // NOTE: COGS entries are NOT reversed for refunds
+  // When items are refunded, the COGS remains recognized (expense already incurred)
+  // Inventory doesn't necessarily return (could be damaged, restocking fee, etc.)
+  // Only the revenue side (sales and payment) is reversed
 
   return entries;
 }
