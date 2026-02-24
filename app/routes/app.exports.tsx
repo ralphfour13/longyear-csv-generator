@@ -189,7 +189,7 @@ export default function Exports() {
         formData.append('action', 'checkJob');
         formData.append('jobId', actionData.jobId);
         fetcher.submit(formData, { method: 'post' });
-      }, 3000); // Poll every 3 seconds
+      }, 15000); // Poll every 15 seconds
 
       return () => clearInterval(pollInterval);
     }
