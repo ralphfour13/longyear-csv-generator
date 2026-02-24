@@ -26,6 +26,7 @@ export interface FileGenerationOptions {
   generatePayoutsOrders?: boolean;
   generateJournalDetails?: boolean;
   generateJournalSummary?: boolean;
+  generateCogsDetails?: boolean;
 }
 
 /**
@@ -272,8 +273,8 @@ export async function processExport(
     }
     }
 
-    // File #5: COGS Details (if Cin7 enabled and has data)
-    if (cin7Enabled && cogsDataMap.size > 0) {
+    // File #5: COGS Details (if Cin7 enabled, has data, and option enabled)
+    if (cin7Enabled && cogsDataMap.size > 0 && fileOptions?.generateCogsDetails !== false) {
       await logInfo(shop, 'Export', 'Generating COGS Details...');
       try {
         const cogsDetailsFilename = `cogs-details_${targetDate}.csv`;

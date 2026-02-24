@@ -55,6 +55,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       generatePayoutsOrders: formData.get('generatePayoutsOrders') === 'true',
       generateJournalDetails: formData.get('generateJournalDetails') === 'true',
       generateJournalSummary: formData.get('generateJournalSummary') === 'true',
+      generateCogsDetails: formData.get('generateCogsDetails') === 'true',
     };
 
     try {
@@ -165,6 +166,7 @@ export default function Exports() {
   const [generatePayoutsOrders, setGeneratePayoutsOrders] = useState(true);
   const [generateJournalDetails, setGenerateJournalDetails] = useState(true);
   const [generateJournalSummary, setGenerateJournalSummary] = useState(true);
+  const [generateCogsDetails, setGenerateCogsDetails] = useState(true);
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [jobStatus, setJobStatus] = useState<string>('');
   const fetcher = useFetcher();
@@ -434,6 +436,7 @@ export default function Exports() {
             <input type="hidden" name="generatePayoutsOrders" value={generatePayoutsOrders ? 'true' : 'false'} />
             <input type="hidden" name="generateJournalDetails" value={generateJournalDetails ? 'true' : 'false'} />
             <input type="hidden" name="generateJournalSummary" value={generateJournalSummary ? 'true' : 'false'} />
+            <input type="hidden" name="generateCogsDetails" value={generateCogsDetails ? 'true' : 'false'} />
 
             <s-stack direction="block" gap="base">
               <div style={{ marginBottom: '12px' }}>
@@ -498,6 +501,15 @@ export default function Exports() {
                       style={{ cursor: 'pointer' }}
                     />
                     <s-text>Journal Entry Summary (Sage 50 Import)</s-text>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateCogsDetails}
+                      onChange={(e) => setGenerateCogsDetails(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <s-text>COGS Details (if Cin7 enabled)</s-text>
                   </label>
                 </s-stack>
               </s-box>
