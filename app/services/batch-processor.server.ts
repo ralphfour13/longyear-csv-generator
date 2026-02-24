@@ -344,9 +344,9 @@ export async function processExport(
     }
 
     // Step 8: Send email notification if enabled
-    const config = await getShopConfig(shop);
-    if (config.emailEnabled && config.emailRecipients) {
-      const recipients = config.emailRecipients
+    const shopConfig = await getShopConfig(shop);
+    if (shopConfig.emailEnabled && shopConfig.emailRecipients) {
+      const recipients = shopConfig.emailRecipients
         .split(',')
         .map(email => email.trim())
         .filter(email => email.length > 0);
