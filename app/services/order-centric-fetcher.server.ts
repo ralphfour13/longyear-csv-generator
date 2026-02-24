@@ -142,16 +142,16 @@ async function fetchOrdersByDate(
   let fetchedCount = 0;
 
   while (hasNextPage) {
-    const params = new URLSearchParams({
-      [minParam]: startDateTime,
-      [maxParam]: endDateTime,
-      status: 'any',
-      limit: '250',
-    });
-
-    if (pageInfo) {
-      params.set('page_info', pageInfo);
-    }
+    // When using page_info for pagination, Shopify requires ONLY page_info parameter
+    // No other query parameters (date filters, status, limit) can be included
+    const params = pageInfo
+      ? new URLSearchParams({ page_info: pageInfo })
+      : new URLSearchParams({
+          [minParam]: startDateTime,
+          [maxParam]: endDateTime,
+          status: 'any',
+          limit: '250',
+        });
 
     const url = `${baseUrl}?${params.toString()}`;
 
