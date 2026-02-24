@@ -14,6 +14,13 @@ import type { Order, Transaction } from '../types/journal-entry';
  */
 
 /**
+ * Rate limiting utility - delays execution to stay under Shopify's 4 calls/second limit
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Fetch orders by capture date range
  *
  * @param shop - Shop domain
@@ -75,13 +82,21 @@ export async function fetchOrdersByCaptureDateRange(
 
       if (data.orders && Array.isArray(data.orders)) {
         // Fetch transactions for each order and parse
-        for (const orderData of data.orders) {
+        // Add rate limiting to stay under Shopify's 4 calls/second limit
+        for (let i = 0; i < data.orders.length; i++) {
+          const orderData = data.orders[i];
           const order = await parseOrderWithTransactions(
             shop,
             accessToken,
             orderData
           );
           orders.push(order);
+
+          // Rate limiting: Wait 250ms between calls (ensures max 4 calls/second)
+          // Skip delay after last order in batch
+          if (i < data.orders.length - 1) {
+            await sleep(250);
+          }
         }
 
         // Check for Link header for pagination
