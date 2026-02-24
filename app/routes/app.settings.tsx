@@ -84,7 +84,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const filename = `order-${orderNumber.replace('#', '')}-${timestamp}.json`;
       const filePath = path.join(dataDir, filename);
 
-      await fs.writeFile(filePath, JSON.stringify(order, null, 2));
+      const jsonString = JSON.stringify(order, null, 2);
+      await fs.writeFile(filePath, jsonString);
 
       return Response.json({
         success: true,
@@ -96,6 +97,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         updatedAt: order.updated_at,
         financialStatus: order.financial_status,
         transactionCount: order.transactions?.length || 0,
+        jsonData: jsonString, // Include JSON for client-side download
       });
     } catch (error) {
       console.error('Debug order error:', error);
@@ -149,6 +151,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function Settings() {
   const { shop, config } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+
+  const handleDownload = () => {
+    if (!actionData?.jsonData || !actionData?.filename) return;
+
+    const blob = new Blob([actionData.jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = actionData.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <s-page heading="Sync Settings">
@@ -368,14 +384,7 @@ export default function Settings() {
                   <strong>Order data saved successfully!</strong>
                 </s-text>
                 <s-text variant="bodySm">
-                  <strong>File:</strong>{' '}
-                  <a
-                    href={`/app/download-debug?filename=${encodeURIComponent(actionData.filename)}`}
-                    download={actionData.filename}
-                    style={{ color: 'var(--p-color-text-brand)', textDecoration: 'underline' }}
-                  >
-                    {actionData.filename}
-                  </a>
+                  <strong>Server File:</strong> {actionData.filePath}
                 </s-text>
                 <s-text variant="bodySm">
                   <strong>Order ID:</strong> {actionData.orderId}
@@ -392,6 +401,12 @@ export default function Settings() {
                 <s-text variant="bodySm">
                   <strong>Transactions:</strong> {actionData.transactionCount}
                 </s-text>
+
+                <div style={{ marginTop: '12px' }}>
+                  <s-button onClick={handleDownload}>
+                    Download {actionData.filename}
+                  </s-button>
+                </div>
               </s-stack>
             </s-banner>
           )}
