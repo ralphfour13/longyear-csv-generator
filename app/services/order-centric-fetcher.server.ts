@@ -21,6 +21,12 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Retry configuration for API calls
+ */
+const MAX_RETRIES = 5;
+const BASE_RETRY_DELAY = 500; // Start with 500ms delay
+
+/**
  * Fetch orders by capture date range
  *
  * @param shop - Shop domain
@@ -204,7 +210,7 @@ function parseOrder(orderData: any): Order {
 }
 
 /**
- * Fetch transactions for a specific order
+ * Fetch transactions for a specific order with retry logic
  */
 async function fetchOrderTransactions(
   shop: string,
@@ -213,35 +219,68 @@ async function fetchOrderTransactions(
 ): Promise<Transaction[]> {
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}/transactions.json`;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
+  // Retry loop with exponential backoff
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return [];
+      // Handle 429 rate limit errors with retry
+      if (response.status === 429) {
+        if (attempt < MAX_RETRIES) {
+          // Calculate exponential backoff delay: 500ms, 1000ms, 2000ms, 4000ms, 8000ms
+          const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+          console.log(
+            `Rate limit hit for order ${orderId}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+          );
+          await sleep(delay);
+          continue; // Retry the request
+        } else {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to fetch transactions after ${MAX_RETRIES} retries: ${response.status} ${response.statusText} - ${errorText}`
+          );
+        }
       }
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch transactions: ${response.status} ${response.statusText} - ${errorText}`
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [];
+        }
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch transactions: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (data.transactions && Array.isArray(data.transactions)) {
+        return data.transactions.map((txn: any) => parseTransaction(txn));
+      }
+
+      return [];
+    } catch (error) {
+      // If this is the last attempt or not a retryable error, throw
+      if (attempt === MAX_RETRIES || !(error instanceof Error) || !error.message.includes('429')) {
+        console.error(`Error fetching transactions for order ${orderId}:`, error);
+        throw error;
+      }
+      // For network errors on early attempts, retry with backoff
+      const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+      console.log(
+        `Error fetching transactions for order ${orderId}. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
       );
+      await sleep(delay);
     }
-
-    const data = await response.json();
-
-    if (data.transactions && Array.isArray(data.transactions)) {
-      return data.transactions.map((txn: any) => parseTransaction(txn));
-    }
-
-    return [];
-  } catch (error) {
-    console.error(`Error fetching transactions for order ${orderId}:`, error);
-    throw error;
   }
+
+  // Should never reach here, but TypeScript needs a return
+  return [];
 }
 
 /**
