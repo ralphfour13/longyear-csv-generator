@@ -33,6 +33,14 @@ export async function calculateOrderCogs(
     warnings: [],
   };
 
+  // DIAGNOSTIC: Log order details for COGS investigation
+  console.log(
+    `📊 COGS Debug - Order ${order.name}:\n` +
+    `  Line Items: ${order.lineItems.length}\n` +
+    `  SKUs: ${order.lineItems.map(i => i.sku || 'NO_SKU').join(', ')}\n` +
+    `  Financial Status: ${order.financialStatus}`
+  );
+
   // Process each line item
   for (const lineItem of order.lineItems) {
     try {
@@ -40,7 +48,10 @@ export async function calculateOrderCogs(
 
       if (!sku) {
         calculation.warnings.push(
-          `⚠️ No SKU found for item: ${lineItem.title}`
+          `⚠️ No SKU found for item: ${lineItem.title} (Qty: ${lineItem.quantity})`
+        );
+        console.log(
+          `  ❌ Line Item Missing SKU: "${lineItem.title}" x${lineItem.quantity}`
         );
         continue;
       }
@@ -49,10 +60,18 @@ export async function calculateOrderCogs(
 
       if (unitCost === null) {
         calculation.warnings.push(
-          `⚠️ COGS not found for Order ${order.name}: "${lineItem.title}" (SKU: ${sku})`
+          `⚠️ COGS not found for Order ${order.name}: "${lineItem.title}" (SKU: ${sku}, Qty: ${lineItem.quantity})`
+        );
+        console.log(
+          `  ❌ COGS Not Found in Cin7: SKU "${sku}" - "${lineItem.title}" x${lineItem.quantity}`
         );
         continue;
       }
+
+      // Log successful COGS lookup for verification
+      console.log(
+        `  ✓ COGS Found: SKU "${sku}" - $${unitCost.toFixed(2)} x${lineItem.quantity} = $${unitCost.times(lineItem.quantity).toFixed(2)}`
+      );
 
       // Validate cost is positive
       if (unitCost.lessThan(0)) {
