@@ -15,24 +15,43 @@ import { generatePayoutsWithOrders } from './payouts-with-orders-generator.serve
 import { generateJournalEntrySummary } from './journal-entry-summary-generator.server';
 
 /**
+ * File generation options
+ */
+export interface FileGenerationOptions {
+  generateDailySales?: boolean;
+  generatePayoutsOrders?: boolean;
+  generateJournalDetails?: boolean;
+  generateJournalSummary?: boolean;
+}
+
+/**
  * Process orders and generate CSV export (Order-Centric Approach)
  *
  * This is the main orchestration function that:
  * 1. Reconciles orders directly by capture date (no payout dependency)
  * 2. Captures ALL payment methods (cash, gift card, store credit, etc.)
  * 3. Applies account mappings
- * 4. Generates four export files
+ * 4. Generates export files based on options
  *
  * @param shop - Shop domain
  * @param accessToken - Shopify access token
  * @param targetDate - Target date (YYYY-MM-DD) - exports charges captured on this date
+ * @param fileOptions - Optional file generation options (defaults to all files)
  * @returns Export history entry with download info
  */
 export async function processExport(
   shop: string,
   accessToken: string,
-  targetDate: string
+  targetDate: string,
+  fileOptions?: FileGenerationOptions
 ): Promise<ExportHistoryEntry> {
+  // Default to generating all files if not specified
+  const options: Required<FileGenerationOptions> = {
+    generateDailySales: fileOptions?.generateDailySales ?? true,
+    generatePayoutsOrders: fileOptions?.generatePayoutsOrders ?? true,
+    generateJournalDetails: fileOptions?.generateJournalDetails ?? true,
+    generateJournalSummary: fileOptions?.generateJournalSummary ?? true,
+  };
   await logInfo(shop, 'Export', `Starting order-centric export for ${targetDate}`);
 
   try {
@@ -80,13 +99,14 @@ export async function processExport(
       allErrors.push(...validationErrors);
     }
 
-    // Step 5: Generate four files with error isolation
+    // Step 5: Generate files based on options with error isolation
     await logInfo(shop, 'Export', 'Generating export files...');
     const generatedFiles: GeneratedFile[] = [];
 
     // File #1: Detailed Sales Report
-    await logInfo(shop, 'Export', 'Generating Detailed Sales Report...');
-    try {
+    if (options.generateDailySales) {
+      await logInfo(shop, 'Export', 'Generating Detailed Sales Report...');
+      try {
       const detailedSalesFilename = `detailed-sales-report_${targetDate}.csv`;
       const detailedSalesContent = generateDailySalesReport(allEnrichedTransactions, targetDate);
       const detailedSalesPath = await writeExport(shop, detailedSalesFilename, detailedSalesContent);
@@ -115,10 +135,12 @@ export async function processExport(
         error: errorMsg,
       });
     }
+    }
 
     // File #2: Payouts with Orders
-    await logInfo(shop, 'Export', 'Generating Payouts with Orders...');
-    try {
+    if (options.generatePayoutsOrders) {
+      await logInfo(shop, 'Export', 'Generating Payouts with Orders...');
+      try {
       const payoutsFilename = `payouts-with-orders_${targetDate}.csv`;
       const payoutsContent = generatePayoutsWithOrders(allEnrichedTransactions);
       const payoutsPath = await writeExport(shop, payoutsFilename, payoutsContent);
@@ -147,12 +169,14 @@ export async function processExport(
         error: errorMsg,
       });
     }
+    }
 
     // File #3: Journal Entry Details (detailed format with Reference column)
-    await logInfo(shop, 'Export', 'Generating Journal Entry Details...');
-    const journalEntriesDetailsFilename = `journal-entry-details_${targetDate}.csv`;
-    let journalEntriesDetailsPath: string;
-    try {
+    if (options.generateJournalDetails) {
+      await logInfo(shop, 'Export', 'Generating Journal Entry Details...');
+      const journalEntriesDetailsFilename = `journal-entry-details_${targetDate}.csv`;
+      let journalEntriesDetailsPath: string;
+      try {
       journalEntriesDetailsPath = await generateCSV(shop, mappedEntries, journalEntriesDetailsFilename);
 
       generatedFiles.push({
@@ -178,11 +202,13 @@ export async function processExport(
         error: errorMsg,
       });
     }
+    }
 
     // File #4: Journal Entry Summary (one line per account for Sage 50 import)
-    await logInfo(shop, 'Export', 'Generating Journal Entry Summary...');
-    const journalEntrySummaryFilename = `journal-entry_${targetDate}.csv`;
-    try {
+    let journalEntrySummaryFilename = `journal-entry_${targetDate}.csv`; // Define outside for return statement
+    if (options.generateJournalSummary) {
+      await logInfo(shop, 'Export', 'Generating Journal Entry Summary...');
+      try {
       // Format date for summary (MM/DD/YYYY)
       const [year, month, day] = targetDate.split('-');
       const formattedDate = `${month}/${day}/${year}`;
@@ -213,6 +239,7 @@ export async function processExport(
         rowCount: 0,
         error: errorMsg,
       });
+    }
     }
 
     // Step 6: Calculate totals

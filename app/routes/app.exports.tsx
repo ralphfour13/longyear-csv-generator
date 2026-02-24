@@ -30,6 +30,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (action === 'export') {
     const useRange = formData.get('useRange') === 'true';
+    const fileOptions = {
+      generateDailySales: formData.get('generateDailySales') === 'true',
+      generatePayoutsOrders: formData.get('generatePayoutsOrders') === 'true',
+      generateJournalDetails: formData.get('generateJournalDetails') === 'true',
+      generateJournalSummary: formData.get('generateJournalSummary') === 'true',
+    };
 
     try {
       const { processExport } = await import('../services/batch-processor.server');
@@ -71,7 +77,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           const result = await processExport(
             shop,
             session.accessToken,
-            dateStr
+            dateStr,
+            fileOptions
           );
 
           // Append date to filenames for clarity
@@ -113,7 +120,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const result = await processExport(
           shop,
           session.accessToken,
-          dateParam
+          dateParam,
+          fileOptions
         );
 
         return Response.json({
@@ -147,6 +155,11 @@ export default function Exports() {
 
   const isExporting = navigation.state === 'submitting';
   const [useRange, setUseRange] = useState(false);
+  const [autoDownload, setAutoDownload] = useState(true);
+  const [generateDailySales, setGenerateDailySales] = useState(true);
+  const [generatePayoutsOrders, setGeneratePayoutsOrders] = useState(true);
+  const [generateJournalDetails, setGenerateJournalDetails] = useState(true);
+  const [generateJournalSummary, setGenerateJournalSummary] = useState(true);
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -158,9 +171,9 @@ export default function Exports() {
     window.open(url, '_blank');
   };
 
-  // Auto-download all files when export completes
+  // Auto-download all files when export completes (if enabled)
   useEffect(() => {
-    if (actionData?.success && actionData?.files) {
+    if (actionData?.success && actionData?.files && autoDownload) {
       // Small delay to ensure UI updates before downloads start
       setTimeout(() => {
         actionData.files.forEach((file: any, index: number) => {
@@ -174,7 +187,7 @@ export default function Exports() {
         });
       }, 500);
     }
-  }, [actionData, shop]);
+  }, [actionData, shop, autoDownload]);
 
   return (
     <s-page heading="Export Center">
@@ -252,6 +265,10 @@ export default function Exports() {
           <Form method="post">
             <input type="hidden" name="action" value="export" />
             <input type="hidden" name="useRange" value={useRange ? 'true' : 'false'} />
+            <input type="hidden" name="generateDailySales" value={generateDailySales ? 'true' : 'false'} />
+            <input type="hidden" name="generatePayoutsOrders" value={generatePayoutsOrders ? 'true' : 'false'} />
+            <input type="hidden" name="generateJournalDetails" value={generateJournalDetails ? 'true' : 'false'} />
+            <input type="hidden" name="generateJournalSummary" value={generateJournalSummary ? 'true' : 'false'} />
 
             <s-stack direction="block" gap="base">
               <div style={{ marginBottom: '12px' }}>
@@ -265,6 +282,60 @@ export default function Exports() {
                   <s-text>Use date range (generate exports for multiple days)</s-text>
                 </label>
               </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={autoDownload}
+                    onChange={(e) => setAutoDownload(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <s-text>Auto-download files after export</s-text>
+                </label>
+              </div>
+
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <s-stack direction="block" gap="tight">
+                  <s-text variant="headingSm">Files to Generate</s-text>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateDailySales}
+                      onChange={(e) => setGenerateDailySales(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <s-text>Detailed Sales Report</s-text>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={generatePayoutsOrders}
+                      onChange={(e) => setGeneratePayoutsOrders(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <s-text>Payouts with Orders</s-text>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateJournalDetails}
+                      onChange={(e) => setGenerateJournalDetails(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <s-text>Journal Entry Details</s-text>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateJournalSummary}
+                      onChange={(e) => setGenerateJournalSummary(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <s-text>Journal Entry Summary (Sage 50 Import)</s-text>
+                  </label>
+                </s-stack>
+              </s-box>
 
               <div style={{ maxWidth: '300px' }}>
                 <s-stack direction="block" gap="tight">
