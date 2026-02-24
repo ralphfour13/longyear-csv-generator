@@ -108,7 +108,7 @@ export class Cin7ProductService {
   }
 
   /**
-   * Batch get product costs
+   * Batch get product costs with controlled concurrency
    *
    * @param skus - Array of SKUs
    * @returns Map of SKU to cost (null if not found)
@@ -116,13 +116,16 @@ export class Cin7ProductService {
   async batchGetCosts(skus: string[]): Promise<Map<string, Decimal | null>> {
     const results = new Map<string, Decimal | null>();
 
-    // Process in parallel (rate limiter will handle throttling)
-    const promises = skus.map(async (sku) => {
-      const cost = await this.getProductCost(sku);
-      results.set(sku, cost);
-    });
-
-    await Promise.all(promises);
+    // Process with limited concurrency (5 at a time) to avoid overwhelming rate limiter
+    const CONCURRENCY = 5;
+    for (let i = 0; i < skus.length; i += CONCURRENCY) {
+      const batch = skus.slice(i, i + CONCURRENCY);
+      const promises = batch.map(async (sku) => {
+        const cost = await this.getProductCost(sku);
+        results.set(sku, cost);
+      });
+      await Promise.all(promises);
+    }
 
     return results;
   }

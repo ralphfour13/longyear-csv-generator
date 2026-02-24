@@ -15,6 +15,52 @@ const RATE_LIMIT_PER_MINUTE = 300;
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 
+// Conservative rate limit: 200/min instead of 300 to leave headroom
+const CONSERVATIVE_RATE_LIMIT = 200;
+
+/**
+ * Global rate limit state shared across all client instances
+ */
+class GlobalRateLimitState {
+  private static instance: GlobalRateLimitState;
+  private cooldownUntil: number = 0;
+
+  static getInstance(): GlobalRateLimitState {
+    if (!GlobalRateLimitState.instance) {
+      GlobalRateLimitState.instance = new GlobalRateLimitState();
+    }
+    return GlobalRateLimitState.instance;
+  }
+
+  /**
+   * Set a global cooldown period
+   */
+  setCooldown(seconds: number): void {
+    const cooldownMs = seconds * 1000;
+    this.cooldownUntil = Date.now() + cooldownMs;
+    console.warn(`⚠️ Cin7 rate limit hit. Pausing ALL requests for ${seconds} seconds...`);
+  }
+
+  /**
+   * Check if we're in a cooldown period
+   */
+  async waitForCooldown(): Promise<void> {
+    const now = Date.now();
+    if (now < this.cooldownUntil) {
+      const waitMs = this.cooldownUntil - now;
+      console.warn(`⏳ Waiting ${Math.ceil(waitMs / 1000)}s for rate limit cooldown...`);
+      await sleep(waitMs);
+    }
+  }
+
+  /**
+   * Check if currently in cooldown
+   */
+  isInCooldown(): boolean {
+    return Date.now() < this.cooldownUntil;
+  }
+}
+
 /**
  * Token Bucket Rate Limiter
  */
@@ -35,6 +81,9 @@ class TokenBucket {
    * Wait until a token is available, then consume it
    */
   async wait(): Promise<void> {
+    // Check global cooldown first
+    await GlobalRateLimitState.getInstance().waitForCooldown();
+
     while (true) {
       this.refill();
 
@@ -76,7 +125,8 @@ export class Cin7Client {
     this.baseUrl = baseUrl || process.env.CIN7_BASE_URL || BASE_URL;
     this.accountId = accountId;
     this.apiKey = apiKey;
-    this.rateLimiter = new TokenBucket(50, RATE_LIMIT_PER_MINUTE); // Allow bursts up to 50
+    // Conservative: 20 token capacity, 200 req/min (lower than 300 limit)
+    this.rateLimiter = new TokenBucket(20, CONSERVATIVE_RATE_LIMIT);
   }
 
   /**
@@ -107,6 +157,8 @@ export class Cin7Client {
       // Handle 429 - rate limited
       if (response.status === 429) {
         const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10);
+        // Set global cooldown to pause all requests
+        GlobalRateLimitState.getInstance().setCooldown(retryAfter);
         throw new Cin7RateLimitError(retryAfter, 'Rate limit exceeded');
       }
 
