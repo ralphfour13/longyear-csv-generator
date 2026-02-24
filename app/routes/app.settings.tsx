@@ -6,6 +6,8 @@ import { updateShopSchedule } from '../services/scheduler.server';
 import type { SyncConfig } from '../types/journal-entry';
 import { PrismaSessionStorage } from '@shopify/shopify-app-session-storage-prisma';
 import prisma from '../db.server';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -21,7 +23,89 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const shop = session.shop;
 
   const formData = await request.formData();
+  const actionType = formData.get('actionType') as string;
 
+  // Handle order debug action
+  if (actionType === 'debugOrder') {
+    try {
+      const orderNumber = formData.get('orderNumber') as string;
+
+      if (!orderNumber) {
+        return Response.json(
+          { success: false, error: 'Order number is required' },
+          { status: 400 }
+        );
+      }
+
+      // Fetch order details from Shopify
+      const url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(orderNumber)}&status=any`;
+
+      const response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': session.accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.orders || data.orders.length === 0) {
+        return Response.json(
+          { success: false, error: `Order ${orderNumber} not found` },
+          { status: 404 }
+        );
+      }
+
+      const order = data.orders[0];
+
+      // Fetch transactions for this order
+      const txnUrl = `https://${shop}/admin/api/2024-10/orders/${order.id}/transactions.json`;
+      const txnResponse = await fetch(txnUrl, {
+        headers: {
+          'X-Shopify-Access-Token': session.accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (txnResponse.ok) {
+        const txnData = await txnResponse.json();
+        order.transactions = txnData.transactions;
+      }
+
+      // Save to file
+      const dataDir = path.join(process.cwd(), 'data', shop, 'debug');
+      await fs.mkdir(dataDir, { recursive: true });
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `order-${orderNumber.replace('#', '')}-${timestamp}.json`;
+      const filePath = path.join(dataDir, filename);
+
+      await fs.writeFile(filePath, JSON.stringify(order, null, 2));
+
+      return Response.json({
+        success: true,
+        message: `Order ${orderNumber} data saved successfully`,
+        filePath: filePath,
+        orderId: order.id,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+        financialStatus: order.financial_status,
+        transactionCount: order.transactions?.length || 0,
+      });
+    } catch (error) {
+      console.error('Debug order error:', error);
+      return Response.json(
+        { success: false, error: `Failed to fetch order: ${error instanceof Error ? error.message : String(error)}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Handle settings save action (existing logic)
   try {
     const config: SyncConfig = {
       shop,
@@ -242,6 +326,69 @@ export default function Settings() {
           </s-button>
         </div>
       </Form>
+
+      <s-section heading="Developer Tools">
+        <s-stack direction="block" gap="large">
+          <s-paragraph>
+            Debug individual orders by fetching their complete JSON payload from Shopify.
+          </s-paragraph>
+
+          <Form method="post">
+            <input type="hidden" name="actionType" value="debugOrder" />
+            <s-stack direction="block" gap="base">
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySm">Order Number</s-text>
+                <input
+                  type="text"
+                  name="orderNumber"
+                  placeholder="#80819"
+                  style={{
+                    width: '100%',
+                    maxWidth: '300px',
+                    padding: '10px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-200)',
+                    fontSize: '14px',
+                  }}
+                />
+                <s-text tone="subdued" variant="bodySm">
+                  Enter order number with or without # (e.g., 80819 or #80819)
+                </s-text>
+              </s-stack>
+
+              <s-button type="submit">Fetch Order JSON</s-button>
+            </s-stack>
+          </Form>
+
+          {actionData?.success && actionData.filePath && (
+            <s-banner tone="success">
+              <s-stack direction="block" gap="tight">
+                <s-text>
+                  <strong>Order data saved successfully!</strong>
+                </s-text>
+                <s-text variant="bodySm">
+                  <strong>File:</strong> {actionData.filePath}
+                </s-text>
+                <s-text variant="bodySm">
+                  <strong>Order ID:</strong> {actionData.orderId}
+                </s-text>
+                <s-text variant="bodySm">
+                  <strong>Created:</strong> {actionData.createdAt}
+                </s-text>
+                <s-text variant="bodySm">
+                  <strong>Updated:</strong> {actionData.updatedAt}
+                </s-text>
+                <s-text variant="bodySm">
+                  <strong>Financial Status:</strong> {actionData.financialStatus}
+                </s-text>
+                <s-text variant="bodySm">
+                  <strong>Transactions:</strong> {actionData.transactionCount}
+                </s-text>
+              </s-stack>
+            </s-banner>
+          )}
+        </s-stack>
+      </s-section>
 
       <s-section heading="How It Works" slot="aside">
         <s-stack direction="block" gap="base">
