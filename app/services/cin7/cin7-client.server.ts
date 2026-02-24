@@ -15,8 +15,8 @@ const RATE_LIMIT_PER_MINUTE = 300;
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 
-// Conservative rate limit: 200/min instead of 300 to leave headroom
-const CONSERVATIVE_RATE_LIMIT = 200;
+// Very conservative rate limit: 120/min (2 req/sec) - leaves 60% headroom for Cin7's 300/min limit
+const CONSERVATIVE_RATE_LIMIT = 120;
 
 /**
  * Global rate limit state shared across all client instances
@@ -125,8 +125,8 @@ export class Cin7Client {
     this.baseUrl = baseUrl || process.env.CIN7_BASE_URL || BASE_URL;
     this.accountId = accountId;
     this.apiKey = apiKey;
-    // Conservative: 20 token capacity, 200 req/min (lower than 300 limit)
-    this.rateLimiter = new TokenBucket(20, CONSERVATIVE_RATE_LIMIT);
+    // Very conservative: 10 token capacity, 120 req/min (2 req/sec with small bursts)
+    this.rateLimiter = new TokenBucket(10, CONSERVATIVE_RATE_LIMIT);
   }
 
   /**

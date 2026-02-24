@@ -270,15 +270,47 @@ export async function collectCogsData(
     return cogsDataMap;
   }
 
-  // Calculate COGS for each order
+  console.log(`📦 Collecting COGS data for ${orders.length} orders...`);
+
+  // OPTIMIZATION: Collect all unique SKUs across all orders first
+  const uniqueSkus = new Set<string>();
+  for (const order of orders) {
+    for (const lineItem of order.lineItems) {
+      if (lineItem.sku) {
+        uniqueSkus.add(lineItem.sku);
+      }
+    }
+  }
+
+  console.log(`📊 Found ${uniqueSkus.length} unique SKUs across ${orders.length} orders`);
+
+  // Pre-fetch all costs in one batch (with rate limiting and caching)
+  const skuArray = Array.from(uniqueSkus);
+  const cin7Service = new (await import('./cin7/cin7-product-service.server')).Cin7ProductService(shop);
+  await cin7Service.initialize();
+
+  console.log(`🔄 Fetching costs for ${skuArray.length} unique SKUs (cached hits will be instant)...`);
+  await cin7Service.batchGetCosts(skuArray);
+  console.log(`✅ Cost pre-fetch complete`);
+
+  // Now calculate COGS for each order (costs are cached, so this is fast)
+  let ordersProcessed = 0;
   for (const order of orders) {
     try {
       const cogsCalculation = await calculateOrderCogs(shop, order);
       cogsDataMap.set(order.id, cogsCalculation);
+      ordersProcessed++;
+
+      // Log progress every 50 orders
+      if (ordersProcessed % 50 === 0) {
+        console.log(`  Processed COGS for ${ordersProcessed}/${orders.length} orders...`);
+      }
     } catch (error) {
       console.error(`Failed to calculate COGS for order ${order.name}:`, error);
     }
   }
+
+  console.log(`✅ COGS collection complete: ${ordersProcessed} orders processed`);
 
   return cogsDataMap;
 }

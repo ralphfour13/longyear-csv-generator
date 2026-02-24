@@ -116,8 +116,9 @@ export class Cin7ProductService {
   async batchGetCosts(skus: string[]): Promise<Map<string, Decimal | null>> {
     const results = new Map<string, Decimal | null>();
 
-    // Process with limited concurrency (5 at a time) to avoid overwhelming rate limiter
-    const CONCURRENCY = 5;
+    // Process with limited concurrency (2 at a time) to avoid overwhelming rate limiter
+    // Very conservative to stay well under Cin7's 300 req/min limit
+    const CONCURRENCY = 2;
     for (let i = 0; i < skus.length; i += CONCURRENCY) {
       const batch = skus.slice(i, i + CONCURRENCY);
       const promises = batch.map(async (sku) => {
@@ -125,6 +126,11 @@ export class Cin7ProductService {
         results.set(sku, cost);
       });
       await Promise.all(promises);
+
+      // Log progress for large batches
+      if (i > 0 && i % 20 === 0) {
+        console.log(`  Fetched ${i}/${skus.length} SKU costs...`);
+      }
     }
 
     return results;
