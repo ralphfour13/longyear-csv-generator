@@ -90,6 +90,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         success: true,
         message: `Order ${orderNumber} data saved successfully`,
         filePath: filePath,
+        filename: filename,
         orderId: order.id,
         createdAt: order.created_at,
         updatedAt: order.updated_at,
@@ -367,7 +368,14 @@ export default function Settings() {
                   <strong>Order data saved successfully!</strong>
                 </s-text>
                 <s-text variant="bodySm">
-                  <strong>File:</strong> {actionData.filePath}
+                  <strong>File:</strong>{' '}
+                  <a
+                    href={`/app/download-debug?filename=${encodeURIComponent(actionData.filename)}`}
+                    download={actionData.filename}
+                    style={{ color: 'var(--p-color-text-brand)', textDecoration: 'underline' }}
+                  >
+                    {actionData.filename}
+                  </a>
                 </s-text>
                 <s-text variant="bodySm">
                   <strong>Order ID:</strong> {actionData.orderId}
