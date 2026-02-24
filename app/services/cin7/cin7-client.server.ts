@@ -67,11 +67,13 @@ class TokenBucket {
  * Cin7 API Client
  */
 export class Cin7Client {
+  private baseUrl: string;
   private accountId: string;
   private apiKey: string;
   private rateLimiter: TokenBucket;
 
-  constructor(accountId: string, apiKey: string) {
+  constructor(accountId: string, apiKey: string, baseUrl?: string) {
+    this.baseUrl = baseUrl || process.env.CIN7_BASE_URL || BASE_URL;
     this.accountId = accountId;
     this.apiKey = apiKey;
     this.rateLimiter = new TokenBucket(50, RATE_LIMIT_PER_MINUTE); // Allow bursts up to 50
@@ -89,7 +91,7 @@ export class Cin7Client {
     return this.retryWithBackoff(async () => {
       await this.rateLimiter.wait();
 
-      const url = `${BASE_URL}/product?sku=${encodeURIComponent(sku)}`;
+      const url = `${this.baseUrl}/product?sku=${encodeURIComponent(sku)}`;
       const response = await fetch(url, {
         headers: {
           'api-auth-accountid': this.accountId,

@@ -22,7 +22,10 @@ function getEncryptionKey(): Buffer {
   if (!keyString) {
     throw new Error(
       'CIN7_ENCRYPTION_KEY environment variable is not set. ' +
-      'Generate one with: openssl rand -hex 32'
+      'This is required to save Cin7 credentials via the UI. ' +
+      'Generate one with: openssl rand -hex 32\n\n' +
+      'Note: If using environment variables (CIN7_API_AUTH_ACCOUNT_ID, CIN7_API_AUTH_APPLICATION_KEY), ' +
+      'you can skip UI configuration and this key is not needed.'
     );
   }
 

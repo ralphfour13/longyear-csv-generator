@@ -17,8 +17,13 @@ const DATA_DIR = 'data';
 /**
  * Get Cin7 configuration for a shop
  *
+ * Priority:
+ * 1. Shop-specific config file (if exists)
+ * 2. Environment variables (global defaults)
+ * 3. Default disabled config
+ *
  * @param shop - Shop domain
- * @returns Decrypted Cin7 configuration, or default config if not found
+ * @returns Decrypted Cin7 configuration
  */
 export async function getCin7Config(shop: string): Promise<Cin7Config> {
   const configPath = getConfigPath(shop);
@@ -27,7 +32,7 @@ export async function getCin7Config(shop: string): Promise<Cin7Config> {
     const fileContent = await fs.readFile(configPath, 'utf-8');
     const encryptedConfig = JSON.parse(fileContent) as Cin7Config;
 
-    // Decrypt sensitive fields
+    // Decrypt sensitive fields from shop-specific config
     return {
       ...encryptedConfig,
       accountId: encryptedConfig.accountId ? decrypt(encryptedConfig.accountId) : '',
@@ -35,13 +40,35 @@ export async function getCin7Config(shop: string): Promise<Cin7Config> {
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      // File doesn't exist - return default config
-      return getDefaultConfig();
+      // File doesn't exist - use environment variables or defaults
+      return getConfigFromEnv();
     }
     throw new Error(
       `Failed to read Cin7 config: ${error instanceof Error ? error.message : String(error)}`
     );
   }
+}
+
+/**
+ * Get Cin7 configuration from environment variables
+ *
+ * @returns Configuration from environment, or default disabled config
+ */
+function getConfigFromEnv(): Cin7Config {
+  const accountId = process.env.CIN7_API_AUTH_ACCOUNT_ID || '';
+  const apiKey = process.env.CIN7_API_AUTH_APPLICATION_KEY || '';
+
+  // If both credentials are set in environment, enable by default
+  const enabled = !!(accountId && apiKey);
+
+  return {
+    enabled,
+    accountId,
+    apiKey,
+    cacheEnabled: true,
+    cacheDurationHours: 24,
+    useFallback: false,
+  };
 }
 
 /**
