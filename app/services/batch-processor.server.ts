@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import type { ExportHistoryEntry, ReconciliationResult, JournalEntry, EnrichedTransaction, GeneratedFile } from '../types/journal-entry';
+import type { ExportHistoryEntry, ReconciliationResult, JournalEntry, EnrichedTransaction, GeneratedFile, Order } from '../types/journal-entry';
 import { fetchPayouts } from './shopify/payout-fetcher.server';
 import { fetchOrdersByDateRange } from './shopify/order-fetcher.server';
 import { reconcilePayout } from './reconciler.server';
@@ -86,6 +86,7 @@ export async function processExport(
     // Step 1.5: Collect COGS data (if Cin7 enabled)
     const cin7Enabled = await isCin7Enabled(shop);
     let cogsDataMap = new Map();
+    let cogsOrders: Order[] = []; // Store orders for reuse in COGS details CSV
 
     if (cin7Enabled) {
       await logInfo(shop, 'Export', 'Collecting COGS data from Cin7...');
@@ -94,6 +95,9 @@ export async function processExport(
         const startDate = addDays(targetDate, -2);
         const endDate = addDays(targetDate, 2);
         const orders = await fetchOrdersByCaptureDateRange(shop, accessToken, startDate, endDate);
+
+        // Store orders for later reuse (prevents 3rd API fetch)
+        cogsOrders = orders;
 
         cogsDataMap = await collectCogsData(shop, orders);
         await logInfo(shop, 'Export', `Collected COGS data for ${cogsDataMap.size} orders`);
@@ -274,10 +278,8 @@ export async function processExport(
       try {
         const cogsDetailsFilename = `cogs-details_${targetDate}.csv`;
 
-        // Get orders for COGS export
-        const startDate = addDays(targetDate, -2);
-        const endDate = addDays(targetDate, 2);
-        const orders = await fetchOrdersByCaptureDateRange(shop, accessToken, startDate, endDate);
+        // Reuse orders from COGS data collection (prevents redundant API fetch and session expiration)
+        const orders = cogsOrders;
 
         const cogsDetailsContent = generateCogsDetailCSV(orders, cogsDataMap);
         const cogsDetailsPath = await writeExport(shop, cogsDetailsFilename, cogsDetailsContent);
