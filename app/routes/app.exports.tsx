@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
-import { Form, useActionData, useLoaderData, useNavigation, useFetcher } from 'react-router';
+import { Form, useActionData, useLoaderData, useNavigation, useFetcher, useRevalidator } from 'react-router';
 import { useEffect, useState, useRef } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats } from '../services/storage.server';
@@ -156,6 +156,7 @@ export default function Exports() {
   const { shop, exports } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const revalidator = useRevalidator();
 
   const isExporting = navigation.state === 'submitting';
   const [useRange, setUseRange] = useState(false);
@@ -218,6 +219,9 @@ export default function Exports() {
           pollIntervalRef.current = null;
         }
 
+        // Revalidate to refresh export history table
+        revalidator.revalidate();
+
         // Trigger auto-download if enabled
         if (autoDownload && job.result?.files) {
           setTimeout(() => {
@@ -240,15 +244,21 @@ export default function Exports() {
           clearInterval(pollIntervalRef.current);
           pollIntervalRef.current = null;
         }
+
+        // Revalidate even on failure to show any partial exports
+        revalidator.revalidate();
       } else if (job.status === 'processing') {
         setJobStatus('Processing export...');
       }
     }
-  }, [fetcher.data, autoDownload, shop]);
+  }, [fetcher.data, autoDownload, shop, revalidator]);
 
   // Legacy: Auto-download all files when export completes immediately (backward compatibility)
   useEffect(() => {
     if (actionData?.success && actionData?.files && !actionData?.processing && autoDownload) {
+      // Revalidate to refresh export history table
+      revalidator.revalidate();
+
       // Small delay to ensure UI updates before downloads start
       setTimeout(() => {
         actionData.files.forEach((file: any, index: number) => {
@@ -262,7 +272,7 @@ export default function Exports() {
         });
       }, 500);
     }
-  }, [actionData, shop, autoDownload]);
+  }, [actionData, shop, autoDownload, revalidator]);
 
   return (
     <s-page heading="Export Center">
