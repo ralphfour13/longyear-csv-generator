@@ -209,13 +209,13 @@ export async function enrichOrderData(
 
 /**
  * Parse tax breakdown from Shopify tax_lines
- * Returns up to 3 tax lines for display
+ * Returns up to 5 tax lines for display
  */
 export function parseTaxBreakdown(taxLines: any[]): TaxLine[] {
   const parsed: TaxLine[] = [];
 
-  // Take up to 3 tax lines
-  const limitedTaxLines = taxLines.slice(0, 3);
+  // Take up to 5 tax lines
+  const limitedTaxLines = taxLines.slice(0, 5);
 
   for (const taxLine of limitedTaxLines) {
     parsed.push({
