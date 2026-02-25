@@ -237,18 +237,27 @@ export async function processExport(
     }
 
     // File #4: Journal Entry Summary (one line per account for Sage 50 import)
+    // Generated in both .txt and .csv formats with identical contents
     let journalEntrySummaryFilename = `journal-entry_${targetDate}.csv`; // Define outside for return statement
+    let journalEntrySummaryTxtFilename = `journal-entry_${targetDate}.txt`;
     if (options.generateJournalSummary) {
-      await logInfo(shop, 'Export', 'Generating Journal Entry Summary...');
+      await logInfo(shop, 'Export', 'Generating Journal Entry Summary (.txt and .csv)...');
       try {
       // Format date for summary (MM/DD/YYYY)
       const [year, month, day] = targetDate.split('-');
       const formattedDate = `${month}/${day}/${year}`;
 
       const journalEntrySummaryContent = generateJournalEntrySummary(mappedEntries, formattedDate);
+
+      // Write CSV file
       const journalEntrySummaryPath = await writeExport(shop, journalEntrySummaryFilename, journalEntrySummaryContent);
 
-      const rowCount = journalEntrySummaryContent.split('\n').length - 1; // Subtract header row
+      // Write TXT file with identical content
+      const journalEntrySummaryTxtPath = await writeExport(shop, journalEntrySummaryTxtFilename, journalEntrySummaryContent);
+
+      const rowCount = journalEntrySummaryContent.split('\n').length;
+
+      // Add CSV file to generated files
       generatedFiles.push({
         type: 'journal-entry-summary',
         filename: journalEntrySummaryFilename,
@@ -256,8 +265,16 @@ export async function processExport(
         rowCount,
       });
 
-      console.log(`✅ Journal Entry Summary created: ${journalEntrySummaryFilename} (${rowCount} rows)`);
-      await logInfo(shop, 'Export', `Journal Entry Summary saved: ${journalEntrySummaryFilename}`);
+      // Add TXT file to generated files
+      generatedFiles.push({
+        type: 'journal-entry-summary',
+        filename: journalEntrySummaryTxtFilename,
+        downloadUrl: `/api/download-csv?shop=${shop}&filename=${journalEntrySummaryTxtFilename}`,
+        rowCount,
+      });
+
+      console.log(`✅ Journal Entry Summary created: ${journalEntrySummaryFilename} and ${journalEntrySummaryTxtFilename} (${rowCount} rows)`);
+      await logInfo(shop, 'Export', `Journal Entry Summary saved: ${journalEntrySummaryFilename} and ${journalEntrySummaryTxtFilename}`);
     } catch (error) {
       const errorMsg = `Journal Entry Summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
       console.error('❌ Journal Entry Summary error:', error);
@@ -267,6 +284,14 @@ export async function processExport(
       generatedFiles.push({
         type: 'journal-entry-summary',
         filename: journalEntrySummaryFilename,
+        downloadUrl: '',
+        rowCount: 0,
+        error: errorMsg,
+      });
+
+      generatedFiles.push({
+        type: 'journal-entry-summary',
+        filename: journalEntrySummaryTxtFilename,
         downloadUrl: '',
         rowCount: 0,
         error: errorMsg,
