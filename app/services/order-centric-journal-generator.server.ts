@@ -185,6 +185,17 @@ export async function createOrderJournalEntries(
  * Refunds reverse the original order entries.
  * Uses the refund transaction's processedAt date.
  *
+ * Entry structure:
+ * - RF- entries: Credit payment account (refund payment going out)
+ * - SO- reversal entries: Debit sales revenue, tax, and shipping (reverse original credits)
+ *
+ * Example refund ($620.98 total: $579.00 sales + $41.98 tax):
+ * RF-#80427: Refund - Order #80427
+ *   1061.000 (Credit Card)     -620.98 Cr  [Refund payment out]
+ * SO-#80427: Reversals
+ *   3000.000 (Sales)           +579.00 Dr  [Reverse original sales credit]
+ *   2110.000 (Tax)              +41.98 Dr  [Reverse original tax credit]
+ *
  * @param shop - Shop domain (for account mappings)
  * @param order - Order being refunded
  * @param refundTransactions - Refund transactions for target date
@@ -201,22 +212,9 @@ export async function createRefundJournalEntries(
   const accountMappings = await getAccountMappings(shop);
 
   for (const refundTxn of refundTransactions) {
-    const reference = `RF-${order.name}`;
     const refundAmount = refundTxn.amount.abs();
 
-    // DEBIT: Sales Returns & Refunds
-    entries.push({
-      date: targetDate,
-      reference,
-      account: accountMappings.refunds_given.accountCode,
-      accountName: accountMappings.refunds_given.accountName,
-      debit: refundAmount,
-      credit: new Decimal(0),
-      memo: `Refund - Order ${order.name}`,
-    });
-
-    // CREDIT: Payment method account (reverse original debit)
-    // Determine which payment method to credit based on refund gateway
+    // RF- ENTRY: Payment reversal (credit payment account)
     const { account, accountName } = await getRefundAccount(
       shop,
       refundTxn.gateway,
@@ -225,13 +223,58 @@ export async function createRefundJournalEntries(
 
     entries.push({
       date: targetDate,
-      reference,
+      reference: `RF-${order.name}`,
       account,
       accountName,
       debit: new Decimal(0),
       credit: refundAmount,
       memo: `Refund ${accountName} - Order ${order.name}`,
     });
+
+    // SO- REVERSAL ENTRIES: Reverse revenue and tax
+    // Calculate amounts from order (must match original SO- entry calculation)
+    const netSales = calculateNetSalesForRefund(order);
+    const taxAmount = order.totalTax || new Decimal(0);
+    const shippingAmount = order.totalShipping || new Decimal(0);
+
+    // DEBIT: Sales Revenue (reverse original credit)
+    if (netSales.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference: `SO-${order.name}`,
+        account: accountMappings.sales_revenue.accountCode,
+        accountName: accountMappings.sales_revenue.accountName,
+        debit: netSales,
+        credit: new Decimal(0),
+        memo: `Sales Refund - Order ${order.name}`,
+      });
+    }
+
+    // DEBIT: Sales Tax (reverse original credit)
+    if (taxAmount.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference: `SO-${order.name}`,
+        account: accountMappings.sales_tax.accountCode,
+        accountName: accountMappings.sales_tax.accountName,
+        debit: taxAmount,
+        credit: new Decimal(0),
+        memo: `Sales Tax Refund - Order ${order.name}`,
+      });
+    }
+
+    // DEBIT: Shipping Revenue (reverse original credit, if applicable)
+    if (shippingAmount.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference: `SO-${order.name}`,
+        account: accountMappings.shipping_revenue.accountCode,
+        accountName: accountMappings.shipping_revenue.accountName,
+        debit: shippingAmount,
+        credit: new Decimal(0),
+        memo: `Shipping Refund - Order ${order.name}`,
+      });
+    }
   }
 
   // NOTE: COGS entries are NOT reversed for refunds
@@ -297,6 +340,35 @@ async function getRefundAccount(
         account: accountMappings.clearing_account.accountCode,
         accountName: accountMappings.clearing_account.accountName,
       };
+  }
+}
+
+/**
+ * Calculate net sales amount for refund reversal
+ * Must match the original SO- entry calculation from createOrderJournalEntries()
+ *
+ * @param order - Order being refunded
+ * @returns Net sales amount (post-discount)
+ */
+function calculateNetSalesForRefund(order: Order): Decimal {
+  // Check if order has been refunded
+  const isRefunded =
+    order.financialStatus === 'refunded' ||
+    order.financialStatus === 'partially_refunded';
+
+  if (isRefunded) {
+    // For refunded orders: Use ORIGINAL subtotal (before refunds)
+    // This ensures reversal matches the original SO- entry
+    return order.subtotalPrice;
+  } else if (order.currentSubtotalPrice) {
+    // For non-refunded orders: currentSubtotalPrice is NET (after discounts)
+    return order.currentSubtotalPrice;
+  } else {
+    // Fallback: Calculate NET from total payment minus tax and shipping
+    // NET Sales = Total Payment - Tax - Shipping
+    return order.totalPrice
+      .minus(order.totalTax || new Decimal(0))
+      .minus(order.totalShipping || new Decimal(0));
   }
 }
 
