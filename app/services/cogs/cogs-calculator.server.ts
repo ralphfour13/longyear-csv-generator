@@ -12,18 +12,19 @@ import { extractSkuFromLineItem } from './product-matcher.server';
  */
 
 /**
- * Calculate COGS for an order
+ * Calculate COGS for an order using pre-initialized service (optimized)
  *
- * @param shop - Shop domain
+ * This is the optimized version that reuses a service instance.
+ * Use this when calculating COGS for multiple orders to avoid initialization overhead.
+ *
+ * @param cin7Service - Pre-initialized Cin7ProductService instance
  * @param order - Shopify order
  * @returns COGS calculation with line items and warnings
  */
-export async function calculateOrderCogs(
-  shop: string,
+export async function calculateOrderCogsWithService(
+  cin7Service: Cin7ProductService,
   order: Order
 ): Promise<CogsCalculation> {
-  const cin7Service = new Cin7ProductService(shop);
-  await cin7Service.initialize();
 
   const calculation: CogsCalculation = {
     orderId: order.id,
@@ -103,6 +104,26 @@ export async function calculateOrderCogs(
   }
 
   return calculation;
+}
+
+/**
+ * Calculate COGS for an order (backward compatible)
+ *
+ * This function creates a new service instance for each call.
+ * For better performance with multiple orders, use calculateOrderCogsWithService()
+ * with a shared service instance.
+ *
+ * @param shop - Shop domain
+ * @param order - Shopify order
+ * @returns COGS calculation with line items and warnings
+ */
+export async function calculateOrderCogs(
+  shop: string,
+  order: Order
+): Promise<CogsCalculation> {
+  const cin7Service = new Cin7ProductService(shop);
+  await cin7Service.initialize();
+  return calculateOrderCogsWithService(cin7Service, order);
 }
 
 /**

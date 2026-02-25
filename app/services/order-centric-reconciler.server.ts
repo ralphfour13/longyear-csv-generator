@@ -24,8 +24,9 @@ import {
   validateOrderEntries,
 } from './order-centric-journal-generator.server';
 import { enrichOrderData } from './enrichment/order-enrichment.server';
-import { calculateOrderCogs } from './cogs/cogs-calculator.server';
+import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
+import { Cin7ProductService } from './cin7/cin7-product-service.server';
 
 /**
  * Reconcile orders by capture date
@@ -247,6 +248,7 @@ export async function reconcileOrdersByDate(
     return {
       journalEntries,
       enrichedTransactions,
+      orders, // Return fetched orders to avoid duplicate fetching
       balanced,
       errors,
       warnings,
@@ -262,6 +264,7 @@ export async function reconcileOrdersByDate(
     return {
       journalEntries,
       enrichedTransactions,
+      orders: [], // Return empty array on error
       balanced: false,
       errors,
       warnings,
@@ -294,6 +297,10 @@ export async function collectCogsData(
 
   console.log(`📦 Collecting COGS data for ${orders.length} orders...`);
 
+  // OPTIMIZATION (Phase 2): Initialize Cin7 service ONCE for all orders
+  const cin7Service = new Cin7ProductService(shop);
+  await cin7Service.initialize();
+
   // OPTIMIZATION: Collect all unique SKUs across all orders first
   const uniqueSkus = new Set<string>();
   for (const order of orders) {
@@ -304,22 +311,21 @@ export async function collectCogsData(
     }
   }
 
-  console.log(`📊 Found ${uniqueSkus.length} unique SKUs across ${orders.length} orders`);
+  console.log(`📊 Found ${uniqueSkus.size} unique SKUs across ${orders.length} orders`);
 
   // Pre-fetch all costs in one batch (with rate limiting and caching)
   const skuArray = Array.from(uniqueSkus);
-  const cin7Service = new (await import('./cin7/cin7-product-service.server')).Cin7ProductService(shop);
-  await cin7Service.initialize();
 
   console.log(`🔄 Fetching costs for ${skuArray.length} unique SKUs (cached hits will be instant)...`);
   await cin7Service.batchGetCosts(skuArray);
   console.log(`✅ Cost pre-fetch complete`);
 
   // Now calculate COGS for each order (costs are cached, so this is fast)
+  // OPTIMIZATION (Phase 2): Reuse same cin7Service instance for all orders
   let ordersProcessed = 0;
   for (const order of orders) {
     try {
-      const cogsCalculation = await calculateOrderCogs(shop, order);
+      const cogsCalculation = await calculateOrderCogsWithService(cin7Service, order);
       cogsDataMap.set(order.id, cogsCalculation);
       ordersProcessed++;
 

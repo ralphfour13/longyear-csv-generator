@@ -326,6 +326,7 @@ export interface ExportJob {
 export interface OrderCentricReconciliationResult {
   journalEntries: JournalEntry[];
   enrichedTransactions: EnrichedTransaction[];
+  orders: Order[]; // Fetched orders from Shopify (to avoid duplicate fetching)
   balanced: boolean;
   errors: string[];
   warnings: string[];

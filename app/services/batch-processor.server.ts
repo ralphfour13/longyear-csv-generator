@@ -82,6 +82,7 @@ export async function processExport(
 
     const allJournalEntries: JournalEntry[] = result.journalEntries;
     const allEnrichedTransactions: EnrichedTransaction[] = result.enrichedTransactions;
+    const orders: Order[] = result.orders; // Use orders from reconciliation result (Phase 1 optimization)
     const allErrors: string[] = result.errors;
     const allWarnings: string[] = result.warnings;
     const cogsWarnings: string[] = result.cogsWarnings || [];
@@ -96,12 +97,8 @@ export async function processExport(
     if (cin7Enabled) {
       await logInfo(shop, 'Export', 'Collecting COGS data from Cin7...');
       try {
-        // Fetch orders again to get full data (with SKUs)
-        const startDate = addDays(targetDate, -2);
-        const endDate = addDays(targetDate, 2);
-        const orders = await fetchOrdersByCaptureDateRange(shop, accessToken, startDate, endDate);
-
-        // Store orders for later reuse (prevents 3rd API fetch)
+        // OPTIMIZATION (Phase 1): Reuse orders from reconciliation result
+        // Previously fetched orders again here - now using result.orders
         cogsOrders = orders;
 
         cogsDataMap = await collectCogsData(shop, orders);
