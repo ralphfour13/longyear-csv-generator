@@ -49,11 +49,57 @@ export interface PaymentBreakdown {
 }
 
 /**
+ * Fetch transactions for an order from Shopify Admin API
+ *
+ * Note: The /orders/{id}.json endpoint does NOT include transactions by default.
+ * We must fetch them separately from /orders/{id}/transactions.json
+ *
+ * @param shop - Shop domain
+ * @param accessToken - Shopify access token
+ * @param orderId - Order ID to fetch transactions for
+ * @returns Array of transactions or empty array if none found
+ */
+async function fetchTransactionsForEnrichment(
+  shop: string,
+  accessToken: string,
+  orderId: string
+): Promise<any[]> {
+  const url = `https://${shop}/admin/api/2024-10/orders/${orderId}/transactions.json`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.warn(`No transactions found for order ${orderId}`);
+        return [];
+      }
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to fetch transactions for order ${orderId}: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const data = await response.json();
+    return data.transactions || [];
+  } catch (error) {
+    console.error(`Error fetching transactions for order ${orderId}:`, error);
+    // Return empty array rather than throwing - we can still enrich other fields
+    return [];
+  }
+}
+
+/**
  * Enrich order data with additional fields for Daily Sales Report
  *
  * Fetches from Shopify Admin API:
  * - order.tags
- * - order.transactions (includes refund transactions)
+ * - order.transactions (fetched separately via transactions endpoint)
  * - order.tax_lines
  * - order.shipping_address
  * - order.fulfillment_status
@@ -99,6 +145,11 @@ export async function enrichOrderData(
 
     const orderData = data.order;
 
+    // Fetch transactions separately
+    // NOTE: The /orders/{id}.json endpoint does NOT include transactions!
+    // We must fetch them from /orders/{id}/transactions.json
+    const transactionData = await fetchTransactionsForEnrichment(shop, accessToken, orderId);
+
     // Extract tags
     const tags = orderData.tags || '';
 
@@ -108,10 +159,10 @@ export async function enrichOrderData(
     // Extract shipping address
     const shippingAddress = parseShippingAddress(orderData.shipping_address);
 
-    // Parse transactions
-    const transactions = parseTransactions(orderData.transactions || []);
+    // Parse transactions (from separate fetch, NOT from orderData)
+    const transactions = parseTransactions(transactionData);
 
-    // Calculate payment breakdown
+    // Calculate payment breakdown (now has actual transaction data!)
     const paymentBreakdown = calculatePaymentBreakdown(transactions);
 
     // Extract status fields
