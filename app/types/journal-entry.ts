@@ -331,6 +331,7 @@ export interface OrderCentricReconciliationResult {
   journalEntries: JournalEntry[];
   enrichedTransactions: EnrichedTransaction[];
   orders: Order[]; // Fetched orders from Shopify (to avoid duplicate fetching)
+  processedOrderIds: Set<string>; // Orders that actually generated journal entries
   balanced: boolean;
   errors: string[];
   warnings: string[];

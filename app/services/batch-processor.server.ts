@@ -83,6 +83,7 @@ export async function processExport(
     const allJournalEntries: JournalEntry[] = result.journalEntries;
     const allEnrichedTransactions: EnrichedTransaction[] = result.enrichedTransactions;
     const orders: Order[] = result.orders; // Use orders from reconciliation result (Phase 1 optimization)
+    const processedOrderIds = result.processedOrderIds; // Orders that generated journal entries
     const allErrors: string[] = result.errors;
     const allWarnings: string[] = result.warnings;
     const cogsWarnings: string[] = result.cogsWarnings || [];
@@ -97,11 +98,13 @@ export async function processExport(
     if (cin7Enabled) {
       await logInfo(shop, 'Export', 'Collecting COGS data from Cin7...');
       try {
-        // OPTIMIZATION (Phase 1): Reuse orders from reconciliation result
-        // Previously fetched orders again here - now using result.orders
-        cogsOrders = orders;
+        // CRITICAL FIX: Filter orders to only those that generated journal entries
+        // This ensures COGS details file matches journal entry details file
+        cogsOrders = orders.filter(order => processedOrderIds.has(order.id));
 
-        cogsDataMap = await collectCogsData(shop, orders);
+        console.log(`📊 COGS: ${cogsOrders.length} orders (filtered from ${orders.length} fetched)`);
+
+        cogsDataMap = await collectCogsData(shop, cogsOrders);
         await logInfo(shop, 'Export', `Collected COGS data for ${cogsDataMap.size} orders`);
       } catch (error) {
         const errorMsg = `COGS data collection failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -151,7 +154,6 @@ export async function processExport(
         rowCount,
       });
 
-      console.log(`✅ Detailed Sales Report created: ${detailedSalesFilename} (${rowCount} rows)`);
       await logInfo(shop, 'Export', `Detailed Sales Report saved: ${detailedSalesFilename}`);
     } catch (error) {
       const errorMsg = `Detailed Sales Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -185,7 +187,6 @@ export async function processExport(
         rowCount,
       });
 
-      console.log(`✅ Payouts with Orders created: ${payoutsFilename} (${rowCount} rows)`);
       await logInfo(shop, 'Export', `Payouts with Orders saved: ${payoutsFilename}`);
     } catch (error) {
       const errorMsg = `Payouts with Orders generation failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -218,7 +219,6 @@ export async function processExport(
         rowCount: mappedEntries.length,
       });
 
-      console.log(`✅ Journal Entry Details created: ${journalEntriesDetailsFilename} (${mappedEntries.length} rows)`);
       await logInfo(shop, 'Export', `Journal Entry Details saved: ${journalEntriesDetailsFilename}`);
     } catch (error) {
       const errorMsg = `Journal Entry Details generation failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -273,7 +273,6 @@ export async function processExport(
         rowCount,
       });
 
-      console.log(`✅ Journal Entry Summary created: ${journalEntrySummaryFilename} and ${journalEntrySummaryTxtFilename} (${rowCount} rows)`);
       await logInfo(shop, 'Export', `Journal Entry Summary saved: ${journalEntrySummaryFilename} and ${journalEntrySummaryTxtFilename}`);
     } catch (error) {
       const errorMsg = `Journal Entry Summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -319,7 +318,6 @@ export async function processExport(
           rowCount,
         });
 
-        console.log(`✅ COGS Details created: ${cogsDetailsFilename} (${rowCount} rows)`);
         await logInfo(shop, 'Export', `COGS Details saved: ${cogsDetailsFilename}`);
       } catch (error) {
         const errorMsg = `COGS Details generation failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -345,7 +343,6 @@ export async function processExport(
           rowCount,
         });
 
-        console.log(`✅ Daily Reconciliation Report created: ${reconciliationFilename} (${rowCount} rows)`);
         await logInfo(shop, 'Export', `Daily Reconciliation Report saved: ${reconciliationFilename}`);
       } catch (error) {
         const errorMsg = `Daily Reconciliation Report generation failed: ${error instanceof Error ? error.message : String(error)}`;

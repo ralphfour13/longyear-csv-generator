@@ -51,8 +51,6 @@ export async function reconcileOrdersByDate(
   const journalEntries: JournalEntry[] = [];
   const enrichedTransactions: EnrichedTransaction[] = [];
 
-  console.log(`\n=== Order-Centric Reconciliation for ${targetDate} ===`);
-
   try {
     // Fetch orders with activity in the date range (±2 day buffer for created_at query)
     // The fetcher uses dual-query strategy:
@@ -61,15 +59,12 @@ export async function reconcileOrdersByDate(
     const startDate = addDays(targetDate, -2);
     const endDate = addDays(targetDate, 2);
 
-    console.log(`Fetching orders between ${startDate} and ${endDate}...`);
     const orders = await fetchOrdersByCaptureDateRange(
       shop,
       accessToken,
       startDate,
       endDate
     );
-
-    console.log(`Found ${orders.length} orders with activity in date range`);
 
     let ordersProcessed = 0;
     let capturesProcessed = 0;
@@ -78,22 +73,6 @@ export async function reconcileOrdersByDate(
     // Process each order
     for (const order of orders) {
       try {
-        // DIAGNOSTIC: Log gift card order details for investigation
-        if (order.name === '#80386' || order.name === '#80423') {
-          console.log(
-            `🎁 Gift Card Order ${order.name}:\n` +
-            `  Financial Status: ${order.financialStatus}\n` +
-            `  Total Price: $${order.totalPrice.toFixed(2)}\n` +
-            `  Line Items: ${order.lineItems.map(i => i.title).join(', ')}\n` +
-            `  Transactions: ${JSON.stringify(order.transactions?.map(t => ({
-              kind: t.kind,
-              status: t.status,
-              gateway: t.gateway,
-              amount: t.amount.toFixed(2)
-            })), null, 2)}`
-          );
-        }
-
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
         // Check this BEFORE capture logic to catch refund-only transactions
         const allCaptureTransactions = order.transactions?.filter(
@@ -104,8 +83,6 @@ export async function reconcileOrdersByDate(
           // No captures - check if this is a refund-only order
           const refundTransactions = filterRefundTransactions(order, targetDate);
           if (refundTransactions.length > 0) {
-            console.log(`Processing refund-only order ${order.name} (${refundTransactions.length} refund(s))`);
-
             await processOrderRefunds(
               shop,
               accessToken,
@@ -119,12 +96,6 @@ export async function reconcileOrdersByDate(
 
             processedOrderIds.add(order.id);
             ordersProcessed++;
-          } else {
-            // DIAGNOSTIC: Log when orders are skipped due to no transactions
-            console.log(
-              `⏭️  Skipping order ${order.name}: No capture/sale/refund transactions found ` +
-              `(Financial: ${order.financialStatus}, Total: $${order.totalPrice.toFixed(2)})`
-            );
           }
           // Skip to next order (either processed refunds or nothing to do)
           continue;
@@ -153,8 +124,6 @@ export async function reconcileOrdersByDate(
         if (processedOrderIds.has(order.id)) {
           continue;
         }
-
-        console.log(`Processing order ${order.name} (${captureTransactions.length} capture(s))`);
 
         // Process captures
         await processOrderCaptures(
@@ -197,10 +166,7 @@ export async function reconcileOrdersByDate(
       }
     }
 
-    console.log(`\nProcessed ${ordersProcessed} orders with ${capturesProcessed} captures`);
-
     // VALIDATION: Verify each SO- reference balances (per-order balance check)
-    console.log('\nValidating per-order balance...');
     const soReferences = new Set(
       journalEntries
         .filter((entry) => entry.reference.startsWith('SO-'))
@@ -218,8 +184,6 @@ export async function reconcileOrdersByDate(
           `❌ ${reference} does NOT balance: Debits=${refDebits.toFixed(2)}, ` +
           `Credits=${refCredits.toFixed(2)}, Diff=${refDebits.minus(refCredits).toFixed(2)}`
         );
-      } else {
-        console.log(`✓ ${reference} balanced: ${refDebits.toFixed(2)}`);
       }
     }
 
@@ -241,14 +205,13 @@ export async function reconcileOrdersByDate(
         `Journal entries do not balance. Difference: ${difference.toFixed(2)} ` +
           `(Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)})`
       );
-    } else {
-      console.log(`✓ Overall journal entries balanced: ${totalDebit.toFixed(2)}`);
     }
 
     return {
       journalEntries,
       enrichedTransactions,
       orders, // Return fetched orders to avoid duplicate fetching
+      processedOrderIds, // Return orders that generated journal entries
       balanced,
       errors,
       warnings,
@@ -265,6 +228,7 @@ export async function reconcileOrdersByDate(
       journalEntries,
       enrichedTransactions,
       orders: [], // Return empty array on error
+      processedOrderIds: new Set<string>(), // Return empty set on error
       balanced: false,
       errors,
       warnings,
@@ -295,8 +259,6 @@ export async function collectCogsData(
     return cogsDataMap;
   }
 
-  console.log(`📦 Collecting COGS data for ${orders.length} orders...`);
-
   // OPTIMIZATION (Phase 2): Initialize Cin7 service ONCE for all orders
   const cin7Service = new Cin7ProductService(shop);
   await cin7Service.initialize();
@@ -311,14 +273,9 @@ export async function collectCogsData(
     }
   }
 
-  console.log(`📊 Found ${uniqueSkus.size} unique SKUs across ${orders.length} orders`);
-
   // Pre-fetch all costs in one batch (with rate limiting and caching)
   const skuArray = Array.from(uniqueSkus);
-
-  console.log(`🔄 Fetching costs for ${skuArray.length} unique SKUs (cached hits will be instant)...`);
   await cin7Service.batchGetCosts(skuArray);
-  console.log(`✅ Cost pre-fetch complete`);
 
   // Now calculate COGS for each order (costs are cached, so this is fast)
   // OPTIMIZATION (Phase 2): Reuse same cin7Service instance for all orders
@@ -328,17 +285,10 @@ export async function collectCogsData(
       const cogsCalculation = await calculateOrderCogsWithService(cin7Service, order);
       cogsDataMap.set(order.id, cogsCalculation);
       ordersProcessed++;
-
-      // Log progress every 50 orders
-      if (ordersProcessed % 50 === 0) {
-        console.log(`  Processed COGS for ${ordersProcessed}/${orders.length} orders...`);
-      }
     } catch (error) {
       console.error(`Failed to calculate COGS for order ${order.name}:`, error);
     }
   }
-
-  console.log(`✅ COGS collection complete: ${ordersProcessed} orders processed`);
 
   return cogsDataMap;
 }
@@ -369,10 +319,6 @@ async function processOrderCaptures(
   if (paymentErrors.length > 0) {
     errors.push(...paymentErrors);
   }
-
-  // Log payment method summary
-  const paymentSummary = getPaymentMethodSummary(paymentBreakdowns);
-  console.log(`  Payment methods: ${paymentSummary}`);
 
   // Create journal entries
   const formattedDate = formatDate(targetDate);

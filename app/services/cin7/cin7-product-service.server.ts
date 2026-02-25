@@ -127,8 +127,8 @@ export class Cin7ProductService {
       });
       await Promise.all(promises);
 
-      // Log progress for large batches
-      if (i > 0 && i % 20 === 0) {
+      // Log progress for large batches (reduced verbosity)
+      if (i > 0 && i % 100 === 0) {
         console.log(`  Fetched ${i}/${skus.length} SKU costs...`);
       }
     }
