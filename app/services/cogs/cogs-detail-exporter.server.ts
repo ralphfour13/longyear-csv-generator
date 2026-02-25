@@ -7,7 +7,10 @@ import type { CogsCalculation, CogsDetailEntry } from '../../types/cin7';
  * Generates detailed COGS CSV file with product-level breakdown.
  *
  * CSV format:
- * Order Number,Order Date,Product Title,SKU,Quantity,Unit Cost,Total Cost,Order Total COGS
+ * Order Number,Capture Date,Product Title,SKU,Quantity,Unit Cost,Total Cost,Order Total COGS
+ *
+ * Note: "Capture Date" represents the date payments were captured (target export date),
+ * not the order creation date. This aligns with the journal entry date.
  */
 
 /**
@@ -15,17 +18,19 @@ import type { CogsCalculation, CogsDetailEntry } from '../../types/cin7';
  *
  * @param orders - Array of orders
  * @param cogsDataMap - Map of order ID to COGS calculation
+ * @param targetDate - Target capture date (YYYY-MM-DD format)
  * @returns CSV content as string
  */
 export function generateCogsDetailCSV(
   orders: Order[],
-  cogsDataMap: Map<string, CogsCalculation>
+  cogsDataMap: Map<string, CogsCalculation>,
+  targetDate: string
 ): string {
   const rows: string[] = [];
 
   // Header row
   rows.push(
-    'Order Number,Order Date,Product Title,SKU,Quantity,Unit Cost,Total Cost,Order Total COGS'
+    'Order Number,Capture Date,Product Title,SKU,Quantity,Unit Cost,Total Cost,Order Total COGS'
   );
 
   // Data rows
@@ -36,13 +41,14 @@ export function generateCogsDetailCSV(
       continue;
     }
 
-    const orderDate = formatDate(order.createdAt);
+    // Use target capture date (not order creation date) for alignment with journal entries
+    const captureDate = formatDate(targetDate);
     const orderTotalCogs = cogsData.totalCogs.toFixed(2);
 
     for (const lineItem of cogsData.lineItems) {
       const entry: CogsDetailEntry = {
         orderNumber: order.name,
-        orderDate,
+        orderDate: captureDate, // Now represents capture date, not creation date
         productTitle: escapeCSV(lineItem.productTitle),
         sku: lineItem.sku,
         quantity: lineItem.quantity,
@@ -71,9 +77,10 @@ export function generateCogsDetailCSV(
 
 /**
  * Format date to MM/DD/YYYY
+ * Accepts either ISO date string (YYYY-MM-DDTHH:mm:ss) or simple date (YYYY-MM-DD)
  */
-function formatDate(isoDate: string): string {
-  const date = new Date(isoDate);
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const year = date.getFullYear();

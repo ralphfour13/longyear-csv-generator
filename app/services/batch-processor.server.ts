@@ -283,7 +283,7 @@ export async function processExport(
         // Reuse orders from COGS data collection (prevents redundant API fetch and session expiration)
         const orders = cogsOrders;
 
-        const cogsDetailsContent = generateCogsDetailCSV(orders, cogsDataMap);
+        const cogsDetailsContent = generateCogsDetailCSV(orders, cogsDataMap, targetDate);
         const cogsDetailsPath = await writeExport(shop, cogsDetailsFilename, cogsDetailsContent);
 
         const rowCount = cogsDetailsContent.split('\n').length - 1; // Subtract header row

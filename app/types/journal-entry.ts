@@ -262,6 +262,7 @@ export interface EnrichedTransaction {
     totalShipping: Decimal;
     totalDiscounts: Decimal;
     financialStatus: string;
+    lineItems: OrderLineItem[]; // Needed for Daily Reconciliation Report notes
   };
 
   // Enriched data for Daily Sales Report

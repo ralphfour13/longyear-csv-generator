@@ -426,6 +426,7 @@ async function processOrderCaptures(
         totalShipping: order.totalShipping,
         totalDiscounts: order.totalDiscounts,
         financialStatus: order.financialStatus,
+        lineItems: order.lineItems,
       },
       enrichedData: enrichedData || undefined,
       payout: {
@@ -489,6 +490,7 @@ async function processOrderRefunds(
         totalShipping: order.totalShipping,
         totalDiscounts: order.totalDiscounts,
         financialStatus: order.financialStatus,
+        lineItems: order.lineItems,
       },
       enrichedData: enrichedData || undefined,
       payout: {

@@ -38,14 +38,12 @@ export function generateDailyReconciliationReport(
   // Group transactions by order
   const orderGroups = groupByOrder(enrichedTransactions);
 
-  // Process each order (one row per order)
+  // Process each order (one row per order, or two rows for refunded orders)
   for (const [orderId, transactions] of orderGroups.entries()) {
     if (transactions.length === 0 || !transactions[0].order) continue;
 
-    const row = transformToReconciliationRow(transactions);
-    if (row) {
-      rows.push(row);
-    }
+    const orderRows = transformToReconciliationRow(transactions);
+    rows.push(...orderRows);
   }
 
   // Sort by order number
@@ -81,13 +79,14 @@ function groupByOrder(
 }
 
 /**
- * Transform order transactions to reconciliation row
+ * Transform order transactions to reconciliation row(s)
+ * Returns array to support multiple rows for refunded orders
  */
 function transformToReconciliationRow(
   transactions: EnrichedTransaction[]
-): DailyReconciliationRow | null {
+): DailyReconciliationRow[] {
   if (transactions.length === 0 || !transactions[0].order || !transactions[0].enrichedData) {
-    return null;
+    return [];
   }
 
   const order = transactions[0].order;
@@ -171,8 +170,8 @@ function transformToReconciliationRow(
     });
   }
 
-  // Return first row (caller will process all rows if needed)
-  return rows[0];
+  // Return all rows (1 for normal orders, 2 for refunded orders)
+  return rows;
 }
 
 /**
@@ -299,6 +298,22 @@ function analyzeGiftCards(order: Order, paymentBreakdown: any): { sold: string; 
 }
 
 /**
+ * Escape a field for CSV format
+ * Wraps fields containing commas, quotes, or newlines in double quotes
+ * Escapes internal quotes by doubling them
+ */
+function escapeCSVField(field: string): string {
+  if (!field) return '';
+
+  // If field contains comma, quote, or newline, wrap in quotes and escape internal quotes
+  if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+    return `"${field.replace(/"/g, '""')}"`;
+  }
+
+  return field;
+}
+
+/**
  * Generate CSV string from rows
  */
 function generateCSV(rows: DailyReconciliationRow[]): string {
@@ -316,7 +331,7 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
     'gift card sold',
     'gift card used',
   ];
-  lines.push(headers.join('\t')); // Tab-separated for better alignment
+  lines.push(headers.map(escapeCSVField).join(','));
 
   // Data rows
   for (const row of rows) {
@@ -331,7 +346,7 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
       row.giftCardSold,
       row.giftCardUsed,
     ];
-    lines.push(fields.join('\t'));
+    lines.push(fields.map(escapeCSVField).join(','));
   }
 
   return lines.join('\n');
