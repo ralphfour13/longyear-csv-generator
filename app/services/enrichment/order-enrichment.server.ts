@@ -255,7 +255,9 @@ export function calculatePaymentBreakdown(transactions: OrderTransaction[]): Pay
   );
 
   for (const txn of captureTransactions) {
-    const gateway = txn.gateway.toLowerCase();
+    // Normalize gateway: lowercase and replace spaces with underscores
+    // Shopify returns "gift card" but we need "gift_card" for matching
+    const gateway = txn.gateway.toLowerCase().replace(/\s+/g, '_');
 
     if (gateway === 'cash') {
       breakdown.cash = breakdown.cash.plus(txn.amount);

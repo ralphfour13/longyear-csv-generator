@@ -77,8 +77,9 @@ function mapGatewayToAccount(
   gateway: string,
   accountMappings: any
 ): { account: string; accountName: string } {
-  // Normalize gateway string
-  const normalizedGateway = gateway.toLowerCase();
+  // Normalize gateway string: lowercase and replace spaces with underscores
+  // Shopify returns "gift card" but we need "gift_card" for matching
+  const normalizedGateway = gateway.toLowerCase().replace(/\s+/g, '_');
 
   // Map gateways to account mappings
   switch (normalizedGateway) {
