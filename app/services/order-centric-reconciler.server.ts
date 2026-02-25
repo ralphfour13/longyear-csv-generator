@@ -77,6 +77,22 @@ export async function reconcileOrdersByDate(
     // Process each order
     for (const order of orders) {
       try {
+        // DIAGNOSTIC: Log gift card order details for investigation
+        if (order.name === '#80386' || order.name === '#80423') {
+          console.log(
+            `🎁 Gift Card Order ${order.name}:\n` +
+            `  Financial Status: ${order.financialStatus}\n` +
+            `  Total Price: $${order.totalPrice.toFixed(2)}\n` +
+            `  Line Items: ${order.lineItems.map(i => i.title).join(', ')}\n` +
+            `  Transactions: ${JSON.stringify(order.transactions?.map(t => ({
+              kind: t.kind,
+              status: t.status,
+              gateway: t.gateway,
+              amount: t.amount.toFixed(2)
+            })), null, 2)}`
+          );
+        }
+
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
         // Check this BEFORE capture logic to catch refund-only transactions
         const allCaptureTransactions = order.transactions?.filter(
@@ -102,6 +118,12 @@ export async function reconcileOrdersByDate(
 
             processedOrderIds.add(order.id);
             ordersProcessed++;
+          } else {
+            // DIAGNOSTIC: Log when orders are skipped due to no transactions
+            console.log(
+              `⏭️  Skipping order ${order.name}: No capture/sale/refund transactions found ` +
+              `(Financial: ${order.financialStatus}, Total: $${order.totalPrice.toFixed(2)})`
+            );
           }
           // Skip to next order (either processed refunds or nothing to do)
           continue;

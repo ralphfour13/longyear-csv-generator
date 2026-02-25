@@ -64,9 +64,27 @@ export async function createOrderJournalEntries(
   }
 
   // Calculate NET sales (post-discount)
+  // CRITICAL: For refunded orders, use ORIGINAL subtotal (not current)
   let netSales: Decimal;
-  if (order.currentSubtotalPrice) {
-    // currentSubtotalPrice is already NET (after discounts applied)
+
+  // Check if order has been refunded
+  const isRefunded =
+    order.financialStatus === 'refunded' ||
+    order.financialStatus === 'partially_refunded';
+
+  if (isRefunded) {
+    // For refunded orders: Use ORIGINAL subtotal (before refunds)
+    // This ensures SO- entry reflects the original captured transaction
+    // The RF- entry will handle the refund reversal separately
+    netSales = order.subtotalPrice;
+
+    console.log(
+      `ℹ️  Order ${order.name} (${order.financialStatus}): ` +
+      `Using ORIGINAL subtotal $${netSales.toFixed(2)} ` +
+      `(current would be $${order.currentSubtotalPrice?.toFixed(2) || 'N/A'})`
+    );
+  } else if (order.currentSubtotalPrice) {
+    // For non-refunded orders: currentSubtotalPrice is NET (after discounts)
     netSales = order.currentSubtotalPrice;
   } else {
     // Fallback: Calculate NET from total payment minus tax and shipping
