@@ -18,6 +18,12 @@ interface DailySalesReportRow {
   tax3Title: string;
   tax3Rate: string;
   tax3Price: string;
+  tax4Title: string;
+  tax4Rate: string;
+  tax4Price: string;
+  tax5Title: string;
+  tax5Rate: string;
+  tax5Price: string;
   taxTotal: string;
   totalShipping: string;
   totalRefund: string;
@@ -133,10 +139,12 @@ function transformToReportRow(
   // For refund transactions, we show a separate row with the refund amount
   const isRefund = balanceTxn.type === 'refund';
 
-  // Tax lines (up to 3)
+  // Tax lines (up to 5)
   const tax1 = enrichedData.taxLines[0] || { title: '', rate: '', price: new Decimal(0) };
   const tax2 = enrichedData.taxLines[1] || { title: '', rate: '', price: new Decimal(0) };
   const tax3 = enrichedData.taxLines[2] || { title: '', rate: '', price: new Decimal(0) };
+  const tax4 = enrichedData.taxLines[3] || { title: '', rate: '', price: new Decimal(0) };
+  const tax5 = enrichedData.taxLines[4] || { title: '', rate: '', price: new Decimal(0) };
 
   // Tax total
   const taxTotal = enrichedData.taxLines.reduce(
@@ -180,6 +188,12 @@ function transformToReportRow(
     tax3Title: tax3.title,
     tax3Rate: tax3.rate,
     tax3Price: tax3.price.toFixed(2),
+    tax4Title: tax4.title,
+    tax4Rate: tax4.rate,
+    tax4Price: tax4.price.toFixed(2),
+    tax5Title: tax5.title,
+    tax5Rate: tax5.rate,
+    tax5Price: tax5.price.toFixed(2),
     taxTotal: taxTotal.toFixed(2),
     totalShipping: order.totalShipping.toFixed(2),
     totalRefund,
@@ -228,6 +242,12 @@ function calculateTotalsRow(rows: DailySalesReportRow[]): DailySalesReportRow {
     tax3Title: '',
     tax3Rate: '',
     tax3Price: '',
+    tax4Title: '',
+    tax4Rate: '',
+    tax4Price: '',
+    tax5Title: '',
+    tax5Rate: '',
+    tax5Price: '',
     taxTotal: '0.00',
     totalShipping: '0.00',
     totalRefund: '0.00',
@@ -328,6 +348,12 @@ function generateCSV(rows: DailySalesReportRow[], totalsRow: DailySalesReportRow
     'Tax 3 Title',
     'Tax 3 Rate',
     'Tax 3 Price',
+    'Tax 4 Title',
+    'Tax 4 Rate',
+    'Tax 4 Price',
+    'Tax 5 Title',
+    'Tax 5 Rate',
+    'Tax 5 Price',
     'Tax: Total',
     'Price: Total Shipping',
     'Price: Total Refund',
@@ -367,6 +393,12 @@ function generateCSV(rows: DailySalesReportRow[], totalsRow: DailySalesReportRow
       row.tax3Title,
       row.tax3Rate,
       row.tax3Price,
+      row.tax4Title,
+      row.tax4Rate,
+      row.tax4Price,
+      row.tax5Title,
+      row.tax5Rate,
+      row.tax5Price,
       row.taxTotal,
       row.totalShipping,
       row.totalRefund,
@@ -406,6 +438,12 @@ function generateCSV(rows: DailySalesReportRow[], totalsRow: DailySalesReportRow
     totalsRow.tax3Title,
     totalsRow.tax3Rate,
     totalsRow.tax3Price,
+    totalsRow.tax4Title,
+    totalsRow.tax4Rate,
+    totalsRow.tax4Price,
+    totalsRow.tax5Title,
+    totalsRow.tax5Rate,
+    totalsRow.tax5Price,
     totalsRow.taxTotal,
     totalsRow.totalShipping,
     totalsRow.totalRefund,
