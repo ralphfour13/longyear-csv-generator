@@ -359,6 +359,7 @@ function extractReportType(filename: string): string {
   if (filename.includes('journal-entry-details')) return 'Journal Entry Details';
   if (filename.includes('journal-entry_') || filename.startsWith('journal-entry-summary')) return 'Journal Entry Summary';
   if (filename.includes('cogs-details')) return 'COGS Details';
+  if (filename.includes('daily-reconciliation')) return 'Daily Reconciliation';
   return 'Unknown';
 }
 
