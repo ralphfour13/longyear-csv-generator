@@ -56,6 +56,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       generateJournalDetails: formData.get('generateJournalDetails') === 'true',
       generateJournalSummary: formData.get('generateJournalSummary') === 'true',
       generateCogsDetails: formData.get('generateCogsDetails') === 'true',
+      generateReconciliation: formData.get('generateReconciliation') === 'true',
     };
 
     try {
@@ -167,6 +168,7 @@ export default function Exports() {
   const [generateJournalDetails, setGenerateJournalDetails] = useState(true);
   const [generateJournalSummary, setGenerateJournalSummary] = useState(true);
   const [generateCogsDetails, setGenerateCogsDetails] = useState(true);
+  const [generateReconciliation, setGenerateReconciliation] = useState(true);
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [jobStatus, setJobStatus] = useState<string>('');
   const fetcher = useFetcher();
@@ -309,6 +311,9 @@ export default function Exports() {
                   } else if (file.type === 'journal-entry-summary') {
                     label = 'Journal Entry';
                     description = `${file.rowCount} accounts, ${fetcher.data.job.result.balanced ? '✓ balanced' : '✗ unbalanced'}`;
+                  } else if (file.type === 'daily-reconciliation') {
+                    label = 'Daily Reconciliation';
+                    description = `${file.rowCount} order rows`;
                   }
 
                   return (
@@ -380,6 +385,9 @@ export default function Exports() {
                   } else if (file.type === 'journal-entry-summary') {
                     label = 'Journal Entry';
                     description = `${file.rowCount} accounts, ${actionData.balanced ? '✓ balanced' : '✗ unbalanced'}`;
+                  } else if (file.type === 'daily-reconciliation') {
+                    label = 'Daily Reconciliation';
+                    description = `${file.rowCount} order rows`;
                   }
 
                   return (
@@ -437,6 +445,7 @@ export default function Exports() {
             <input type="hidden" name="generateJournalDetails" value={generateJournalDetails ? 'true' : 'false'} />
             <input type="hidden" name="generateJournalSummary" value={generateJournalSummary ? 'true' : 'false'} />
             <input type="hidden" name="generateCogsDetails" value={generateCogsDetails ? 'true' : 'false'} />
+            <input type="hidden" name="generateReconciliation" value={generateReconciliation ? 'true' : 'false'} />
 
             <s-stack direction="block" gap="base">
               <div style={{ marginBottom: '12px' }}>
@@ -510,6 +519,15 @@ export default function Exports() {
                       style={{ cursor: 'pointer' }}
                     />
                     <s-text>COGS Details (if Cin7 enabled)</s-text>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={generateReconciliation}
+                      onChange={(e) => setGenerateReconciliation(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <s-text>Daily Reconciliation Report (Quick review format)</s-text>
                   </label>
                 </s-stack>
               </s-box>

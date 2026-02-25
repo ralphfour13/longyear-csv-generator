@@ -14,6 +14,7 @@ import { generateDailySalesReport } from './daily-sales-report-generator.server'
 import { generatePayoutsWithOrders } from './payouts-with-orders-generator.server';
 import { generateJournalEntrySummary } from './journal-entry-summary-generator.server';
 import { generateCogsDetailCSV } from './cogs/cogs-detail-exporter.server';
+import { generateDailyReconciliationReport } from './daily-reconciliation-generator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
 import { sendExportEmail, type ExportEmailData } from './email.server';
@@ -27,6 +28,7 @@ export interface FileGenerationOptions {
   generateJournalDetails?: boolean;
   generateJournalSummary?: boolean;
   generateCogsDetails?: boolean;
+  generateReconciliation?: boolean;
 }
 
 /**
@@ -56,6 +58,8 @@ export async function processExport(
     generatePayoutsOrders: fileOptions?.generatePayoutsOrders ?? true,
     generateJournalDetails: fileOptions?.generateJournalDetails ?? true,
     generateJournalSummary: fileOptions?.generateJournalSummary ?? true,
+    generateCogsDetails: fileOptions?.generateCogsDetails ?? true,
+    generateReconciliation: fileOptions?.generateReconciliation ?? true,
   };
   await logInfo(shop, 'Export', `Starting order-centric export for ${targetDate}`);
 
@@ -300,6 +304,40 @@ export async function processExport(
         console.error('❌ COGS Details error:', error);
         await logError(shop, 'Export', errorMsg);
         allWarnings.push(errorMsg);
+      }
+    }
+
+    // File #6: Daily Reconciliation Report (simplified one-row-per-order format)
+    if (options.generateReconciliation) {
+      await logInfo(shop, 'Export', 'Generating Daily Reconciliation Report...');
+      try {
+        const reconciliationFilename = `daily-reconciliation_${targetDate}.csv`;
+        const reconciliationContent = generateDailyReconciliationReport(allEnrichedTransactions, targetDate);
+        const reconciliationPath = await writeExport(shop, reconciliationFilename, reconciliationContent);
+
+        const rowCount = reconciliationContent.split('\n').length - 1; // Subtract header row
+        generatedFiles.push({
+          type: 'daily-reconciliation',
+          filename: reconciliationFilename,
+          downloadUrl: `/api/download-csv?shop=${shop}&filename=${reconciliationFilename}`,
+          rowCount,
+        });
+
+        console.log(`✅ Daily Reconciliation Report created: ${reconciliationFilename} (${rowCount} rows)`);
+        await logInfo(shop, 'Export', `Daily Reconciliation Report saved: ${reconciliationFilename}`);
+      } catch (error) {
+        const errorMsg = `Daily Reconciliation Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error('❌ Daily Reconciliation Report error:', error);
+        await logError(shop, 'Export', errorMsg);
+        allWarnings.push(errorMsg);
+
+        generatedFiles.push({
+          type: 'daily-reconciliation',
+          filename: `daily-reconciliation_${targetDate}.csv`,
+          downloadUrl: '',
+          rowCount: 0,
+          error: errorMsg,
+        });
       }
     }
 
