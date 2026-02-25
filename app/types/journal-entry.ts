@@ -254,7 +254,10 @@ export interface EnrichedTransaction {
     id: string;
     name: string;
     createdAt: string;
+    totalPrice: Decimal; // Total including tax and shipping
+    subtotalPrice: Decimal; // Subtotal before tax/shipping
     currentTotalPrice: Decimal;
+    currentSubtotalPrice?: Decimal; // Current subtotal (after edits)
     totalTax: Decimal;
     totalShipping: Decimal;
     totalDiscounts: Decimal;
