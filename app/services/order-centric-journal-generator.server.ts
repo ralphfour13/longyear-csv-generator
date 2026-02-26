@@ -234,46 +234,62 @@ export async function createRefundJournalEntries(
       memo: `Refund ${accountName} - Order ${order.name}`,
     });
 
-    // SO- REVERSAL ENTRIES: Reverse revenue and tax
-    // Calculate amounts from order (must match original SO- entry calculation)
+    // SO- REVERSAL ENTRIES: Reverse revenue and tax PROPORTIONALLY
+    // Calculate amounts from order
     const netSales = calculateNetSalesForRefund(order);
     const taxAmount = order.totalTax || new Decimal(0);
     const shippingAmount = order.totalShipping || new Decimal(0);
 
-    // DEBIT: Sales Revenue (reverse original credit)
-    if (netSales.greaterThan(0)) {
+    // Calculate refund ratio (what % of order is being refunded)
+    const orderTotal = order.totalPrice;
+    const refundRatio = refundAmount.dividedBy(orderTotal);
+
+    // Calculate proportional amounts based on refund ratio
+    const refundedSales = netSales.times(refundRatio);
+    const refundedTax = taxAmount.times(refundRatio);
+    const refundedShipping = shippingAmount.times(refundRatio);
+
+    console.log(
+      `Refund ${order.name}: $${refundAmount.toFixed(2)} / $${orderTotal.toFixed(2)} = ` +
+      `${refundRatio.times(100).toFixed(2)}% ` +
+      `(Sales: $${refundedSales.toFixed(2)}, Tax: $${refundedTax.toFixed(2)}, ` +
+      `Shipping: $${refundedShipping.toFixed(2)})`
+    );
+
+    // DEBIT: Sales Revenue (reverse proportional credit)
+    if (refundedSales.greaterThan(0)) {
       entries.push({
         date: targetDate,
         reference: `SO-${order.name}`,
         account: accountMappings.sales_revenue.accountCode,
         accountName: accountMappings.sales_revenue.accountName,
-        debit: netSales,
+        debit: refundedSales,
         credit: new Decimal(0),
         memo: `Sales Refund - Order ${order.name}`,
       });
     }
 
-    // DEBIT: Sales Tax (reverse original credit)
-    if (taxAmount.greaterThan(0)) {
+    // DEBIT: Sales Tax (reverse proportional credit)
+    if (refundedTax.greaterThan(0)) {
       entries.push({
         date: targetDate,
         reference: `SO-${order.name}`,
         account: accountMappings.sales_tax.accountCode,
         accountName: accountMappings.sales_tax.accountName,
-        debit: taxAmount,
+        debit: refundedTax,
         credit: new Decimal(0),
         memo: `Sales Tax Refund - Order ${order.name}`,
       });
     }
 
-    // DEBIT: Shipping Revenue (reverse original credit, if applicable)
-    if (shippingAmount.greaterThan(0)) {
+    // DEBIT: Shipping Revenue (reverse proportional credit, if applicable)
+    if (refundedShipping.greaterThan(0)) {
       entries.push({
         date: targetDate,
         reference: `SO-${order.name}`,
         account: accountMappings.shipping_revenue.accountCode,
         accountName: accountMappings.shipping_revenue.accountName,
-        debit: shippingAmount,
+        debit: refundedShipping,
         credit: new Decimal(0),
         memo: `Shipping Refund - Order ${order.name}`,
       });

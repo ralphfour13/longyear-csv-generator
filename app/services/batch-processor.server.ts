@@ -136,6 +136,22 @@ export async function processExport(
       allErrors.push(...validationErrors);
     }
 
+    // Step 4.5: Validate journal entry balance (Debits = Credits)
+    await logInfo(shop, 'Export', 'Validating journal entry balance...');
+    const totalDebitsCheck = mappedEntries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
+    const totalCreditsCheck = mappedEntries.reduce((sum, e) => sum.plus(e.credit), new Decimal(0));
+    const imbalance = totalDebitsCheck.minus(totalCreditsCheck).abs();
+
+    if (imbalance.greaterThan(new Decimal('0.01'))) {
+      const errorMsg = `⚠️ Journal entries are IMBALANCED: Debits=$${totalDebitsCheck.toFixed(2)}, ` +
+        `Credits=$${totalCreditsCheck.toFixed(2)}, Difference=$${imbalance.toFixed(2)}`;
+      allErrors.push(errorMsg);
+      await logError(shop, 'Journal Balance', errorMsg);
+      console.error('❌ IMBALANCE DETECTED:', errorMsg);
+    } else {
+      await logInfo(shop, 'Journal Balance', `✅ Journal entries balanced: Debits=$${totalDebitsCheck.toFixed(2)}, Credits=$${totalCreditsCheck.toFixed(2)}`);
+    }
+
     // Step 5: Generate files based on options with error isolation
     await logInfo(shop, 'Export', 'Generating export files...');
     const generatedFiles: GeneratedFile[] = [];
