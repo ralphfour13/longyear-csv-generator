@@ -38,13 +38,15 @@ import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
  * @param order - Order with transaction details
  * @param paymentBreakdowns - Payment method breakdowns
  * @param targetDate - Target date for journal entry (MM/DD/YYYY format)
+ * @param accessToken - Shopify access token (optional, for COGS fulfillment filtering)
  * @returns Array of journal entries
  */
 export async function createOrderJournalEntries(
   shop: string,
   order: Order,
   paymentBreakdowns: PaymentMethodBreakdown[],
-  targetDate: string
+  targetDate: string,
+  accessToken?: string
 ): Promise<JournalEntry[]> {
   const entries: JournalEntry[] = [];
   const reference = `SO-${order.name}`;
@@ -139,7 +141,8 @@ export async function createOrderJournalEntries(
   try {
     const cin7Enabled = await isCin7Enabled(shop);
     if (cin7Enabled && order.lineItems.length > 0) {
-      const cogsCalculation = await calculateOrderCogs(shop, order);
+      // NEW: Pass accessToken to enable fulfillment-based filtering
+      const cogsCalculation = await calculateOrderCogs(shop, order, accessToken, true);
 
       // Always create COGS entries if order has products, even if calculation is $0
       // This ensures journal completeness and highlights missing COGS data

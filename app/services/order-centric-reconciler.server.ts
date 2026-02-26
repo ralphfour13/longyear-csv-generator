@@ -243,12 +243,16 @@ export async function reconcileOrdersByDate(
  * Collect COGS data for orders
  * Used to generate COGS detail CSV file
  *
+ * NEW: Now uses fulfillment-based calculation to exclude removed items
+ *
  * @param shop - Shop domain
+ * @param accessToken - Shopify access token (for fulfillment filtering)
  * @param orders - Array of orders
  * @returns Map of order ID to COGS calculation
  */
 export async function collectCogsData(
   shop: string,
+  accessToken: string,
   orders: Order[]
 ): Promise<Map<string, CogsCalculation>> {
   const cogsDataMap = new Map<string, CogsCalculation>();
@@ -279,10 +283,17 @@ export async function collectCogsData(
 
   // Now calculate COGS for each order (costs are cached, so this is fast)
   // OPTIMIZATION (Phase 2): Reuse same cin7Service instance for all orders
+  // NEW: Pass shop and accessToken to enable fulfillment-based filtering
   let ordersProcessed = 0;
   for (const order of orders) {
     try {
-      const cogsCalculation = await calculateOrderCogsWithService(cin7Service, order);
+      const cogsCalculation = await calculateOrderCogsWithService(
+        cin7Service,
+        order,
+        shop,
+        accessToken,
+        true // Use fulfillments to exclude removed items
+      );
       cogsDataMap.set(order.id, cogsCalculation);
       ordersProcessed++;
     } catch (error) {
@@ -326,7 +337,8 @@ async function processOrderCaptures(
     shop,
     order,
     paymentBreakdowns,
-    formattedDate
+    formattedDate,
+    accessToken // NEW: Pass accessToken for COGS fulfillment filtering
   );
 
   journalEntries.push(...entries);

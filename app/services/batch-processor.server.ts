@@ -18,6 +18,7 @@ import { generateDailyReconciliationReport } from './daily-reconciliation-genera
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
 import { sendExportEmail, type ExportEmailData } from './email.server';
+import { validateCogsConsistency, logValidationResult } from './cogs/cogs-reconciliation-validator.server';
 
 /**
  * File generation options
@@ -104,7 +105,8 @@ export async function processExport(
 
         console.log(`📊 COGS: ${cogsOrders.length} orders (filtered from ${orders.length} fetched)`);
 
-        cogsDataMap = await collectCogsData(shop, cogsOrders);
+        // NEW: Pass accessToken to enable fulfillment-based filtering
+        cogsDataMap = await collectCogsData(shop, accessToken, cogsOrders);
         await logInfo(shop, 'Export', `Collected COGS data for ${cogsDataMap.size} orders`);
       } catch (error) {
         const errorMsg = `COGS data collection failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -319,6 +321,26 @@ export async function processExport(
         });
 
         await logInfo(shop, 'Export', `COGS Details saved: ${cogsDetailsFilename}`);
+
+        // NEW: Validate COGS consistency between JE and CSV
+        await logInfo(shop, 'Export', 'Validating COGS consistency...');
+        try {
+          const validationResult = validateCogsConsistency(allJournalEntries, cogsDataMap);
+          logValidationResult(validationResult);
+
+          if (!validationResult.valid) {
+            const discrepancyMsg = `⚠️ COGS Validation: ${validationResult.discrepancies.length} discrepancies found (Total diff: $${validationResult.totalDifference.toFixed(2)})`;
+            allWarnings.push(discrepancyMsg);
+            await logWarning(shop, 'COGS Validation', discrepancyMsg);
+          } else {
+            await logInfo(shop, 'COGS Validation', '✅ All COGS amounts match between JE and CSV');
+          }
+        } catch (validationError) {
+          const errorMsg = `COGS validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}`;
+          console.error('❌ COGS Validation error:', validationError);
+          await logWarning(shop, 'COGS Validation', errorMsg);
+          allWarnings.push(errorMsg);
+        }
       } catch (error) {
         const errorMsg = `COGS Details generation failed: ${error instanceof Error ? error.message : String(error)}`;
         console.error('❌ COGS Details error:', error);
