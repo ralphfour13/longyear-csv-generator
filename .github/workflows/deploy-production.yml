@@ -84,21 +84,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CAPROVER_API_TOKEN: op://sage50-sync/caprover/api-token
+
       - name: Install CapRover CLI
         run: npm install -g caprover
 
       - name: Authenticate with CapRover
         run: |
-          if [ -n "${{ secrets.CAPROVER_API_TOKEN }}" ]; then
-            echo "Using API token authentication"
-            caprover login --apiToken "${{ secrets.CAPROVER_API_TOKEN }}" --caproverUrl "${{ env.CAPROVER_URL }}"
-          elif [ -n "${{ secrets.CAPROVER_PASSWORD }}" ]; then
-            echo "Using password authentication"
-            echo "${{ secrets.CAPROVER_PASSWORD }}" | caprover login --caproverUrl "${{ env.CAPROVER_URL }}"
-          else
-            echo "❌ Error: Neither CAPROVER_API_TOKEN nor CAPROVER_PASSWORD secret is configured"
-            exit 1
-          fi
+          echo "Using API token authentication from 1Password"
+          caprover login --apiToken "$CAPROVER_API_TOKEN" --caproverUrl "${{ env.CAPROVER_URL }}"
 
       - name: Create deployment tarball
         run: |
@@ -142,6 +142,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          SHOPIFY_CLI_TOKEN: op://sage50-sync/shopify/cli-token
+          SHOPIFY_API_SECRET: op://sage50-sync/shopify/api-secret
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -152,9 +161,6 @@ jobs:
         run: npm ci
 
       - name: Deploy to Shopify
-        env:
-          SHOPIFY_CLI_TOKEN: ${{ secrets.SHOPIFY_CLI_TOKEN }}
-          SHOPIFY_API_SECRET: ${{ secrets.SHOPIFY_API_SECRET }}
         run: |
           echo "Deploying to Shopify..."
           npm run deploy
@@ -249,6 +255,17 @@ jobs:
     if: always()
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Load secrets from 1Password
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          SLACK_WEBHOOK_URL: op://sage50-sync/slack/webhook-url
+
       - name: Determine deployment status
         id: status
         run: |
@@ -264,8 +281,6 @@ jobs:
 
       - name: Send Slack notification
         if: env.SLACK_WEBHOOK_URL != ''
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B)
           COMMIT_SHA=$(git rev-parse --short HEAD)

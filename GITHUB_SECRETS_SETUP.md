@@ -1,307 +1,445 @@
-# GitHub Secrets Setup for CI/CD
+# 1Password Secrets Setup for CI/CD
 
-This document provides step-by-step instructions for configuring the GitHub secrets required for the CI/CD pipeline.
+This document provides step-by-step instructions for configuring 1Password to securely manage secrets for the CI/CD pipeline.
 
 ## Overview
 
-The CI/CD pipeline requires several secrets to authenticate with CapRover and Shopify during automated deployments. These secrets are stored securely in GitHub and are never exposed in logs or code.
+The CI/CD pipeline uses **1Password** as the single source of truth for all secrets. This provides:
 
-## Required Secrets
+✅ **Centralized secret management** - One place to manage all credentials
+✅ **Easy rotation** - Update secrets in 1Password, no GitHub changes needed
+✅ **Better security** - Secrets never stored directly in GitHub
+✅ **Audit trail** - 1Password tracks all secret access
+✅ **Team access** - Easy to share with team members securely
 
-### 1. CAPROVER_API_TOKEN (Recommended)
+**Only one GitHub secret is required**: `OP_SERVICE_ACCOUNT_TOKEN`
 
-**Purpose**: Authenticate CI/CD with CapRover for automated deployments
-
-**How to generate**:
-
-1. Open CapRover Dashboard: https://captain.server.four13.dev
-2. Log in with your credentials
-3. Click on your username in the top-right corner
-4. Select "Account Settings" or "API Token"
-5. Click "Generate New Token"
-6. Copy the generated token (you won't see it again!)
-7. Save it immediately to GitHub secrets
-
-**Alternative**: `CAPROVER_PASSWORD`
-- If you don't have an API token, you can use `CAPROVER_PASSWORD` instead
-- Less secure than API token
-- Use the same password you use to log in to CapRover Dashboard
-
-**Security Note**: API tokens are preferred over passwords because:
-- They can be revoked without changing your password
-- They have limited scope
-- They're designed for automation
+All other secrets (CapRover, Shopify, Slack) are pulled from 1Password at runtime.
 
 ---
 
-### 2. SHOPIFY_CLI_TOKEN
+## Architecture
 
-**Purpose**: Authenticate Shopify CLI for automated app deployments
+```
+GitHub Actions Workflow
+    ↓
+Uses OP_SERVICE_ACCOUNT_TOKEN
+    ↓
+1Password Load Secrets Action
+    ↓
+Fetches secrets from 1Password vault
+    ↓
+Exports as environment variables
+    ↓
+Used by deployment steps
+```
 
-**How to generate**:
+---
 
-1. Open a terminal on your local machine
-2. Run the following command:
+## Step 1: Organize Secrets in 1Password
+
+### Create or Use Existing Vault
+
+1. Open 1Password
+2. Create a new vault named **"sage50-sync"** (or use an existing vault)
+3. This vault will store all CI/CD secrets
+
+### Create Secret Items
+
+Create the following items in the **sage50-sync** vault:
+
+#### 1. CapRover Credentials
+
+**Item name**: `caprover`
+**Item type**: Password or Login
+
+**Fields**:
+- **api-token**: Your CapRover API token
+  - Get from: https://captain.server.four13.dev → Account → API Token
+  - Click "Generate New Token"
+  - Copy and paste into this field
+
+**1Password reference**: `op://sage50-sync/caprover/api-token`
+
+---
+
+#### 2. Shopify Credentials
+
+**Item name**: `shopify`
+**Item type**: Password or Login
+
+**Fields**:
+- **cli-token**: Shopify CLI authentication token
+  - Generate with: `shopify auth login`
+  - Or get from: `~/.config/shopify/cli.yml`
+
+- **api-secret**: Shopify App API secret
+  - Get from: https://partners.shopify.com → Your App → Client credentials → Client secret
+
+**1Password references**:
+- CLI Token: `op://sage50-sync/shopify/cli-token`
+- API Secret: `op://sage50-sync/shopify/api-secret`
+
+---
+
+#### 3. Slack Webhook (Optional)
+
+**Item name**: `slack`
+**Item type**: Password or Login
+
+**Fields**:
+- **webhook-url**: Slack incoming webhook URL
+  - Get from: https://api.slack.com/apps → Create App → Incoming Webhooks
+  - Add to workspace and copy webhook URL
+
+**1Password reference**: `op://sage50-sync/slack/webhook-url`
+
+---
+
+## Step 2: Create 1Password Service Account
+
+A **service account** is a special type of 1Password account designed for automation (like CI/CD).
+
+### Create Service Account
+
+1. **Sign in to 1Password** as an admin: https://start.1password.com
+2. Navigate to **Settings** → **Integrations** → **Service Accounts**
+3. Click **"Create Service Account"**
+4. Name it: `GitHub Actions - sage50-sync`
+5. Set description: `CI/CD pipeline for Sage 50 Journal Entry Sync`
+
+### Grant Vault Access
+
+1. In the service account settings, click **"Grant Access to Vaults"**
+2. Select the **sage50-sync** vault
+3. Set permission to **Read Only** (service accounts should never write)
+4. Save changes
+
+### Get Service Account Token
+
+1. After creating the service account, 1Password will display the token **once**
+2. **Copy the token immediately** - it looks like: `ops_xxxxxxxxxxxxxxxxxxxxx`
+3. **Save it securely** - you'll need it for the next step
+4. If you lose it, you must create a new service account
+
+**⚠️ Warning**: This token provides access to all secrets in the vault. Treat it like a master password.
+
+---
+
+## Step 3: Add Service Account Token to GitHub
+
+Now add the **only GitHub secret** you need:
+
+1. Go to your repository: https://github.com/four13co/sage50-journal-entry-sync
+2. Click **Settings** → **Secrets and variables** → **Actions**
+3. Click **"New repository secret"**
+4. Enter details:
+   - **Name**: `OP_SERVICE_ACCOUNT_TOKEN`
+   - **Value**: Paste the service account token from Step 2
+5. Click **"Add secret"**
+
+**That's it!** No other GitHub secrets needed.
+
+---
+
+## Step 4: Verify 1Password References
+
+The workflow uses these 1Password references:
+
+```yaml
+# CapRover deployment
+CAPROVER_API_TOKEN: op://sage50-sync/caprover/api-token
+
+# Shopify deployment
+SHOPIFY_CLI_TOKEN: op://sage50-sync/shopify/cli-token
+SHOPIFY_API_SECRET: op://sage50-sync/shopify/api-secret
+
+# Slack notifications (optional)
+SLACK_WEBHOOK_URL: op://sage50-sync/slack/webhook-url
+```
+
+**Reference format**: `op://[vault-name]/[item-name]/[field-name]`
+
+### Verify Your Setup
+
+Use the 1Password CLI to test references locally:
+
+```bash
+# Install 1Password CLI (if not already installed)
+brew install 1password-cli
+
+# Authenticate with service account
+export OP_SERVICE_ACCOUNT_TOKEN="ops_xxxxxxxxxxxxxxxxxxxxx"
+
+# Test fetching secrets
+op read "op://sage50-sync/caprover/api-token"
+op read "op://sage50-sync/shopify/cli-token"
+op read "op://sage50-sync/shopify/api-secret"
+```
+
+If these commands return the correct values, your 1Password setup is correct!
+
+---
+
+## Step 5: Test the Pipeline
+
+After completing the setup, test the CI/CD pipeline:
+
+1. **Make a test commit**:
    ```bash
-   shopify auth login
+   git commit --allow-empty -m "Test CI/CD with 1Password"
+   git push origin Production
    ```
-3. Follow the prompts to authenticate with Shopify
-4. After successful authentication, the CLI will display your token
-5. Copy the token from the CLI output
-6. Save it immediately to GitHub secrets
 
-**Example output**:
-```
-✓ Logged in to Shopify
-Your CLI token is: shp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
+2. **Monitor the workflow**:
+   - Go to: https://github.com/four13co/sage50-journal-entry-sync/actions
+   - Watch the workflow run
+   - Check that secrets load successfully
 
-**Token Location**:
-- The token is also stored locally at: `~/.config/shopify/cli.yml`
-- You can retrieve it from there if you missed the CLI output
-
-**Token Expiration**:
-- Shopify CLI tokens may expire after some time
-- If deployments start failing, regenerate the token using the same steps
-
----
-
-### 3. SHOPIFY_API_SECRET
-
-**Purpose**: Shopify app API secret for authentication during deployment
-
-**How to get**:
-
-1. Go to Shopify Partners Dashboard: https://partners.shopify.com
-2. Navigate to: Apps → Your Apps
-3. Click on "sage-50-sync-for-fly-shop" (or your app name)
-4. In the app details page, find "Client credentials"
-5. Copy the "Client secret" value
-6. Save it to GitHub secrets
-
-**Security Warning**:
-- NEVER commit this secret to your repository
-- NEVER share it publicly
-- Rotate it if you suspect it's been compromised
-
----
-
-## Optional Secrets
-
-### 4. SLACK_WEBHOOK_URL (Optional)
-
-**Purpose**: Send deployment notifications to Slack channel
-
-**How to generate**:
-
-1. Go to: https://api.slack.com/apps
-2. Click "Create New App" → "From scratch"
-3. Name it "CI/CD Notifications" and select your workspace
-4. In the app settings, click "Incoming Webhooks"
-5. Toggle "Activate Incoming Webhooks" to ON
-6. Click "Add New Webhook to Workspace"
-7. Select the channel where you want notifications
-8. Copy the webhook URL (looks like: `https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX`)
-9. Save it to GitHub secrets
-
-**What you'll receive**:
-- Deployment success/failure notifications
-- Commit information (SHA, author, message)
-- Links to GitHub Actions logs
-- Direct link to deployed app
-
-**Fallback**:
-- If this secret is not configured, the pipeline still works
-- You just won't get Slack notifications
-- GitHub commit status checks still work
-
----
-
-## Adding Secrets to GitHub
-
-**Step-by-step process**:
-
-1. **Navigate to repository settings**:
-   - Go to: https://github.com/four13co/sage50-journal-entry-sync
-   - Click "Settings" tab
-   - Click "Secrets and variables" in the left sidebar
-   - Click "Actions"
-
-2. **Add a new secret**:
-   - Click "New repository secret" button
-   - Enter the secret name (exact spelling matters!):
-     - `CAPROVER_API_TOKEN`
-     - `SHOPIFY_CLI_TOKEN`
-     - `SHOPIFY_API_SECRET`
-     - `SLACK_WEBHOOK_URL` (optional)
-   - Paste the secret value
-   - Click "Add secret"
-
-3. **Verify secrets are added**:
-   - You should see all secrets listed (values are hidden)
-   - Secret names must match exactly as shown above
-
-**Important Notes**:
-- Secret values are hidden after saving
-- You cannot view secret values again (only update or delete)
-- If you need to check a secret, you must regenerate it
-
----
-
-## Security Best Practices
-
-### Token Rotation
-
-**Recommended schedule**:
-- Rotate all tokens quarterly (every 3 months)
-- Rotate immediately if you suspect compromise
-- Keep a secure record of when tokens were last rotated
-
-**How to rotate**:
-1. Generate new token/secret using the same steps above
-2. Update the GitHub secret with the new value
-3. Test a deployment to verify the new token works
-4. Revoke/delete the old token if possible
-
-### Access Control
-
-**Who should have access**:
-- Only repository administrators should access GitHub secrets
-- Limit the number of people with admin access
-- Use principle of least privilege
-
-**Audit trail**:
-- GitHub logs all secret access and modifications
-- Check: Settings → Secrets and variables → Actions → Audit log
-
-### Monitoring
-
-**Watch for**:
-- Failed authentication in deployment logs
-- Suspicious deployment activity
-- Unexpected secret modifications
-
-**Alert on**:
-- Multiple failed deployments (could indicate token issues)
-- Deployments from unexpected branches
-- Secret modifications in audit log
+3. **Verify deployment**:
+   ```bash
+   curl https://sage50-sync.four13.dev/api/healthz | jq '.'
+   ```
 
 ---
 
 ## Troubleshooting
 
-### "CAPROVER_API_TOKEN not configured" error
+### "Failed to load secrets from 1Password"
 
-**Symptoms**:
-- Deployment fails at "Authenticate with CapRover" step
-- Error message: "Neither CAPROVER_API_TOKEN nor CAPROVER_PASSWORD secret is configured"
+**Symptoms**: Workflow fails at "Load secrets from 1Password" step
+
+**Possible causes**:
+1. OP_SERVICE_ACCOUNT_TOKEN not set in GitHub
+2. Service account token is invalid or expired
+3. Service account doesn't have access to vault
+4. Secret reference format is incorrect
 
 **Solutions**:
-1. Verify secret name is exactly `CAPROVER_API_TOKEN` (case-sensitive)
-2. Generate new token from CapRover Dashboard
-3. Add/update the secret in GitHub
-4. Retry the deployment
+1. Verify OP_SERVICE_ACCOUNT_TOKEN exists in GitHub secrets
+2. Test token locally: `op read "op://sage50-sync/caprover/api-token"`
+3. Check service account has Read access to sage50-sync vault
+4. Verify reference format: `op://vault/item/field`
 
 ---
 
-### "SHOPIFY_CLI_TOKEN invalid" error
+### "Secret reference not found"
 
-**Symptoms**:
-- Shopify deployment fails
-- Error message about authentication failure
+**Symptoms**: Error message like "item 'shopify' not found in vault 'sage50-sync'"
 
 **Solutions**:
-1. Regenerate token: `shopify auth login`
-2. Update GitHub secret with new token
-3. Retry the deployment
-
-**Common causes**:
-- Token expired (Shopify tokens expire after some time)
-- Token was revoked in Shopify Partners
-- Token was copied incorrectly (trailing spaces, etc.)
+1. Verify item name in 1Password matches reference exactly (case-sensitive)
+2. Ensure item is in the correct vault (sage50-sync)
+3. Check field name matches exactly
+4. Refresh 1Password to sync changes
 
 ---
 
-### "SHOPIFY_API_SECRET invalid" error
+### "Service account token invalid"
 
-**Symptoms**:
-- Shopify deployment fails during authentication
+**Symptoms**: Authentication fails immediately
 
 **Solutions**:
-1. Verify secret value from Shopify Partners Dashboard
-2. Ensure you copied the "Client secret", not "Client ID"
-3. Check for no extra spaces or characters
-4. Update GitHub secret if incorrect
+1. Check token was copied correctly (no extra spaces/newlines)
+2. Verify token starts with `ops_`
+3. Create a new service account if token is lost
+4. Update GitHub secret with new token
 
 ---
 
-### Testing Secrets Configuration
+### Testing Individual Secrets Locally
 
-**After adding all secrets, test the CI/CD pipeline**:
+Use 1Password CLI to debug:
 
-1. Make a small, safe change to the repository
-2. Commit and push to Production branch:
-   ```bash
-   git commit --allow-empty -m "Test CI/CD pipeline"
-   git push origin Production
-   ```
-3. Watch the GitHub Actions workflow run
-4. Verify all jobs complete successfully
-5. Check that the app deployed correctly
+```bash
+# Set service account token
+export OP_SERVICE_ACCOUNT_TOKEN="ops_xxxxxxxxxxxxxxxxxxxxx"
 
-**If any job fails**:
-- Click on the failed job in GitHub Actions
-- Review the error logs
-- Check which secret is causing the issue
-- Follow the troubleshooting steps above
+# List all items in vault
+op item list --vault sage50-sync
+
+# Get details of specific item
+op item get caprover --vault sage50-sync
+
+# Read specific field
+op read "op://sage50-sync/caprover/api-token"
+```
+
+---
+
+## Security Best Practices
+
+### Service Account Management
+
+1. **Rotate service accounts quarterly**
+   - Create new service account
+   - Update GitHub secret
+   - Delete old service account
+
+2. **Use Read-Only access**
+   - Service accounts should never write to vaults
+   - Prevents accidental or malicious modifications
+
+3. **One service account per environment**
+   - Production: GitHub Actions (sage50-sync)
+   - Development: Separate service account if needed
+
+### Secret Rotation
+
+**To rotate a secret** (e.g., CapRover API token):
+
+1. Generate new token in CapRover Dashboard
+2. Update the field in 1Password item
+3. **No GitHub changes needed!** Next deployment uses new token
+4. Revoke old token in CapRover
+
+**Benefits**:
+- No downtime
+- No GitHub secret updates
+- Centralized management
+
+### Audit Trail
+
+**Monitor secret access**:
+
+1. In 1Password, go to **Activity** log
+2. Filter by service account name
+3. Review all secret accesses
+4. Alert on unusual activity
+
+---
+
+## Migration from GitHub Secrets
+
+If you previously had secrets in GitHub, you can remove them:
+
+1. Go to: https://github.com/four13co/sage50-journal-entry-sync/settings/secrets/actions
+2. Delete these secrets (no longer needed):
+   - `CAPROVER_API_TOKEN` ✗
+   - `CAPROVER_PASSWORD` ✗
+   - `SHOPIFY_CLI_TOKEN` ✗
+   - `SHOPIFY_API_SECRET` ✗
+   - `SLACK_WEBHOOK_URL` ✗
+
+3. Keep only:
+   - `OP_SERVICE_ACCOUNT_TOKEN` ✓
+
+---
+
+## 1Password CLI Reference
+
+### Installation
+
+```bash
+# macOS
+brew install 1password-cli
+
+# Linux
+wget https://downloads.1password.com/linux/debian/amd64/stable/1password-cli-latest-amd64.deb
+sudo dpkg -i 1password-cli-latest-amd64.deb
+
+# Verify installation
+op --version
+```
+
+### Common Commands
+
+```bash
+# Authenticate with service account
+export OP_SERVICE_ACCOUNT_TOKEN="ops_xxxxxxxxxxxxxxxxxxxxx"
+
+# List vaults
+op vault list
+
+# List items in vault
+op item list --vault sage50-sync
+
+# Get item details
+op item get caprover --vault sage50-sync --format json
+
+# Read specific field
+op read "op://sage50-sync/caprover/api-token"
+
+# Read multiple secrets
+op read "op://sage50-sync/caprover/api-token" "op://sage50-sync/shopify/cli-token"
+```
+
+---
+
+## Reference: 1Password Item Structure
+
+### Expected Vault Structure
+
+```
+sage50-sync (Vault)
+├── caprover (Item)
+│   └── api-token (Field)
+├── shopify (Item)
+│   ├── cli-token (Field)
+│   └── api-secret (Field)
+└── slack (Item)
+    └── webhook-url (Field)
+```
+
+### Creating Items via CLI (Optional)
+
+```bash
+# Create CapRover item
+op item create \
+  --category=password \
+  --title="caprover" \
+  --vault="sage50-sync" \
+  api-token="your-token-here"
+
+# Create Shopify item with multiple fields
+op item create \
+  --category=password \
+  --title="shopify" \
+  --vault="sage50-sync" \
+  cli-token="your-cli-token" \
+  api-secret="your-api-secret"
+```
 
 ---
 
 ## Quick Reference
 
-### Secret Names (copy-paste ready)
+### Required Setup
+- ✅ 1Password account with admin access
+- ✅ Service account created with vault access
+- ✅ OP_SERVICE_ACCOUNT_TOKEN added to GitHub
+- ✅ All secrets organized in sage50-sync vault
 
+### Secret References
 ```
-CAPROVER_API_TOKEN
-SHOPIFY_CLI_TOKEN
-SHOPIFY_API_SECRET
-SLACK_WEBHOOK_URL
+op://sage50-sync/caprover/api-token
+op://sage50-sync/shopify/cli-token
+op://sage50-sync/shopify/api-secret
+op://sage50-sync/slack/webhook-url
 ```
 
-### Commands for Token Generation
-
+### Testing Commands
 ```bash
-# Shopify CLI token
-shopify auth login
-
-# CapRover token
-# (Generate via Dashboard: https://captain.server.four13.dev)
-
-# Shopify API secret
-# (Get from Partners Dashboard: https://partners.shopify.com)
-```
-
-### GitHub Secrets URL
-
-```
-https://github.com/four13co/sage50-journal-entry-sync/settings/secrets/actions
+export OP_SERVICE_ACCOUNT_TOKEN="ops_xxxxx"
+op read "op://sage50-sync/caprover/api-token"
 ```
 
 ---
 
 ## Next Steps
 
-After configuring all secrets:
+After completing this setup:
 
-1. ✓ Test the CI/CD pipeline with a test commit
-2. ✓ Verify all jobs complete successfully
-3. ✓ Monitor first few automated deployments
-4. ✓ Set calendar reminder for quarterly token rotation
-5. ✓ Document any custom secrets or configuration
+1. ✅ Test CI/CD pipeline with empty commit
+2. ✅ Verify all secrets load successfully
+3. ✅ Monitor first automated deployment
+4. ✅ Set calendar reminder for quarterly token rotation
+5. ✅ Document any custom secrets or configuration
+6. ✅ Remove old GitHub secrets (except OP_SERVICE_ACCOUNT_TOKEN)
 
 ---
 
-**Security Reminder**: Never commit secrets to the repository. Always use GitHub Secrets for sensitive data.
+**Security Reminder**: The service account token is the only secret stored in GitHub. All other secrets are securely managed in 1Password with proper audit logging and access controls.
 
 ---
 

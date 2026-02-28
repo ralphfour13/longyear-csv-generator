@@ -182,22 +182,28 @@ Post-Deployment Verification (health check, smoke tests)
 Notifications (success/failure alerts)
 ```
 
-### Required GitHub Secrets
+### Secret Management with 1Password
 
-The following secrets must be configured in GitHub repository settings:
+The pipeline uses **1Password** as the single source of truth for all secrets.
 
-**Required**:
-- `CAPROVER_API_TOKEN` - CapRover authentication token
-- `SHOPIFY_CLI_TOKEN` - Shopify CLI authentication token
-- `SHOPIFY_API_SECRET` - Shopify app API secret
+**Only one GitHub secret required**: `OP_SERVICE_ACCOUNT_TOKEN`
 
-**Optional**:
-- `SLACK_WEBHOOK_URL` - Slack notifications
+**Secrets stored in 1Password**:
+- CapRover API token (`op://sage50-sync/caprover/api-token`)
+- Shopify CLI token (`op://sage50-sync/shopify/cli-token`)
+- Shopify API secret (`op://sage50-sync/shopify/api-secret`)
+- Slack webhook URL (`op://sage50-sync/slack/webhook-url`)
 
-**To configure secrets**:
-1. Go to: https://github.com/four13co/sage50-journal-entry-sync/settings/secrets/actions
-2. Click "New repository secret"
-3. Add each secret with its value
+**Benefits**:
+- ✅ Centralized secret management
+- ✅ Easy rotation (update in 1Password, no GitHub changes)
+- ✅ Better security (secrets never in GitHub)
+- ✅ Audit trail via 1Password
+
+**Setup**:
+1. Organize secrets in 1Password vault (sage50-sync)
+2. Create 1Password service account
+3. Add `OP_SERVICE_ACCOUNT_TOKEN` to GitHub secrets
 
 For detailed setup instructions, see: `GITHUB_SECRETS_SETUP.md`
 
