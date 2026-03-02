@@ -1,6 +1,5 @@
-import { json } from 'react-router';
 import type { Route } from './+types/api.healthz';
-import { prisma } from '~/db.server';
+import prisma from '~/db.server';
 
 export async function loader({ request }: Route.LoaderArgs) {
   try {
@@ -11,7 +10,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     const fs = await import('fs/promises');
     await fs.access('/app/data');
 
-    return json({
+    return Response.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || 'unknown',
@@ -22,7 +21,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       }
     });
   } catch (error) {
-    return json(
+    return Response.json(
       {
         status: 'error',
         timestamp: new Date().toISOString(),
