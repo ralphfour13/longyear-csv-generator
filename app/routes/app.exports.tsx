@@ -162,7 +162,7 @@ export default function Exports() {
 
   const isExporting = navigation.state === 'submitting';
   const [useRange, setUseRange] = useState(false);
-  const [autoDownload, setAutoDownload] = useState(true);
+  const [autoDownload, setAutoDownload] = useState(false);
   const [generateDailySales, setGenerateDailySales] = useState(true);
   const [generatePayoutsOrders, setGeneratePayoutsOrders] = useState(true);
   const [generateJournalDetails, setGenerateJournalDetails] = useState(true);
@@ -185,6 +185,10 @@ export default function Exports() {
 
   // Store polling interval ref so we can clear it when job completes
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Track which jobs have already triggered downloads to prevent repeated downloads
+  const downloadedJobsRef = useRef<Set<string>>(new Set());
+  const lastActionDataRef = useRef<any>(null);
 
   // Poll for job status when job is created
   useEffect(() => {
@@ -226,8 +230,9 @@ export default function Exports() {
         // Revalidate to refresh export history table
         revalidator.revalidate();
 
-        // Trigger auto-download if enabled
-        if (autoDownload && job.result?.files) {
+        // Trigger auto-download if enabled (only once per job)
+        if (autoDownload && job.result?.files && !downloadedJobsRef.current.has(job.id)) {
+          downloadedJobsRef.current.add(job.id);
           setTimeout(() => {
             job.result.files.forEach((file: any, index: number) => {
               if (!file.error) {
@@ -260,21 +265,26 @@ export default function Exports() {
   // Legacy: Auto-download all files when export completes immediately (backward compatibility)
   useEffect(() => {
     if (actionData?.success && actionData?.files && !actionData?.processing && autoDownload) {
-      // Revalidate to refresh export history table
-      revalidator.revalidate();
+      // Only trigger downloads if this is new actionData
+      if (lastActionDataRef.current !== actionData) {
+        lastActionDataRef.current = actionData;
 
-      // Small delay to ensure UI updates before downloads start
-      setTimeout(() => {
-        actionData.files.forEach((file: any, index: number) => {
-          if (!file.error) {
-            // Stagger downloads slightly to avoid browser blocking
-            setTimeout(() => {
-              const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${file.filename}`;
-              window.open(url, '_blank');
-            }, index * 300); // 300ms between each download
-          }
-        });
-      }, 500);
+        // Revalidate to refresh export history table
+        revalidator.revalidate();
+
+        // Small delay to ensure UI updates before downloads start
+        setTimeout(() => {
+          actionData.files.forEach((file: any, index: number) => {
+            if (!file.error) {
+              // Stagger downloads slightly to avoid browser blocking
+              setTimeout(() => {
+                const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${file.filename}`;
+                window.open(url, '_blank');
+              }, index * 300); // 300ms between each download
+            }
+          });
+        }, 500);
+      }
     }
   }, [actionData, shop, autoDownload, revalidator]);
 
