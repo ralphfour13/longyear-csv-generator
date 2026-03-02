@@ -11,7 +11,6 @@ import { Cin7ApiError, Cin7RateLimitError } from '../../types/cin7';
  */
 
 const BASE_URL = 'https://inventory.dearsystems.com/ExternalApi/v2';
-const RATE_LIMIT_PER_MINUTE = 300;
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 
@@ -84,6 +83,7 @@ class TokenBucket {
     // Check global cooldown first
     await GlobalRateLimitState.getInstance().waitForCooldown();
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       this.refill();
 

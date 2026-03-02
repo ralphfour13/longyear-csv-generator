@@ -144,7 +144,7 @@ async function fetchOrdersByDate(
   while (hasNextPage) {
     // When using page_info for pagination, Shopify requires ONLY page_info parameter
     // No other query parameters (date filters, status, limit) can be included
-    const params = pageInfo
+    const params: URLSearchParams = pageInfo
       ? new URLSearchParams({ page_info: pageInfo })
       : new URLSearchParams({
           [minParam]: startDateTime,
@@ -153,7 +153,7 @@ async function fetchOrdersByDate(
           limit: '250',
         });
 
-    const url = `${baseUrl}?${params.toString()}`;
+    const url: string = `${baseUrl}?${params.toString()}`;
 
     try {
       const response = await fetch(url, {
@@ -198,9 +198,9 @@ async function fetchOrdersByDate(
         }
 
         // Check for pagination
-        const linkHeader = response.headers.get('Link');
+        const linkHeader: string | null = response.headers.get('Link');
         if (linkHeader && linkHeader.includes('rel="next"')) {
-          const match = linkHeader.match(/page_info=([^&>]+)/);
+          const match: RegExpMatchArray | null = linkHeader.match(/page_info=([^&>]+)/);
           if (match) {
             pageInfo = match[1];
           } else {
@@ -235,6 +235,7 @@ async function fetchOrdersByDate(
 async function parseOrderWithTransactions(
   shop: string,
   accessToken: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   orderData: any
 ): Promise<Order> {
   // Parse basic order data
@@ -250,8 +251,10 @@ async function parseOrderWithTransactions(
 /**
  * Parse Shopify order API response into our Order type
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseOrder(orderData: any): Order {
   // Parse line items
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lineItems = (orderData.line_items || []).map((item: any) => ({
     id: item.id.toString(),
     productId: item.product_id?.toString() || '',
@@ -262,6 +265,7 @@ function parseOrder(orderData: any): Order {
     price: new Decimal(item.price),
     totalDiscount: new Decimal(item.total_discount || 0),
     taxable: item.taxable,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     taxes: (item.tax_lines || []).map((tax: any) => ({
       title: tax.title,
       rate: parseFloat(tax.rate),
@@ -271,7 +275,9 @@ function parseOrder(orderData: any): Order {
 
   // Calculate shipping total
   const shippingLines = orderData.shipping_lines || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const totalShipping = shippingLines.reduce(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (sum: Decimal, line: any) => sum.plus(new Decimal(line.price || 0)),
     new Decimal(0)
   );
@@ -357,6 +363,7 @@ async function fetchOrderTransactions(
       const data = await response.json();
 
       if (data.transactions && Array.isArray(data.transactions)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return data.transactions.map((txn: any) => parseTransaction(txn));
       }
 
@@ -383,6 +390,7 @@ async function fetchOrderTransactions(
 /**
  * Parse transaction data from Shopify API
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseTransaction(txnData: any): Transaction {
   const fees = parseFees(txnData);
 
@@ -402,7 +410,9 @@ function parseTransaction(txnData: any): Transaction {
 /**
  * Parse fee details from transaction
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseFees(txnData: any): any[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fees: any[] = [];
 
   if (txnData.receipt && typeof txnData.receipt === 'object') {
@@ -556,16 +566,20 @@ function formatDateOnly(isoTimestamp: string): string {
  * Parse refunds from Shopify order data
  * Extracts refund transactions and line items for proper tax splitting
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRefunds(refundsData: any[]): Refund[] {
   if (!refundsData || refundsData.length === 0) {
     return [];
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return refundsData.map((refund: any) => {
     // Parse refund transactions
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const transactions = (refund.transactions || []).map((txn: any) => parseTransaction(txn));
 
     // Parse refund line items
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const refund_line_items: RefundLineItem[] = (refund.refund_line_items || []).map((item: any) => ({
       id: item.id.toString(),
       line_item_id: item.line_item_id?.toString() || '',

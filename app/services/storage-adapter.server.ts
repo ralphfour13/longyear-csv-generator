@@ -10,6 +10,7 @@
 const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
 
 // Import appropriate storage implementation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let storage: any;
 
 if (IS_VERCEL) {

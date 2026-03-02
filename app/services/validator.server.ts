@@ -222,7 +222,7 @@ export function validateAccountMappings(mappings: AccountMappings): ValidationEr
   for (const key of requiredMappings) {
     if (!mappings[key]) {
       errors.push({
-        field: key,
+        field: key as string,
         message: `Missing required account mapping: ${key}`,
       });
       continue;

@@ -9,7 +9,6 @@ import type {
 } from '../types/journal-entry';
 import { fetchBalanceTransactions } from './shopify/balance-transaction-fetcher.server';
 import { fetchOrderById } from './shopify/order-fetcher.server';
-import { fetchOrderTransactions } from './shopify/transaction-fetcher.server';
 import { enrichOrderData } from './enrichment/order-enrichment.server';
 
 /**
@@ -195,11 +194,14 @@ async function processBalanceTransaction(
                 id: order.id,
                 name: order.name,
                 createdAt: order.createdAt,
+                totalPrice: order.totalPrice,
+                subtotalPrice: order.subtotalPrice,
                 currentTotalPrice: order.currentTotalPrice || order.totalPrice,
                 totalTax: order.totalTax,
                 totalShipping: order.totalShipping,
                 totalDiscounts: order.totalDiscounts,
                 financialStatus: order.financialStatus,
+                lineItems: order.lineItems,
               },
               enrichedData: enrichedData || undefined,
               payout: {
@@ -289,11 +291,14 @@ async function processBalanceTransaction(
                 id: order.id,
                 name: order.name,
                 createdAt: order.createdAt,
+                totalPrice: order.totalPrice,
+                subtotalPrice: order.subtotalPrice,
                 currentTotalPrice: order.currentTotalPrice || order.totalPrice,
                 totalTax: order.totalTax,
                 totalShipping: order.totalShipping,
                 totalDiscounts: order.totalDiscounts,
                 financialStatus: order.financialStatus,
+                lineItems: order.lineItems,
               },
               enrichedData: enrichedData || undefined,
               payout: {
@@ -530,7 +535,7 @@ function createOrderEntries(
     errors.push(errorMsg);
   } else {
     // Log successful balance with context
-    let successMsg = `Order ${order.name} ✓ Balanced: AR=${arAmount.toFixed(2)}`;
+    const successMsg = `Order ${order.name} ✓ Balanced: AR=${arAmount.toFixed(2)}`;
     if (!hasTax) {
       console.log(`${successMsg} [Out-of-state - no tax]`);
     }

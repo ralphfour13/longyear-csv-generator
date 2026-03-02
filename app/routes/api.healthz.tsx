@@ -1,7 +1,6 @@
-import type { Route } from './+types/api.healthz';
 import prisma from '../db.server';
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader() {
   try {
     // Check database connection
     await prisma.$queryRaw`SELECT 1`;

@@ -271,7 +271,7 @@ export async function createRefundJournalEntries(
     // Check if this is a cancellation (no money refunded)
     const isCancellation = refund?.refund_line_items?.some(
       item => item.restock_type === 'cancel'
-    ) && refund.transactions.length === 0;
+    ) && refund?.transactions.length === 0;
 
     if (isCancellation) {
       // This is a CANCELLATION (no money refunded)
@@ -285,12 +285,12 @@ export async function createRefundJournalEntries(
       if (!wasCaptured) {
         // Cancellation before capture: Only reverse AR, not cash
         // Calculate amounts from refund line items
-        const refundedSubtotal = refund.refund_line_items.reduce(
+        const refundedSubtotal = refund?.refund_line_items.reduce(
           (sum, item) => sum.plus(item.subtotal), new Decimal(0)
-        );
-        const refundedTax = refund.refund_line_items.reduce(
+        ) || new Decimal(0);
+        const refundedTax = refund?.refund_line_items.reduce(
           (sum, item) => sum.plus(item.total_tax), new Decimal(0)
-        );
+        ) || new Decimal(0);
 
         entries.push({
           date: targetDate,
@@ -445,6 +445,7 @@ async function getRefundAccount(
   shop: string,
   refundTransaction: Transaction,
   order: Order,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   accountMappings: any
 ): Promise<{ account: string; accountName: string }> {
   const normalizedGateway = refundTransaction.gateway.toLowerCase();

@@ -7,7 +7,6 @@
  */
 
 import { initializeScheduler, stopAllScheduledExports } from './services/scheduler.server';
-import { shopifyApi } from '@shopify/shopify-api';
 import { PrismaSessionStorage } from '@shopify/shopify-app-session-storage-prisma';
 import prisma from './db.server';
 

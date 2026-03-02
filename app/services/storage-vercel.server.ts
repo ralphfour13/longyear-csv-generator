@@ -88,6 +88,26 @@ function getDefaultMappings(): AccountMappings {
       accountCode: '1400-00',
       accountName: 'Inventory Asset',
     },
+    gift_card_liability: {
+      accountCode: '2300-00',
+      accountName: 'Gift Card Liability',
+    },
+    store_credit_liability: {
+      accountCode: '2310-00',
+      accountName: 'Store Credit Liability',
+    },
+    cash_register: {
+      accountCode: '1010-00',
+      accountName: 'Cash Register',
+    },
+    cogs_inventory_writeoff: {
+      accountCode: '5100-00',
+      accountName: 'COGS Inventory Write-off',
+    },
+    undeposited_funds: {
+      accountCode: '1050-00',
+      accountName: 'Undeposited Funds',
+    },
   };
 }
 

@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
-import { Form, useActionData, useLoaderData, useSearchParams } from 'react-router';
+import { Form, useActionData, useLoaderData } from 'react-router';
 import { useState } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats, getExportPath } from '../services/storage.server';
@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   );
 
-  return Response.json({ shop, exports });
+  return { shop, exports };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -42,36 +42,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const filename = formData.get('filename') as string;
 
     if (!filename) {
-      return Response.json(
-        { success: false, error: 'Filename required' },
-        { status: 400 }
-      );
+      return { success: false, error: 'Filename required', status: 400 };
     }
 
     try {
       const filePath = getExportPath(shop, filename);
       await fs.unlink(filePath);
 
-      return Response.json({
+      return {
         success: true,
         message: `File "${filename}" deleted successfully`,
-      });
+      };
     } catch (error) {
       console.error('Delete error:', error);
-      return Response.json(
-        { success: false, error: `Failed to delete file: ${error instanceof Error ? error.message : String(error)}` },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Failed to delete file: ${error instanceof Error ? error.message : String(error)}`,
+        status: 500,
+      };
     }
   }
 
-  return Response.json({ success: false, error: 'Invalid action' }, { status: 400 });
+  return { success: false, error: 'Invalid action', status: 400 };
 };
 
 export default function ExportHistory() {
   const { shop, exports } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [reportTypeFilter, setReportTypeFilter] = useState<string>('all');
@@ -152,13 +149,13 @@ export default function ExportHistory() {
       </s-button>
 
       {actionData?.success && (
-        <s-banner tone="success" style={{ marginBottom: '20px' }}>
+        <s-banner tone="success">
           <s-text>{actionData.message}</s-text>
         </s-banner>
       )}
 
-      {actionData?.error && (
-        <s-banner tone="critical" style={{ marginBottom: '20px' }}>
+      {actionData && 'error' in actionData && actionData.error && (
+        <s-banner tone="critical">
           <s-text>{actionData.error}</s-text>
         </s-banner>
       )}
@@ -168,9 +165,9 @@ export default function ExportHistory() {
         <s-stack direction="block" gap="base">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '800px' }}>
             <div>
-              <s-text variant="bodySm" style={{ display: 'block', marginBottom: '8px' }}>
-                Search
-              </s-text>
+              <div style={{ marginBottom: '8px' }}>
+                <s-text>Search</s-text>
+              </div>
               <input
                 type="text"
                 placeholder="Search filenames..."
@@ -187,9 +184,9 @@ export default function ExportHistory() {
             </div>
 
             <div>
-              <s-text variant="bodySm" style={{ display: 'block', marginBottom: '8px' }}>
-                Report Type
-              </s-text>
+              <div style={{ marginBottom: '8px' }}>
+                <s-text>Report Type</s-text>
+              </div>
               <select
                 value={reportTypeFilter}
                 onChange={(e) => setReportTypeFilter(e.target.value)}
@@ -209,7 +206,7 @@ export default function ExportHistory() {
             </div>
           </div>
 
-          <s-text tone="subdued" variant="bodySm">
+          <s-text tone="neutral">
             Showing {filteredExports.length} of {exports.length} exports
           </s-text>
         </s-stack>
@@ -225,7 +222,7 @@ export default function ExportHistory() {
             }
           </s-paragraph>
         ) : (
-          <s-box borderWidth="base" borderRadius="base" background="surface">
+          <s-box borderWidth="base" borderRadius="base">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--p-color-border)' }}>
@@ -233,36 +230,36 @@ export default function ExportHistory() {
                     style={{ padding: '16px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => toggleSort('reportType')}
                   >
-                    <s-text variant="headingSm">
+                    <s-text><strong>
                       Report Type {getSortIcon('reportType')}
-                    </s-text>
+                    </strong></s-text>
                   </th>
                   <th
                     style={{ padding: '16px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => toggleSort('reportDate')}
                   >
-                    <s-text variant="headingSm">
+                    <s-text><strong>
                       Report Date {getSortIcon('reportDate')}
-                    </s-text>
+                    </strong></s-text>
                   </th>
                   <th
                     style={{ padding: '16px', textAlign: 'left', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => toggleSort('created')}
                   >
-                    <s-text variant="headingSm">
+                    <s-text><strong>
                       Created {getSortIcon('created')}
-                    </s-text>
+                    </strong></s-text>
                   </th>
                   <th
                     style={{ padding: '16px', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
                     onClick={() => toggleSort('size')}
                   >
-                    <s-text variant="headingSm">
+                    <s-text><strong>
                       Size {getSortIcon('size')}
-                    </s-text>
+                    </strong></s-text>
                   </th>
                   <th style={{ padding: '16px', textAlign: 'center' }}>
-                    <s-text variant="headingSm">Actions</s-text>
+                    <s-text><strong>Actions</strong></s-text>
                   </th>
                 </tr>
               </thead>

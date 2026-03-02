@@ -1,6 +1,5 @@
 import { Decimal } from 'decimal.js';
 import type { EnrichedTransaction } from '../types/journal-entry';
-import { determineReportDate } from './enrichment/order-enrichment.server';
 
 /**
  * Daily Sales Report Row
@@ -65,7 +64,6 @@ interface DailySalesReportRow {
  */
 export function generateDailySalesReport(
   enrichedTransactions: EnrichedTransaction[],
-  targetDate: string
 ): string {
   const rows: DailySalesReportRow[] = [];
 
@@ -75,10 +73,10 @@ export function generateDailySalesReport(
   // Process all orders that were already filtered by the reconciler
   // The reconciler has already filtered transactions by the target date,
   // so we don't need to filter again here
-  for (const [orderId, transactions] of orderGroups.entries()) {
+  for (const [, transactions] of orderGroups.entries()) {
     // For each transaction in the order, create a separate row
     for (const enrichedTxn of transactions) {
-      const row = transformToReportRow(enrichedTxn, transactions);
+      const row = transformToReportRow(enrichedTxn);
       if (row) {
         rows.push(row);
       }
@@ -124,7 +122,6 @@ function groupByOrder(
  */
 function transformToReportRow(
   enrichedTxn: EnrichedTransaction,
-  allOrderTransactions: EnrichedTransaction[]
 ): DailySalesReportRow | null {
   if (!enrichedTxn.order || !enrichedTxn.enrichedData) {
     return null;

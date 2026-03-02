@@ -13,7 +13,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const mappings = await getAccountMappings(shop);
 
-  return Response.json({ shop, mappings });
+  return ({ shop, mappings });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -30,12 +30,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const mappings = JSON.parse(mappingsJson) as AccountMappings;
         await saveAccountMappings(shop, mappings);
 
-        return Response.json({ success: true, message: 'Account mappings saved successfully' });
+        return { success: true, message: 'Account mappings saved successfully' };
       } catch (error) {
-        return Response.json(
-          { success: false, error: 'Invalid mappings format' },
-          { status: 400 }
-        );
+        return { success: false, error: 'Invalid mappings format', status: 400 };
       }
     }
   }
@@ -44,26 +41,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const defaultMappings = await getAccountMappings(shop);
     await saveAccountMappings(shop, defaultMappings);
 
-    return Response.json({ success: true, message: 'Account mappings reset to defaults' });
+    return { success: true, message: 'Account mappings reset to defaults' };
   }
 
-  return Response.json({ success: false, error: 'Invalid action' }, { status: 400 });
+  return { success: false, error: 'Invalid action', status: 400 };
 };
 
 export default function AccountMappings() {
-  const { shop, mappings } = useLoaderData<typeof loader>();
+  const { mappings } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   return (
     <s-page heading="Account Mappings">
       {actionData?.success && (
-        <s-banner tone="success" style={{ marginBottom: '20px' }}>
+        <s-banner tone="success">
           <s-text>{actionData.message}</s-text>
         </s-banner>
       )}
 
-      {actionData?.error && (
-        <s-banner tone="critical" style={{ marginBottom: '20px' }}>
+      {actionData && 'error' in actionData && actionData.error && (
+        <s-banner tone="critical">
           <s-text>{actionData.error}</s-text>
         </s-banner>
       )}
@@ -180,6 +177,7 @@ export default function AccountMappings() {
 
           <s-button
             variant="secondary"
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={(e: any) => {
               e.preventDefault();
               const form = document.getElementById('mappingsForm') as HTMLFormElement;
@@ -229,12 +227,13 @@ function MappingRow({ label, mappingKey, mapping }: MappingRowProps) {
   return (
     <s-box padding="base" borderWidth="base" borderRadius="base">
       <s-stack direction="block" gap="base">
-        <s-text variant="headingSm">{label}</s-text>
+        <s-text><strong>{label}</strong></s-text>
 
-        <s-stack direction="inline" gap="base" style={{ width: '100%' }}>
+        <div style={{ width: '100%' }}>
+        <s-stack direction="inline" gap="base">
           <div style={{ flex: '0 0 150px' }}>
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodySm">Account Code</s-text>
+            <s-stack direction="block" gap="base">
+              <s-text>Account Code</s-text>
               <input
                 type="text"
                 defaultValue={mapping.accountCode}
@@ -253,8 +252,8 @@ function MappingRow({ label, mappingKey, mapping }: MappingRowProps) {
           </div>
 
           <div style={{ flex: '1 1 200px' }}>
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodySm">Account Name</s-text>
+            <s-stack direction="block" gap="base">
+              <s-text>Account Name</s-text>
               <input
                 type="text"
                 defaultValue={mapping.accountName}
@@ -272,8 +271,8 @@ function MappingRow({ label, mappingKey, mapping }: MappingRowProps) {
           </div>
 
           <div style={{ flex: '1 1 300px' }}>
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodySm">Description</s-text>
+            <s-stack direction="block" gap="base">
+              <s-text>Description</s-text>
               <input
                 type="text"
                 defaultValue={mapping.description || ''}
@@ -290,6 +289,7 @@ function MappingRow({ label, mappingKey, mapping }: MappingRowProps) {
             </s-stack>
           </div>
         </s-stack>
+        </div>
       </s-stack>
     </s-box>
   );

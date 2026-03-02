@@ -12,6 +12,7 @@ interface ErrorLogEntry {
   level: 'error' | 'warning' | 'info';
   context: string;
   message: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: any;
   stack?: string;
 }
@@ -23,6 +24,7 @@ export async function logError(
   shop: string,
   context: string,
   error: Error | string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: any
 ): Promise<void> {
   const logEntry: ErrorLogEntry = {
@@ -45,6 +47,7 @@ export async function logWarning(
   shop: string,
   context: string,
   message: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: any
 ): Promise<void> {
   const logEntry: ErrorLogEntry = {
@@ -66,6 +69,7 @@ export async function logInfo(
   shop: string,
   context: string,
   message: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   details?: any
 ): Promise<void> {
   const logEntry: ErrorLogEntry = {

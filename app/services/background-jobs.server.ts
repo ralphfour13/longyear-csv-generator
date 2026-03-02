@@ -16,6 +16,7 @@ export interface ExportJob {
   startedAt?: string;
   completedAt?: string;
   error?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result?: any;
 }
 

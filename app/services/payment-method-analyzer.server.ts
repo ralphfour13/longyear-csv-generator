@@ -75,6 +75,7 @@ export async function analyzeOrderPayments(
  */
 function mapGatewayToAccount(
   gateway: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   accountMappings: any
 ): { account: string; accountName: string } {
   // Normalize gateway string: lowercase and replace spaces with underscores

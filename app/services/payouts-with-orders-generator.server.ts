@@ -45,7 +45,7 @@ export function generatePayoutsWithOrders(
   // Group transactions by order
   const orderGroups = groupByOrder(enrichedTransactions);
 
-  for (const [orderId, transactions] of orderGroups.entries()) {
+  for (const [, transactions] of orderGroups.entries()) {
     // Sum net amounts for this order (handles multiple balance transactions per order)
     const netToPayout = transactions.reduce(
       (sum, txn) => sum.plus(txn.balanceTransaction.net),

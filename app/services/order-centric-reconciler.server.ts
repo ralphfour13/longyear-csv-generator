@@ -9,13 +9,11 @@ import type {
 import type { CogsCalculation } from '../types/cin7';
 import {
   fetchOrdersByCaptureDateRange,
-  filterOrderTransactionsByDate,
   getOrderCaptureDate,
 } from './order-centric-fetcher.server';
 import {
   analyzeOrderPayments,
   validatePaymentTotal,
-  getPaymentMethodSummary,
 } from './payment-method-analyzer.server';
 import {
   createOrderJournalEntries,
@@ -284,7 +282,6 @@ export async function collectCogsData(
   // Now calculate COGS for each order (costs are cached, so this is fast)
   // OPTIMIZATION (Phase 2): Reuse same cin7Service instance for all orders
   // NEW: Pass shop and accessToken to enable fulfillment-based filtering
-  let ordersProcessed = 0;
   for (const order of orders) {
     try {
       const cogsCalculation = await calculateOrderCogsWithService(
@@ -295,7 +292,6 @@ export async function collectCogsData(
         true // Use fulfillments to exclude removed items
       );
       cogsDataMap.set(order.id, cogsCalculation);
-      ordersProcessed++;
     } catch (error) {
       console.error(`Failed to calculate COGS for order ${order.name}:`, error);
     }

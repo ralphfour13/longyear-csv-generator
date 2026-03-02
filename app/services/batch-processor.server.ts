@@ -1,22 +1,18 @@
 import { Decimal } from 'decimal.js';
-import type { ExportHistoryEntry, ReconciliationResult, JournalEntry, EnrichedTransaction, GeneratedFile, Order } from '../types/journal-entry';
-import { fetchPayouts } from './shopify/payout-fetcher.server';
-import { fetchOrdersByDateRange } from './shopify/order-fetcher.server';
-import { reconcilePayout } from './reconciler.server';
+import type { ExportHistoryEntry, JournalEntry, EnrichedTransaction, GeneratedFile, Order } from '../types/journal-entry';
 import { reconcileOrdersByDate, collectCogsData } from './order-centric-reconciler.server'; // NEW: Order-centric reconciler
 import { applyAccountMappings } from './account-mapper.server';
-import { generateCSV, generateFilename, validateEntries } from './csv-generator.server';
+import { generateCSV, validateEntries } from './csv-generator.server';
 import { getAccountMappings, getShopConfig, writeExport } from './storage.server';
 import { randomUUID } from 'crypto';
 import { logError, logWarning, logInfo } from './error-logger.server';
-import { validateExportRequest, validateEntriesBalanceToPayout } from './validator.server';
+import { validateExportRequest } from './validator.server';
 import { generateDailySalesReport } from './daily-sales-report-generator.server';
 import { generatePayoutsWithOrders } from './payouts-with-orders-generator.server';
 import { generateJournalEntrySummary } from './journal-entry-summary-generator.server';
 import { generateCogsDetailCSV } from './cogs/cogs-detail-exporter.server';
 import { generateDailyReconciliationReport } from './daily-reconciliation-generator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
-import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
 import { sendExportEmail, type ExportEmailData } from './email.server';
 import { validateCogsConsistency, logValidationResult } from './cogs/cogs-reconciliation-validator.server';
 import { generateConsistencyReport, generateErrorReportCsv } from './consistency-checker.server';
@@ -97,7 +93,7 @@ export async function processExport(
     // Step 1.25: Check for order changes (state tracking)
     await logInfo(shop, 'Export', 'Checking for order changes since last export...');
     let changedOrderCount = 0;
-    let ordersNeedingReexport: string[] = [];
+    const ordersNeedingReexport: string[] = [];
 
     for (const order of orders) {
       try {
@@ -247,8 +243,8 @@ export async function processExport(
       await logInfo(shop, 'Export', 'Generating Detailed Sales Report...');
       try {
       const detailedSalesFilename = `detailed-sales-report_${targetDate}.csv`;
-      const detailedSalesContent = generateDailySalesReport(allEnrichedTransactions, targetDate);
-      const detailedSalesPath = await writeExport(shop, detailedSalesFilename, detailedSalesContent);
+      const detailedSalesContent = generateDailySalesReport(allEnrichedTransactions);
+      await writeExport(shop, detailedSalesFilename, detailedSalesContent);
 
       const rowCount = detailedSalesContent.split('\n').length - 2; // Subtract header and totals row
       generatedFiles.push({
@@ -281,7 +277,7 @@ export async function processExport(
       try {
       const payoutsFilename = `payouts-with-orders_${targetDate}.csv`;
       const payoutsContent = generatePayoutsWithOrders(allEnrichedTransactions);
-      const payoutsPath = await writeExport(shop, payoutsFilename, payoutsContent);
+      await writeExport(shop, payoutsFilename, payoutsContent);
 
       const rowCount = payoutsContent.split('\n').length - 1; // Subtract header row
       generatedFiles.push({
@@ -312,9 +308,8 @@ export async function processExport(
     if (options.generateJournalDetails) {
       await logInfo(shop, 'Export', 'Generating Journal Entry Details...');
       const journalEntriesDetailsFilename = `journal-entry-details_${targetDate}.csv`;
-      let journalEntriesDetailsPath: string;
       try {
-      journalEntriesDetailsPath = await generateCSV(shop, mappedEntries, journalEntriesDetailsFilename);
+      await generateCSV(shop, mappedEntries, journalEntriesDetailsFilename);
 
       generatedFiles.push({
         type: 'journal-entries-details',
@@ -342,8 +337,8 @@ export async function processExport(
 
     // File #4: Journal Entry Summary (one line per account for Sage 50 import)
     // Generated in both .txt and .csv formats with identical contents
-    let journalEntrySummaryFilename = `journal-entry_${targetDate}.csv`; // Define outside for return statement
-    let journalEntrySummaryTxtFilename = `journal-entry_${targetDate}.txt`;
+    const journalEntrySummaryFilename = `journal-entry_${targetDate}.csv`; // Define outside for return statement
+    const journalEntrySummaryTxtFilename = `journal-entry_${targetDate}.txt`;
     if (options.generateJournalSummary) {
       await logInfo(shop, 'Export', 'Generating Journal Entry Summary (.txt and .csv)...');
       try {
@@ -354,10 +349,10 @@ export async function processExport(
       const journalEntrySummaryContent = generateJournalEntrySummary(mappedEntries, formattedDate);
 
       // Write CSV file
-      const journalEntrySummaryPath = await writeExport(shop, journalEntrySummaryFilename, journalEntrySummaryContent);
+      await writeExport(shop, journalEntrySummaryFilename, journalEntrySummaryContent);
 
       // Write TXT file with identical content
-      const journalEntrySummaryTxtPath = await writeExport(shop, journalEntrySummaryTxtFilename, journalEntrySummaryContent);
+      await writeExport(shop, journalEntrySummaryTxtFilename, journalEntrySummaryContent);
 
       const rowCount = journalEntrySummaryContent.split('\n').length;
 
@@ -409,10 +404,10 @@ export async function processExport(
         const cogsDetailsFilename = `cogs-details_${targetDate}.csv`;
 
         // Reuse orders from COGS data collection (prevents redundant API fetch and session expiration)
-        const orders = cogsOrders;
+        const ordersForCogs = cogsOrders;
 
-        const cogsDetailsContent = generateCogsDetailCSV(orders, cogsDataMap, targetDate);
-        const cogsDetailsPath = await writeExport(shop, cogsDetailsFilename, cogsDetailsContent);
+        const cogsDetailsContent = generateCogsDetailCSV(ordersForCogs, cogsDataMap, targetDate);
+        await writeExport(shop, cogsDetailsFilename, cogsDetailsContent);
 
         const rowCount = cogsDetailsContent.split('\n').length - 1; // Subtract header row
         generatedFiles.push({
@@ -456,8 +451,8 @@ export async function processExport(
       await logInfo(shop, 'Export', 'Generating Daily Reconciliation Report...');
       try {
         const reconciliationFilename = `daily-reconciliation_${targetDate}.csv`;
-        const reconciliationContent = generateDailyReconciliationReport(allEnrichedTransactions, targetDate);
-        const reconciliationPath = await writeExport(shop, reconciliationFilename, reconciliationContent);
+        const reconciliationContent = generateDailyReconciliationReport(allEnrichedTransactions);
+        await writeExport(shop, reconciliationFilename, reconciliationContent);
 
         const rowCount = reconciliationContent.split('\n').length - 1; // Subtract header row
         generatedFiles.push({
@@ -490,7 +485,7 @@ export async function processExport(
       try {
         const errorReportFilename = `error-report_${targetDate}.csv`;
         const errorReportContent = generateErrorReportCsv(consistencyReport);
-        const errorReportPath = await writeExport(shop, errorReportFilename, errorReportContent);
+        await writeExport(shop, errorReportFilename, errorReportContent);
 
         const rowCount = errorReportContent.split('\n').length - 1; // Subtract header row
         generatedFiles.push({
@@ -621,18 +616,6 @@ export async function processExport(
 }
 
 /**
- * Add days to a date string (YYYY-MM-DD format)
- */
-function addDays(dateString: string, days: number): string {
-  const date = new Date(dateString);
-  date.setDate(date.getDate() + days);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
  * Calculate date for auto-export based on config
  *
  * @param autoExportDate - Config value: 'yesterday', 'today', 'last_7_days'
@@ -695,136 +678,3 @@ function formatDateISO(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * Calculate date offset (add/subtract days)
- * @param dateStr - Date string in YYYY-MM-DD format
- * @param days - Number of days to add (positive) or subtract (negative)
- * @returns New date string in YYYY-MM-DD format
- */
-function calculateDateOffset(dateStr: string, days: number): string {
-  const date = new Date(dateStr);
-  date.setDate(date.getDate() + days);
-  return formatDateISO(date);
-}
-
-/**
- * Create journal entries directly from an order (without balance transaction)
- * Used when generating order-based exports without payouts
- */
-function createOrderEntriesFromOrder(
-  order: any,
-  errors: string[]
-): JournalEntry[] {
-  const entries: JournalEntry[] = [];
-  const orderDate = formatDate(order.createdAt);
-  const reference = `SO-${order.name}`;
-
-  // AR Debit: What customer actually paid (use CURRENT total for edited orders)
-  // Note: For fully refunded orders, we still generate SO- entries using original amounts
-  // The refund is handled separately by RF- entries, which net together on AR
-  const arAmount = order.currentTotalPrice || order.totalPrice;
-
-  entries.push({
-    date: orderDate,
-    reference,
-    account: '1250-00',
-    accountName: 'Shopify Clearing Account',
-    debit: arAmount,
-    credit: new Decimal(0),
-    memo: `Order ${order.name}`,
-  });
-
-  // Calculate GROSS sales (before discounts)
-  const discountAmount = order.currentTotalDiscounts || order.totalDiscounts || new Decimal(0);
-
-  let grossSales: Decimal;
-  if (order.currentSubtotalPrice) {
-    // For edited orders: NET + Discount = GROSS
-    grossSales = order.currentSubtotalPrice.plus(discountAmount);
-  } else {
-    // For standard orders: sum line item prices (GROSS per item)
-    grossSales = order.lineItems.reduce(
-      (sum: Decimal, item: any) => sum.plus(new Decimal(item.price).times(item.quantity)),
-      new Decimal(0)
-    );
-  }
-
-  // Credit: Sales Revenue (GROSS)
-  entries.push({
-    date: orderDate,
-    reference,
-    account: '4000-00',
-    accountName: 'Sales Revenue',
-    debit: new Decimal(0),
-    credit: grossSales,
-    memo: `Sales - Order ${order.name}`,
-  });
-
-  // Debit: Discounts (if any)
-  if (discountAmount.greaterThan(0)) {
-    entries.push({
-      date: orderDate,
-      reference,
-      account: '4050-00',
-      accountName: 'Discounts Given',
-      debit: discountAmount,
-      credit: new Decimal(0),
-      memo: `Discount - Order ${order.name}`,
-    });
-  }
-
-  // Credit: Sales Tax (only if > 0)
-  const taxAmount = order.totalTax || new Decimal(0);
-  if (taxAmount.greaterThan(0)) {
-    entries.push({
-      date: orderDate,
-      reference,
-      account: '2200-00',
-      accountName: 'Sales Tax Payable',
-      debit: new Decimal(0),
-      credit: taxAmount,
-      memo: `Sales Tax - Order ${order.name}`,
-    });
-  }
-
-  // Credit: Shipping Revenue (only if > 0)
-  const shippingAmount = order.totalShipping || new Decimal(0);
-  if (shippingAmount.greaterThan(0)) {
-    entries.push({
-      date: orderDate,
-      reference,
-      account: '4100-00',
-      accountName: 'Shipping Revenue',
-      debit: new Decimal(0),
-      credit: shippingAmount,
-      memo: `Shipping - Order ${order.name}`,
-    });
-  }
-
-  // Validation
-  const totalDebits = arAmount.plus(discountAmount);
-  const totalCredits = grossSales.plus(taxAmount).plus(shippingAmount);
-  const diff = totalDebits.minus(totalCredits).abs();
-  const isBalanced = diff.lessThanOrEqualTo(new Decimal('0.01'));
-
-  if (!isBalanced) {
-    const errorMsg = `Order ${order.name} IMBALANCE: ` +
-      `Debits=${totalDebits.toFixed(2)}, Credits=${totalCredits.toFixed(2)} ` +
-      `(diff=${totalDebits.minus(totalCredits).toFixed(2)})`;
-    errors.push(errorMsg);
-  }
-
-  return entries;
-}
-
-/**
- * Format date for journal entries (MM/DD/YYYY)
- */
-function formatDate(isoDate: string): string {
-  const date = new Date(isoDate);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const year = date.getFullYear();
-
-  return `${month}/${day}/${year}`;
-}

@@ -18,7 +18,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   );
 
-  return Response.json({ shop, exports });
+  return { shop, exports };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -32,20 +32,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (action === 'checkJob') {
     const jobId = formData.get('jobId');
     if (!jobId || typeof jobId !== 'string') {
-      return Response.json({ success: false, error: 'Job ID required' }, { status: 400 });
+      return { success: false, error: 'Job ID required', status: 400 };
     }
 
     const { getJobStatus } = await import('../services/background-jobs.server');
     const job = await getJobStatus(jobId);
 
     if (!job) {
-      return Response.json({ success: false, error: 'Job not found' }, { status: 404 });
+      return { success: false, error: 'Job not found', status: 404 };
     }
 
-    return Response.json({
+    return {
       success: true,
       job,
-    });
+    };
   }
 
   if (action === 'export') {
@@ -70,20 +70,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (!startDateParam || typeof startDateParam !== 'string' ||
             !endDateParam || typeof endDateParam !== 'string') {
-          return Response.json(
-            { success: false, error: 'Start and end dates are required' },
-            { status: 400 }
-          );
+          return { success: false, error: 'Start and end dates are required', status: 400 };
         }
 
         const startDate = new Date(startDateParam);
         const endDate = new Date(endDateParam);
 
         if (startDate > endDate) {
-          return Response.json(
-            { success: false, error: 'Start date must be before end date' },
-            { status: 400 }
-          );
+          return { success: false, error: 'Start date must be before end date', status: 400 };
         }
 
         // Create background job
@@ -95,28 +89,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
 
         // Start processing in background (don't await)
-        processPendingJobs(shop, session.accessToken).catch((error) => {
+        const accessToken = session.accessToken || '';
+        processPendingJobs(shop, accessToken).catch((error) => {
           console.error('Background job processing error:', error);
         });
 
         const dayCount = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-        return Response.json({
+        return {
           success: true,
           processing: true,
           jobId,
           message: `Export started for ${dayCount} days (${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}). Processing in background...`,
           dateRange: { start: startDateParam, end: endDateParam, count: dayCount },
-        });
+        };
       } else {
         // Single date mode
         const dateParam = formData.get('date');
 
         if (!dateParam || typeof dateParam !== 'string') {
-          return Response.json(
-            { success: false, error: 'Export date is required' },
-            { status: 400 }
-          );
+          return { success: false, error: 'Export date is required', status: 400 };
         }
 
         // Create background job
@@ -128,30 +120,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
 
         // Start processing in background (don't await)
-        processPendingJobs(shop, session.accessToken).catch((error) => {
+        const accessToken = session.accessToken || '';
+        processPendingJobs(shop, accessToken).catch((error) => {
           console.error('Background job processing error:', error);
         });
 
-        return Response.json({
+        return {
           success: true,
           processing: true,
           jobId,
           message: `Export started for ${dateParam}. Processing in background...`,
-        });
+        };
       }
     } catch (error) {
       console.error('Export error:', error);
-      return Response.json(
-        {
-          success: false,
-          error: `Export failed: ${error instanceof Error ? error.message : String(error)}`,
-        },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Export failed: ${error instanceof Error ? error.message : String(error)}`,
+        status: 500,
+      };
     }
   }
 
-  return Response.json({ success: false, error: 'Invalid action' }, { status: 400 });
+  return { success: false, error: 'Invalid action', status: 400 };
 };
 
 export default function Exports() {
@@ -264,7 +255,8 @@ export default function Exports() {
 
   // Legacy: Auto-download all files when export completes immediately (backward compatibility)
   useEffect(() => {
-    if (actionData?.success && actionData?.files && !actionData?.processing && autoDownload) {
+    if (actionData && 'success' in actionData && actionData.success &&
+        'files' in actionData && 'processing' in actionData && !actionData.processing && autoDownload) {
       // Only trigger downloads if this is new actionData
       if (lastActionDataRef.current !== actionData) {
         lastActionDataRef.current = actionData;
@@ -274,7 +266,8 @@ export default function Exports() {
 
         // Small delay to ensure UI updates before downloads start
         setTimeout(() => {
-          actionData.files.forEach((file: { filename: string; error?: string }, index: number) => {
+          const files = actionData.files as { filename: string; error?: string }[];
+          files.forEach((file, index) => {
             if (!file.error) {
               // Stagger downloads slightly to avoid browser blocking
               setTimeout(() => {
@@ -291,48 +284,48 @@ export default function Exports() {
   return (
     <s-page heading="Export Center">
       {currentJob && (
-        <s-banner tone="info" style={{ marginBottom: '20px' }}>
-          <s-stack direction="block" gap="tight">
-            <s-text variant="headingSm">Export in Progress</s-text>
+        <s-banner tone="info">
+          <s-stack direction="block" gap="base">
+            <s-text><strong>Export in Progress</strong></s-text>
             <s-text>{jobStatus}</s-text>
-            <s-text variant="bodySm">This may take several minutes for large date ranges. You can refresh the page to check progress, or wait here.</s-text>
+            <s-text>This may take several minutes for large date ranges. You can refresh the page to check progress, or wait here.</s-text>
           </s-stack>
         </s-banner>
       )}
 
       {fetcher.data?.job?.status === 'completed' && fetcher.data?.job?.result && (
-        <s-banner tone="success" style={{ marginBottom: '20px' }}>
+        <s-banner tone="success">
           <s-stack direction="block" gap="base">
-            <s-text variant="headingSm">{fetcher.data.job.result.message}</s-text>
+            <s-text><strong>{fetcher.data.job.result.message}</strong></s-text>
             {fetcher.data.job.result.files && fetcher.data.job.result.files.length > 0 && (
-              <s-stack direction="block" gap="tight">
-                {fetcher.data.job.result.files.map((file: { filename: string; error?: string }) => {
+              <s-stack direction="block" gap="base">
+                {fetcher.data.job.result.files.map((file: { filename: string; error?: string; type?: string; rowCount?: number }) => {
                   let label = '';
                   let description = '';
                   if (file.type === 'daily-sales') {
                     label = 'Detailed Sales Report';
-                    description = `${file.rowCount} transaction rows`;
+                    description = `${file.rowCount || 0} transaction rows`;
                   } else if (file.type === 'payouts-orders') {
                     label = 'Payouts with Orders';
-                    description = `${file.rowCount} order rows`;
+                    description = `${file.rowCount || 0} order rows`;
                   } else if (file.type === 'journal-entries-details') {
                     label = 'Journal Entry Details';
-                    description = `${file.rowCount} detailed entries`;
+                    description = `${file.rowCount || 0} detailed entries`;
                   } else if (file.type === 'journal-entry-summary') {
                     label = 'Journal Entry';
-                    description = `${file.rowCount} accounts, ${fetcher.data.job.result.balanced ? '✓ balanced' : '✗ unbalanced'}`;
+                    description = `${file.rowCount || 0} accounts, ${fetcher.data.job.result.balanced ? '✓ balanced' : '✗ unbalanced'}`;
                   } else if (file.type === 'daily-reconciliation') {
                     label = 'Daily Reconciliation';
-                    description = `${file.rowCount} order rows`;
+                    description = `${file.rowCount || 0} order rows`;
                   }
 
                   return (
-                    <s-stack key={file.type} direction="inline" gap="tight" alignItems="center">
-                      <s-text variant="bodySm"><strong>{label}:</strong></s-text>
+                    <s-stack key={file.type} direction="inline" gap="base" alignItems="center">
+                      <s-text><strong>{label}:</strong></s-text>
                       {file.error ? (
                         <s-text tone="critical">{file.error}</s-text>
                       ) : (
-                        <>
+                        <s-stack direction="inline" gap="base">
                           <button
                             onClick={() => handleDownload(file.filename)}
                             style={{
@@ -344,13 +337,12 @@ export default function Exports() {
                               padding: 0,
                               font: 'inherit',
                               fontWeight: 500,
-                              marginLeft: '4px',
                             }}
                           >
                             {file.filename}
                           </button>
-                          <s-text style={{ marginLeft: '4px' }}>({description})</s-text>
-                        </>
+                          <s-text>({description})</s-text>
+                        </s-stack>
                       )}
                     </s-stack>
                   );
@@ -362,51 +354,54 @@ export default function Exports() {
       )}
 
       {fetcher.data?.job?.status === 'failed' && (
-        <s-banner tone="critical" style={{ marginBottom: '20px' }}>
+        <s-banner tone="critical">
           <s-text>Export failed: {fetcher.data.job.error || 'Unknown error'}</s-text>
         </s-banner>
       )}
 
       {actionData?.success && actionData?.processing && (
-        <s-banner tone="info" style={{ marginBottom: '20px' }}>
+        <s-banner tone="info">
           <s-text>{actionData.message}</s-text>
         </s-banner>
       )}
 
-      {actionData?.success && !actionData?.processing && (
-        <s-banner tone="success" style={{ marginBottom: '20px' }}>
+      {actionData && 'success' in actionData && actionData.success && 'processing' in actionData && !actionData.processing && 'files' in actionData && (
+        <s-banner tone="success">
           <s-stack direction="block" gap="base">
-            <s-text variant="headingSm">{actionData.message}</s-text>
-            {actionData.files && actionData.files.length > 0 && (
-              <s-stack direction="block" gap="tight">
-                {actionData.files.map((file: { filename: string; error?: string }) => {
+            <s-text><strong>{'message' in actionData ? actionData.message : ''}</strong></s-text>
+            {(() => {
+              const files = actionData.files as { filename: string; error?: string; type?: string; rowCount?: number }[];
+              return files && files.length > 0 && (
+              <s-stack direction="block" gap="base">
+                {files.map((file: { filename: string; error?: string; type?: string; rowCount?: number }) => {
                   // Get file type label
                   let label = '';
                   let description = '';
                   if (file.type === 'daily-sales') {
                     label = 'Detailed Sales Report';
-                    description = `${file.rowCount} transaction rows`;
+                    description = `${file.rowCount || 0} transaction rows`;
                   } else if (file.type === 'payouts-orders') {
                     label = 'Payouts with Orders';
-                    description = `${file.rowCount} order rows`;
+                    description = `${file.rowCount || 0} order rows`;
                   } else if (file.type === 'journal-entries-details') {
                     label = 'Journal Entry Details';
-                    description = `${file.rowCount} detailed entries`;
+                    description = `${file.rowCount || 0} detailed entries`;
                   } else if (file.type === 'journal-entry-summary') {
                     label = 'Journal Entry';
-                    description = `${file.rowCount} accounts, ${actionData.balanced ? '✓ balanced' : '✗ unbalanced'}`;
+                    const balanced = 'balanced' in actionData ? actionData.balanced : false;
+                    description = `${file.rowCount || 0} accounts, ${balanced ? '✓ balanced' : '✗ unbalanced'}`;
                   } else if (file.type === 'daily-reconciliation') {
                     label = 'Daily Reconciliation';
-                    description = `${file.rowCount} order rows`;
+                    description = `${file.rowCount || 0} order rows`;
                   }
 
                   return (
-                    <s-stack key={file.type} direction="inline" gap="tight" alignItems="center">
-                      <s-text variant="bodySm"><strong>{label}:</strong></s-text>
+                    <s-stack key={file.type} direction="inline" gap="base" alignItems="center">
+                      <s-text><strong>{label}:</strong></s-text>
                       {file.error ? (
                         <s-text tone="critical">{file.error}</s-text>
                       ) : (
-                        <>
+                        <s-stack direction="inline" gap="base">
                           <button
                             onClick={() => handleDownload(file.filename)}
                             style={{
@@ -418,25 +413,25 @@ export default function Exports() {
                               padding: 0,
                               font: 'inherit',
                               fontWeight: 500,
-                              marginLeft: '4px',
                             }}
                           >
                             {file.filename}
                           </button>
-                          <s-text style={{ marginLeft: '4px' }}>({description})</s-text>
-                        </>
+                          <s-text>({description})</s-text>
+                        </s-stack>
                       )}
                     </s-stack>
                   );
                 })}
               </s-stack>
-            )}
+              );
+            })()}
           </s-stack>
         </s-banner>
       )}
 
       {actionData?.error && (
-        <s-banner tone="critical" style={{ marginBottom: '20px' }}>
+        <s-banner tone="critical">
           <s-text>{actionData.error}</s-text>
         </s-banner>
       )}
@@ -483,8 +478,8 @@ export default function Exports() {
               </div>
 
               <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-                <s-stack direction="block" gap="tight">
-                  <s-text variant="headingSm">Files to Generate</s-text>
+                <s-stack direction="block" gap="base">
+                  <s-text><strong>Files to Generate</strong></s-text>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
@@ -543,8 +538,8 @@ export default function Exports() {
               </s-box>
 
               <div style={{ maxWidth: '300px' }}>
-                <s-stack direction="block" gap="tight">
-                  <s-text variant="bodySm">{useRange ? 'Start Date' : 'Export Date'}</s-text>
+                <s-stack direction="block" gap="base">
+                  <s-text>{useRange ? 'Start Date' : 'Export Date'}</s-text>
                   <input
                     type="date"
                     name={useRange ? 'startDate' : 'date'}
@@ -563,8 +558,8 @@ export default function Exports() {
 
               {useRange && (
                 <div style={{ maxWidth: '300px' }}>
-                  <s-stack direction="block" gap="tight">
-                    <s-text variant="bodySm">End Date</s-text>
+                  <s-stack direction="block" gap="base">
+                    <s-text>End Date</s-text>
                     <input
                       type="date"
                       name="endDate"
@@ -592,14 +587,18 @@ export default function Exports() {
 
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
             <s-stack direction="block" gap="base">
-              <s-text variant="headingSm">How it works</s-text>
-              <s-stack direction="block" gap="tight">
+              <s-text><strong>How it works</strong></s-text>
+              <s-stack direction="block" gap="base">
                 <s-text>1. Select the date (transactions captured on this day)</s-text>
                 <s-text>2. Click &quot;Generate CSV&quot; to create four export files:</s-text>
-                <s-text style={{ paddingLeft: '20px' }}>• Detailed Sales Report - Transaction-level detail for bookkeeping</s-text>
-                <s-text style={{ paddingLeft: '20px' }}>• Payouts with Orders - Reconciliation view of payout breakdown</s-text>
-                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry Details - Detailed transaction entries</s-text>
-                <s-text style={{ paddingLeft: '20px' }}>• Journal Entry - Summary by account (import into Sage 50)</s-text>
+                <div style={{ paddingLeft: '20px' }}>
+                  <s-stack direction="block" gap="base">
+                    <s-text>• Detailed Sales Report - Transaction-level detail for bookkeeping</s-text>
+                    <s-text>• Payouts with Orders - Reconciliation view of payout breakdown</s-text>
+                    <s-text>• Journal Entry Details - Detailed transaction entries</s-text>
+                    <s-text>• Journal Entry - Summary by account (import into Sage 50)</s-text>
+                  </s-stack>
+                </div>
                 <s-text>3. Download all four files for complete audit trail</s-text>
               </s-stack>
             </s-stack>
@@ -611,21 +610,21 @@ export default function Exports() {
         {exports.length === 0 ? (
           <s-paragraph>No exports yet. Generate your first export above.</s-paragraph>
         ) : (
-          <s-box borderWidth="base" borderRadius="base" background="surface">
+          <s-box borderWidth="base" borderRadius="base">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--p-color-border)' }}>
                   <th style={{ padding: '16px', textAlign: 'left' }}>
-                    <s-text variant="headingSm">Filename</s-text>
+                    <s-text><strong>Filename</strong></s-text>
                   </th>
                   <th style={{ padding: '16px', textAlign: 'left' }}>
-                    <s-text variant="headingSm">Created</s-text>
+                    <s-text><strong>Created</strong></s-text>
                   </th>
                   <th style={{ padding: '16px', textAlign: 'right' }}>
-                    <s-text variant="headingSm">Size</s-text>
+                    <s-text><strong>Size</strong></s-text>
                   </th>
                   <th style={{ padding: '16px', textAlign: 'center' }}>
-                    <s-text variant="headingSm">Actions</s-text>
+                    <s-text><strong>Actions</strong></s-text>
                   </th>
                 </tr>
               </thead>

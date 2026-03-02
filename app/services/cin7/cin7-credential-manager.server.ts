@@ -167,16 +167,3 @@ function getConfigPath(shop: string): string {
   return path.join(DATA_DIR, shop, 'cin7-config.json');
 }
 
-/**
- * Get default Cin7 configuration
- */
-function getDefaultConfig(): Cin7Config {
-  return {
-    enabled: false,
-    accountId: '',
-    apiKey: '',
-    cacheEnabled: true,
-    cacheDurationHours: 24,
-    useFallback: false,
-  };
-}

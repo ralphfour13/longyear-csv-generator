@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import type { EnrichedTransaction, Order, OrderLineItem } from '../types/journal-entry';
+import type { EnrichedTransaction, OrderLineItem } from '../types/journal-entry';
 
 /**
  * Daily Reconciliation Report Row
@@ -42,7 +42,6 @@ interface DailyReconciliationRow {
  */
 export function generateDailyReconciliationReport(
   enrichedTransactions: EnrichedTransaction[],
-  targetDate: string
 ): string {
   const rows: DailyReconciliationRow[] = [];
 
@@ -50,7 +49,7 @@ export function generateDailyReconciliationReport(
   const orderGroups = groupByOrder(enrichedTransactions);
 
   // Process each order (one row per order, or two rows for refunded orders)
-  for (const [orderId, transactions] of orderGroups.entries()) {
+  for (const [, transactions] of orderGroups.entries()) {
     if (transactions.length === 0 || !transactions[0].order) continue;
 
     const orderRows = transformToReconciliationRow(transactions);
@@ -120,11 +119,6 @@ function transformToReconciliationRow(
       .minus(order.totalShipping || new Decimal(0));
   }
 
-  // Check if this is a refund row (negative sales)
-  const hasRefundTransaction = transactions.some(
-    (t) => t.balanceTransaction?.type === 'refund'
-  );
-
   // For fully refunded orders, create two rows: original sale and refund
   const rows: DailyReconciliationRow[] = [];
 
@@ -159,8 +153,8 @@ function transformToReconciliationRow(
       originalSubtotal: originalSubtotal.neg().toFixed(2),
       discount: discount.neg().toFixed(2),
       netSubtotal: netSubtotal.neg().toFixed(2), // Negative for refund
-      tax: order.totalTax.neg().toFixed(2),
-      shipping: order.totalShipping.gt(0) ? order.totalShipping.neg().toFixed(2) : '',
+      tax: (order.totalTax || new Decimal(0)).neg().toFixed(2),
+      shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.neg().toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
@@ -181,8 +175,8 @@ function transformToReconciliationRow(
       originalSubtotal: originalSubtotal.toFixed(2),
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
-      tax: order.totalTax.toFixed(2),
-      shipping: order.totalShipping.gt(0) ? order.totalShipping.toFixed(2) : '',
+      tax: (order.totalTax || new Decimal(0)).toFixed(2),
+      shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
@@ -203,8 +197,8 @@ function transformToReconciliationRow(
       originalSubtotal: originalSubtotal.toFixed(2),
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
-      tax: order.totalTax.toFixed(2),
-      shipping: order.totalShipping.gt(0) ? order.totalShipping.toFixed(2) : '',
+      tax: (order.totalTax || new Decimal(0)).toFixed(2),
+      shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
@@ -227,7 +221,8 @@ function transformToReconciliationRow(
 /**
  * Determine order area (POS vs Canadian Catalog)
  */
-function determineArea(order: Order, enrichedData: any): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function determineArea(order: any, enrichedData: any): string {
   // Check tags for POS indicator
   const tags = enrichedData.tags?.toLowerCase() || '';
   if (tags.includes('pos') || tags.includes('point of sale')) {
@@ -248,6 +243,7 @@ function determineArea(order: Order, enrichedData: any): string {
 /**
  * Determine tender (payment method)
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function determineTender(paymentBreakdown: any): string {
   if (!paymentBreakdown) return 'cc';
 
@@ -275,7 +271,8 @@ function determineTender(paymentBreakdown: any): string {
 /**
  * Generate notes for special conditions
  */
-function generateNotes(order: Order, enrichedData: any): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function generateNotes(order: any, enrichedData: any): string {
   const notes: string[] = [];
 
   // Check for fishing licenses in line items
@@ -320,7 +317,8 @@ function generateNotes(order: Order, enrichedData: any): string {
 /**
  * Analyze gift card usage
  */
-function analyzeGiftCards(order: Order, paymentBreakdown: any): { sold: string; used: string } {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function analyzeGiftCards(order: any, paymentBreakdown: any): { sold: string; used: string } {
   let sold = '';
   let used = '';
 

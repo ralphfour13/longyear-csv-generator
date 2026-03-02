@@ -156,7 +156,7 @@ async function executeScheduledExport(
       filename: result.filename,
       entryCount: result.entryCount,
       startDate,
-      endDate,
+      endDate: startDate,
       duration,
     });
   } catch (error) {
@@ -272,6 +272,7 @@ async function logScheduledExport(
 export async function getScheduledExportLogs(
   shop: string,
   limit: number = 50
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any[]> {
   const logFile = path.join(process.cwd(), 'data', shop, 'scheduled-exports.log');
 

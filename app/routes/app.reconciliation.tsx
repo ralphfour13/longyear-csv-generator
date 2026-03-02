@@ -27,18 +27,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     getSnapshotStats(shop),
   ]);
 
-  return Response.json({
+  return {
     shop,
     days,
     recentMetrics,
     qualityTrend,
     summaryStats,
     snapshotStats,
-  });
+  };
 };
 
 export default function Reconciliation() {
-  const { shop, days, recentMetrics, qualityTrend, summaryStats, snapshotStats } =
+  const { days, recentMetrics, qualityTrend, summaryStats, snapshotStats } =
     useLoaderData<typeof loader>();
 
   const [selectedDays, setSelectedDays] = useState(days.toString());
@@ -80,9 +80,9 @@ export default function Reconciliation() {
       </s-button>
 
       {/* Time Period Selector */}
-      <s-section style={{ marginBottom: '20px' }}>
+      <s-section >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <s-text variant="bodyMd">Time Period:</s-text>
+          <s-text>Time Period:</s-text>
           <select
             value={selectedDays}
             onChange={(e) => handlePeriodChange(e.target.value)}
@@ -117,18 +117,18 @@ export default function Reconciliation() {
             borderRadius: '12px',
             border: '1px solid #E1E3E5',
           }}>
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodyMd" style={{ color: '#6D7175' }}>
+            <s-stack direction="block" gap="base">
+              <span style={{ color: '#6D7175', fontSize: '14px' }}>
                 Average Quality Score
-              </s-text>
-              <s-text variant="heading2xl" style={{ color: '#202223' }}>
+              </span>
+              <span style={{ color: '#202223', fontSize: '14px' }}>
                 {summaryStats.averageQualityScore.toFixed(1)}%
-              </s-text>
+              </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px' }}>
                 <span style={{ fontSize: '20px' }}>{trendInfo.icon}</span>
-                <s-text variant="bodySm" style={{ color: trendInfo.color, fontWeight: 600 }}>
+                <span style={{ color: trendInfo.color, fontWeight: 600, fontSize: '14px' }}>
                   {trendInfo.text}
-                </s-text>
+                </span>
               </div>
             </s-stack>
           </div>
@@ -140,16 +140,16 @@ export default function Reconciliation() {
             borderRadius: '12px',
             border: '1px solid #E1E3E5',
           }}>
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodyMd" style={{ color: '#6D7175' }}>
+            <s-stack direction="block" gap="base">
+              <span style={{ color: '#6D7175', fontSize: '14px' }}>
                 Orders Processed
-              </s-text>
-              <s-text variant="heading2xl" style={{ color: '#202223' }}>
+              </span>
+              <span style={{ color: '#202223', fontSize: '14px' }}>
                 {summaryStats.totalOrdersProcessed.toLocaleString()}
-              </s-text>
-              <s-text variant="bodySm" style={{ color: '#6D7175', marginTop: '8px' }}>
+              </span>
+              <span style={{ color: '#6D7175', marginTop: '8px', fontSize: '14px' }}>
                 in last {days} days
-              </s-text>
+              </span>
             </s-stack>
           </div>
 
@@ -160,18 +160,18 @@ export default function Reconciliation() {
             borderRadius: '12px',
             border: '1px solid #E1E3E5',
           }}>
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodyMd" style={{ color: '#6D7175' }}>
+            <s-stack direction="block" gap="base">
+              <span style={{ color: '#6D7175', fontSize: '14px' }}>
                 Orders with Errors
-              </s-text>
-              <s-text variant="heading2xl" style={{ color: '#D72C0D' }}>
+              </span>
+              <span style={{ color: '#D72C0D', fontSize: '14px' }}>
                 {summaryStats.totalErrorOrders.toLocaleString()}
-              </s-text>
-              <s-text variant="bodySm" style={{ color: '#6D7175', marginTop: '8px' }}>
+              </span>
+              <span style={{ color: '#6D7175', marginTop: '8px', fontSize: '14px' }}>
                 {summaryStats.totalOrdersProcessed > 0
                   ? ((summaryStats.totalErrorOrders / summaryStats.totalOrdersProcessed) * 100).toFixed(1)
                   : '0.0'}% error rate
-              </s-text>
+              </span>
             </s-stack>
           </div>
 
@@ -182,18 +182,18 @@ export default function Reconciliation() {
             borderRadius: '12px',
             border: '1px solid #E1E3E5',
           }}>
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodyMd" style={{ color: '#6D7175' }}>
+            <s-stack direction="block" gap="base">
+              <span style={{ color: '#6D7175', fontSize: '14px' }}>
                 Most Common Issue
-              </s-text>
-              <s-text variant="headingLg" style={{ color: '#202223' }}>
+              </span>
+              <span style={{ color: '#202223', fontSize: '14px' }}>
                 {summaryStats.mostCommonError
                   ? summaryStats.mostCommonError.replace(/([A-Z])/g, ' $1').trim()
                   : 'None'}
-              </s-text>
-              <s-text variant="bodySm" style={{ color: '#6D7175', marginTop: '8px' }}>
+              </span>
+              <span style={{ color: '#6D7175', marginTop: '8px', fontSize: '14px' }}>
                 {summaryStats.mostCommonError ? 'needs attention' : 'No errors detected'}
-              </s-text>
+              </span>
             </s-stack>
           </div>
         </div>
@@ -202,7 +202,7 @@ export default function Reconciliation() {
       {/* Quality Trend Chart */}
       <s-section>
         <s-stack direction="block" gap="base">
-          <s-text variant="headingLg">Quality Score Trend</s-text>
+          <s-text>Quality Score Trend</s-text>
 
           {qualityTrend.length > 0 ? (
             <div style={{
@@ -219,7 +219,7 @@ export default function Reconciliation() {
                 maxHeight: '300px',
                 overflowY: 'auto',
               }}>
-                {qualityTrend.slice().reverse().map((point, index) => {
+                {qualityTrend.slice().reverse().map((point: QualityTrend, index: number) => {
                   const barWidth = `${point.qualityScore}%`;
                   const barColor = point.qualityScore >= 90 ? '#008060' :
                                   point.qualityScore >= 80 ? '#FFC453' :
@@ -227,9 +227,9 @@ export default function Reconciliation() {
 
                   return (
                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <s-text variant="bodySm" style={{ minWidth: '80px', color: '#6D7175' }}>
+                      <span style={{ minWidth: '80px', color: '#6D7175', fontSize: '14px' }}>
                         {point.date}
-                      </s-text>
+                      </span>
                       <div style={{
                         flex: 1,
                         height: '24px',
@@ -246,12 +246,12 @@ export default function Reconciliation() {
                           transition: 'width 0.3s ease',
                         }} />
                       </div>
-                      <s-text variant="bodySm" style={{ minWidth: '60px', textAlign: 'right', fontWeight: 600 }}>
+                      <span style={{ minWidth: '60px', textAlign: 'right', fontWeight: 600, fontSize: '14px' }}>
                         {point.qualityScore.toFixed(1)}%
-                      </s-text>
-                      <s-text variant="bodySm" style={{ minWidth: '100px', textAlign: 'right', color: '#6D7175' }}>
+                      </span>
+                      <span style={{ minWidth: '100px', textAlign: 'right', color: '#6D7175', fontSize: '14px' }}>
                         {point.totalOrders} orders
-                      </s-text>
+                      </span>
                     </div>
                   );
                 })}
@@ -269,7 +269,7 @@ export default function Reconciliation() {
       {errorBreakdown.length > 0 && (
         <s-section>
           <s-stack direction="block" gap="base">
-            <s-text variant="headingLg">Error Breakdown (Latest Export)</s-text>
+            <s-text>Error Breakdown (Latest Export)</s-text>
 
             <div style={{
               padding: '20px',
@@ -287,12 +287,12 @@ export default function Reconciliation() {
                     backgroundColor: '#F6F6F7',
                     borderRadius: '8px',
                   }}>
-                    <s-text variant="bodyMd">
+                    <s-text>
                       {errorType.replace(/([A-Z])/g, ' $1').trim()}
                     </s-text>
-                    <s-text variant="bodyMd" style={{ fontWeight: 600, color: count > 0 ? '#D72C0D' : '#6D7175' }}>
+                    <span style={{ fontWeight: 600, color: count > 0 ? '#D72C0D' : '#6D7175', fontSize: '14px' }}>
                       {count} {count === 1 ? 'order' : 'orders'}
-                    </s-text>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -304,7 +304,7 @@ export default function Reconciliation() {
       {/* Order State Tracking Stats */}
       <s-section>
         <s-stack direction="block" gap="base">
-          <s-text variant="headingLg">Order State Tracking</s-text>
+          <s-text>Order State Tracking</s-text>
 
           <div style={{
             padding: '20px',
@@ -314,41 +314,41 @@ export default function Reconciliation() {
           }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               <div>
-                <s-text variant="bodySm" style={{ color: '#6D7175', display: 'block', marginBottom: '4px' }}>
+                <span style={{ color: '#6D7175', display: 'block', marginBottom: '4px', fontSize: '14px' }}>
                   Total Snapshots
-                </s-text>
-                <s-text variant="headingMd" style={{ color: '#202223' }}>
+                </span>
+                <span style={{ color: '#202223', fontSize: '14px' }}>
                   {snapshotStats.totalSnapshots.toLocaleString()}
-                </s-text>
+                </span>
               </div>
 
               <div>
-                <s-text variant="bodySm" style={{ color: '#6D7175', display: 'block', marginBottom: '4px' }}>
+                <span style={{ color: '#6D7175', display: 'block', marginBottom: '4px', fontSize: '14px' }}>
                   Unique Orders
-                </s-text>
-                <s-text variant="headingMd" style={{ color: '#202223' }}>
+                </span>
+                <span style={{ color: '#202223', fontSize: '14px' }}>
                   {snapshotStats.uniqueOrders.toLocaleString()}
-                </s-text>
+                </span>
               </div>
 
               <div>
-                <s-text variant="bodySm" style={{ color: '#6D7175', display: 'block', marginBottom: '4px' }}>
+                <span style={{ color: '#6D7175', display: 'block', marginBottom: '4px', fontSize: '14px' }}>
                   Avg Versions per Order
-                </s-text>
-                <s-text variant="headingMd" style={{ color: '#202223' }}>
+                </span>
+                <span style={{ color: '#202223', fontSize: '14px' }}>
                   {snapshotStats.versionsPerOrder.toFixed(2)}
-                </s-text>
+                </span>
               </div>
 
               <div>
-                <s-text variant="bodySm" style={{ color: '#6D7175', display: 'block', marginBottom: '4px' }}>
+                <span style={{ color: '#6D7175', display: 'block', marginBottom: '4px', fontSize: '14px' }}>
                   Date Range
-                </s-text>
-                <s-text variant="headingMd" style={{ color: '#202223' }}>
+                </span>
+                <span style={{ color: '#202223', fontSize: '14px' }}>
                   {snapshotStats.dateRange.earliest && snapshotStats.dateRange.latest
                     ? `${snapshotStats.dateRange.earliest} to ${snapshotStats.dateRange.latest}`
                     : 'No data'}
-                </s-text>
+                </span>
               </div>
             </div>
           </div>
@@ -359,7 +359,7 @@ export default function Reconciliation() {
       {recentMetrics.length > 0 && (
         <s-section>
           <s-stack direction="block" gap="base">
-            <s-text variant="headingLg">Recent Export History</s-text>
+            <s-text>Recent Export History</s-text>
 
             <div style={{ overflowX: 'auto' }}>
               <table style={{
@@ -372,27 +372,27 @@ export default function Reconciliation() {
                 <thead>
                   <tr style={{ backgroundColor: '#F6F6F7', borderBottom: '1px solid #E1E3E5' }}>
                     <th style={{ padding: '12px', textAlign: 'left' }}>
-                      <s-text variant="bodyMd" style={{ fontWeight: 600 }}>Date</s-text>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>Date</span>
                     </th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>
-                      <s-text variant="bodyMd" style={{ fontWeight: 600 }}>Total Orders</s-text>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>Total Orders</span>
                     </th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>
-                      <s-text variant="bodyMd" style={{ fontWeight: 600 }}>Clean Orders</s-text>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>Clean Orders</span>
                     </th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>
-                      <s-text variant="bodyMd" style={{ fontWeight: 600 }}>Error Orders</s-text>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>Error Orders</span>
                     </th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>
-                      <s-text variant="bodyMd" style={{ fontWeight: 600 }}>Warning Orders</s-text>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>Warning Orders</span>
                     </th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>
-                      <s-text variant="bodyMd" style={{ fontWeight: 600 }}>Quality Score</s-text>
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>Quality Score</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentMetrics.slice().reverse().map((metric, index) => (
+                  {recentMetrics.slice().reverse().map((metric: ReconciliationMetric, index: number) => (
                     <tr
                       key={metric.id}
                       style={{
@@ -400,38 +400,38 @@ export default function Reconciliation() {
                       }}
                     >
                       <td style={{ padding: '12px' }}>
-                        <s-text variant="bodyMd">{metric.date}</s-text>
+                        <s-text>{metric.date}</s-text>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <s-text variant="bodyMd">{metric.totalOrders}</s-text>
+                        <s-text>{metric.totalOrders}</s-text>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <s-text variant="bodyMd" style={{ color: '#008060' }}>
+                        <span style={{ color: '#008060', fontSize: '14px' }}>
                           {metric.cleanOrders}
-                        </s-text>
+                        </span>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <s-text variant="bodyMd" style={{ color: metric.errorOrders > 0 ? '#D72C0D' : '#6D7175' }}>
+                        <span style={{ color: metric.errorOrders > 0 ? '#D72C0D' : '#6D7175', fontSize: '14px' }}>
                           {metric.errorOrders}
-                        </s-text>
+                        </span>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <s-text variant="bodyMd" style={{ color: metric.warningOrders > 0 ? '#FFA500' : '#6D7175' }}>
+                        <span style={{ color: metric.warningOrders > 0 ? '#FFA500' : '#6D7175', fontSize: '14px' }}>
                           {metric.warningOrders}
-                        </s-text>
+                        </span>
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <s-text
-                          variant="bodyMd"
+                        <span
                           style={{
                             fontWeight: 600,
+                            fontSize: '14px',
                             color: metric.qualityScore >= 90 ? '#008060' :
                                    metric.qualityScore >= 80 ? '#FFC453' :
                                    metric.qualityScore >= 70 ? '#FFA500' : '#D72C0D',
                           }}
                         >
                           {metric.qualityScore.toFixed(1)}%
-                        </s-text>
+                        </span>
                       </td>
                     </tr>
                   ))}

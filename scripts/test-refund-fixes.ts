@@ -8,7 +8,7 @@
  */
 
 import { Decimal } from 'decimal.js';
-import type { Order, Refund, RefundLineItem, Transaction } from '../app/types/journal-entry';
+import type { RefundLineItem, Refund, Transaction } from '../app/types/journal-entry';
 
 // Test 1: Verify refund tax splitting
 function testRefundTaxSplitting() {

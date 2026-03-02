@@ -24,7 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   );
 
-  return Response.json({
+  return ({
     shop,
     config,
     recentExports,
@@ -175,7 +175,7 @@ export default function Index() {
             {config.transactionTypes.inventory && <li>Inventory</li>}
           </ul>
         </s-paragraph>
-        <s-button href="/app/settings" variant="secondary" size="slim">
+        <s-button href="/app/settings" variant="secondary">
           Edit Settings
         </s-button>
       </s-section>

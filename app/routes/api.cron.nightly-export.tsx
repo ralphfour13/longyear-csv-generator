@@ -26,7 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Get all shops with enabled sync from database
     const sessions = await prisma.session.findMany({
       where: {
-        accessToken: { not: null },
+        accessToken: { not: '' },
       },
     });
 

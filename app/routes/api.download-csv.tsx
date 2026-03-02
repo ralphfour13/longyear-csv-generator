@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs } from 'react-router';
-import { authenticate } from '../shopify.server';
 import { readExport, exportExists } from '../services/storage.server';
 
 /**

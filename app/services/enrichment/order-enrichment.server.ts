@@ -1,5 +1,4 @@
 import { Decimal } from 'decimal.js';
-import type { Order } from '../../types/journal-entry';
 
 /**
  * Enriched order data for Daily Sales Report
@@ -59,10 +58,12 @@ export interface PaymentBreakdown {
  * @param orderId - Order ID to fetch transactions for
  * @returns Array of transactions or empty array if none found
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchTransactionsForEnrichment(
   shop: string,
   accessToken: string,
   orderId: string
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any[]> {
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}/transactions.json`;
 
@@ -211,6 +212,7 @@ export async function enrichOrderData(
  * Parse tax breakdown from Shopify tax_lines
  * Returns up to 5 tax lines for display
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function parseTaxBreakdown(taxLines: any[]): TaxLine[] {
   const parsed: TaxLine[] = [];
 
@@ -241,6 +243,7 @@ function formatTaxRate(rate: number | string): string {
 /**
  * Parse shipping address from Shopify order
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseShippingAddress(address: any): ShippingAddress {
   if (!address) {
     return {
@@ -263,6 +266,7 @@ function parseShippingAddress(address: any): ShippingAddress {
  * Parse order transactions from Shopify
  * Includes both payment captures and refunds
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseTransactions(transactions: any[]): OrderTransaction[] {
   return transactions.map((txn) => ({
     kind: txn.kind || 'unknown',

@@ -21,7 +21,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const cin7Config = await getCin7Config(shop);
   const cin7CacheStats = cin7Cache.getStats(shop);
 
-  return Response.json({ shop, config, cin7Config, cin7CacheStats });
+  return { shop, config, cin7Config, cin7CacheStats };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -38,23 +38,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const apiKey = formData.get('cin7ApiKey') as string;
 
       if (!accountId || !apiKey) {
-        return Response.json(
-          { success: false, error: 'Account ID and API Key are required' },
-          { status: 400 }
-        );
+        return {
+          success: false,
+          error: 'Account ID and API Key are required',
+        };
       }
 
       const testResult = await testCin7Connection(accountId, apiKey);
 
-      return Response.json({
+      return {
         success: testResult.success,
         message: testResult.message,
-      });
+      };
     } catch (error) {
-      return Response.json(
-        { success: false, error: `Connection test failed: ${error instanceof Error ? error.message : String(error)}` },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Connection test failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -62,15 +62,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (actionType === 'clearCin7Cache') {
     try {
       cin7Cache.clearShop(shop);
-      return Response.json({
+      return {
         success: true,
         message: 'Cin7 cache cleared successfully',
-      });
+      };
     } catch (error) {
-      return Response.json(
-        { success: false, error: `Failed to clear cache: ${error instanceof Error ? error.message : String(error)}` },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Failed to clear cache: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -90,15 +90,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       await saveCin7Config(shop, cin7Config);
 
-      return Response.json({
+      return {
         success: true,
         message: 'Cin7 settings saved successfully',
-      });
+      };
     } catch (error) {
-      return Response.json(
-        { success: false, error: `Failed to save Cin7 settings: ${error instanceof Error ? error.message : String(error)}` },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Failed to save Cin7 settings: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -108,26 +108,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const testRecipient = formData.get('testEmailRecipient') as string;
 
       if (!testRecipient) {
-        return Response.json(
-          { success: false, error: 'Email address is required' },
-          { status: 400 }
-        );
+        return {
+          success: false,
+          error: 'Email address is required',
+        };
       }
 
       const result = await testEmailConnection(testRecipient);
 
-      return Response.json({
+      return {
         success: result.success,
         message: result.success
           ? `Test email sent successfully to ${testRecipient}`
           : result.error,
         messageId: result.messageId,
-      });
+      };
     } catch (error) {
-      return Response.json(
-        { success: false, error: `Failed to send test email: ${error instanceof Error ? error.message : String(error)}` },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Failed to send test email: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -137,11 +137,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const exportFiles = await listExports(shop);
 
       if (exportFiles.length === 0) {
-        return Response.json({
+        return {
           success: true,
           message: 'No exports to delete',
           deletedCount: 0,
-        });
+        };
       }
 
       // Delete all export files
@@ -158,23 +158,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       if (errors.length > 0) {
-        return Response.json({
+        return {
           success: false,
           error: `Deleted ${deletedCount} files, but ${errors.length} failed: ${errors.join(', ')}`,
           deletedCount,
-        });
+        };
       }
 
-      return Response.json({
+      return {
         success: true,
         message: `Successfully deleted ${deletedCount} export file${deletedCount !== 1 ? 's' : ''}`,
         deletedCount,
-      });
+      };
     } catch (error) {
-      return Response.json(
-        { success: false, error: `Failed to clear exports: ${error instanceof Error ? error.message : String(error)}` },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Failed to clear exports: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -192,10 +192,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       // Fetch order details from Shopify
       const url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(orderNumber)}&status=any`;
+      const accessToken = session.accessToken || '';
 
       const response = await fetch(url, {
         headers: {
-          'X-Shopify-Access-Token': session.accessToken,
+          'X-Shopify-Access-Token': accessToken,
           'Content-Type': 'application/json',
         },
       });
@@ -207,10 +208,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const data = await response.json();
 
       if (!data.orders || data.orders.length === 0) {
-        return Response.json(
-          { success: false, error: `Order ${orderNumber} not found` },
-          { status: 404 }
-        );
+        return {
+          success: false,
+          error: `Order ${orderNumber} not found`,
+        };
       }
 
       const order = data.orders[0];
@@ -219,7 +220,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const txnUrl = `https://${shop}/admin/api/2024-10/orders/${order.id}/transactions.json`;
       const txnResponse = await fetch(txnUrl, {
         headers: {
-          'X-Shopify-Access-Token': session.accessToken,
+          'X-Shopify-Access-Token': accessToken,
           'Content-Type': 'application/json',
         },
       });
@@ -240,7 +241,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const jsonString = JSON.stringify(order, null, 2);
       await fs.writeFile(filePath, jsonString);
 
-      return Response.json({
+      return {
         success: true,
         message: `Order ${orderNumber} data saved successfully`,
         filePath: filePath,
@@ -251,13 +252,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         financialStatus: order.financial_status,
         transactionCount: order.transactions?.length || 0,
         jsonData: jsonString, // Include JSON for client-side download
-      });
+      };
     } catch (error) {
       console.error('Debug order error:', error);
-      return Response.json(
-        { success: false, error: `Failed to fetch order: ${error instanceof Error ? error.message : String(error)}` },
-        { status: 500 }
-      );
+      return {
+        success: false,
+        error: `Failed to fetch order: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -294,17 +295,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     await updateShopSchedule(shop, config, getAccessToken);
 
-    return Response.json({ success: true, message: 'Settings saved successfully' });
+    return { success: true, message: 'Settings saved successfully' };
   } catch (error) {
-    return Response.json(
-      { success: false, error: 'Failed to save settings' },
-      { status: 500 }
-    );
+    return { success: false, error: 'Failed to save settings' };
   }
 };
 
 export default function Settings() {
-  const { shop, config, cin7Config, cin7CacheStats } = useLoaderData<typeof loader>();
+  const { config, cin7Config, cin7CacheStats } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   const handleDownload = () => {
@@ -324,13 +322,13 @@ export default function Settings() {
   return (
     <s-page heading="Sync Settings">
       {actionData?.success && (
-        <s-banner tone="success" style={{ marginBottom: '20px' }}>
+        <s-banner tone="success">
           <s-text>{actionData.message}</s-text>
         </s-banner>
       )}
 
       {actionData?.error && (
-        <s-banner tone="critical" style={{ marginBottom: '20px' }}>
+        <s-banner tone="critical">
           <s-text>{actionData.error}</s-text>
         </s-banner>
       )}
@@ -353,8 +351,8 @@ export default function Settings() {
                 <s-text>Enable automatic exports</s-text>
               </label>
 
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Schedule Type</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Schedule Type</s-text>
                 <select
                   name="syncSchedule"
                   defaultValue={config.syncSchedule}
@@ -372,8 +370,8 @@ export default function Settings() {
                 </select>
               </s-stack>
 
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Scheduled Time (24-hour format)</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Scheduled Time (24-hour format)</s-text>
                 <input
                   type="time"
                   name="scheduledTime"
@@ -386,13 +384,13 @@ export default function Settings() {
                     maxWidth: '200px',
                   }}
                 />
-                <s-text tone="subdued" variant="bodySm">
+                <s-text tone="neutral">
                   Time when automatic exports will run (e.g., 02:00 for 2:00 AM)
                 </s-text>
               </s-stack>
 
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Auto-Export Date Range</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Auto-Export Date Range</s-text>
                 <select
                   name="autoExportDate"
                   defaultValue={config.autoExportDate}
@@ -409,7 +407,7 @@ export default function Settings() {
                   <option value="today">Today</option>
                   <option value="last_7_days">Last 7 Days</option>
                 </select>
-                <s-text tone="subdued" variant="bodySm">
+                <s-text tone="neutral">
                   Which date(s) to export during automatic runs
                 </s-text>
               </s-stack>
@@ -461,7 +459,7 @@ export default function Settings() {
                   value="true"
                   defaultChecked={config.transactionTypes.inventory}
                 />
-                <s-text tone="subdued">Inventory Adjustments (Coming Soon)</s-text>
+                <s-text tone="neutral">Inventory Adjustments (Coming Soon)</s-text>
               </label>
             </s-stack>
           </s-stack>
@@ -469,8 +467,8 @@ export default function Settings() {
 
         <s-section heading="CSV Format">
           <s-stack direction="block" gap="large">
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodySm">Format Type</s-text>
+            <s-stack direction="block" gap="base">
+              <s-text>Format Type</s-text>
               <select
                 name="csvFormat"
                 defaultValue={config.csvFormat}
@@ -508,8 +506,8 @@ export default function Settings() {
               <s-text>Enable email notifications for scheduled exports</s-text>
             </label>
 
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodySm">Email Recipients</s-text>
+            <s-stack direction="block" gap="base">
+              <s-text>Email Recipients</s-text>
               <input
                 type="text"
                 name="emailRecipients"
@@ -523,16 +521,16 @@ export default function Settings() {
                   fontSize: '14px',
                 }}
               />
-              <s-text variant="bodySm" tone="subdued">
+              <s-text tone="neutral">
                 Comma-separated email addresses. Files will be attached to the email.
               </s-text>
             </s-stack>
 
             <s-divider />
 
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodySm"><strong>Test Email Configuration</strong></s-text>
-              <s-text variant="bodySm" tone="subdued">
+            <s-stack direction="block" gap="base">
+              <s-text><strong>Test Email Configuration</strong></s-text>
+              <s-text tone="neutral">
                 Send a test email to verify your configuration is working.
               </s-text>
             </s-stack>
@@ -590,8 +588,8 @@ export default function Settings() {
                 <s-text>Enable Cin7 COGS integration</s-text>
               </label>
 
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Cin7 Account ID</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Cin7 Account ID</s-text>
                 <input
                   type="text"
                   name="cin7AccountId"
@@ -606,13 +604,13 @@ export default function Settings() {
                     fontSize: '14px',
                   }}
                 />
-                <s-text tone="subdued" variant="bodySm">
+                <s-text tone="neutral">
                   Found in Cin7 Settings → Integrations → API
                 </s-text>
               </s-stack>
 
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Cin7 API Key</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Cin7 API Key</s-text>
                 <input
                   type="password"
                   name="cin7ApiKey"
@@ -627,7 +625,7 @@ export default function Settings() {
                     fontSize: '14px',
                   }}
                 />
-                <s-text tone="subdued" variant="bodySm">
+                <s-text tone="neutral">
                   API key is encrypted at rest using AES-256
                 </s-text>
               </s-stack>
@@ -642,15 +640,15 @@ export default function Settings() {
 
           <s-divider />
 
-          <s-text variant="headingSm">Test Connection</s-text>
+          <s-text>Test Connection</s-text>
           <Form method="post">
             <input type="hidden" name="actionType" value="testCin7Connection" />
             <input type="hidden" name="cin7AccountId" value={cin7Config.accountId} />
             <input type="hidden" name="cin7ApiKey" value={cin7Config.apiKey} />
 
-            <s-stack direction="inline" gap="base" align="center">
+            <s-stack direction="inline" gap="base">
               <s-button type="submit">Test Cin7 Connection</s-button>
-              <s-text tone="subdued" variant="bodySm">
+              <s-text tone="neutral">
                 Last tested: {cin7Config.lastTested ? new Date(cin7Config.lastTested).toLocaleString() : 'Never'}
               </s-text>
             </s-stack>
@@ -658,7 +656,7 @@ export default function Settings() {
 
           <s-divider />
 
-          <s-text variant="headingSm">Advanced Settings</s-text>
+          <s-text>Advanced Settings</s-text>
           <Form method="post">
             <input type="hidden" name="actionType" value="saveCin7Settings" />
             <input type="hidden" name="cin7Enabled" value={cin7Config.enabled ? 'true' : 'false'} />
@@ -676,8 +674,8 @@ export default function Settings() {
                 <s-text>Enable COGS caching (24 hours)</s-text>
               </label>
 
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Cache Duration (hours)</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Cache Duration (hours)</s-text>
                 <input
                   type="number"
                   name="cin7CacheDuration"
@@ -704,8 +702,8 @@ export default function Settings() {
                 <s-text>Use fallback cost when product not found</s-text>
               </label>
 
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Fallback COGS (optional)</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Fallback COGS (optional)</s-text>
                 <input
                   type="number"
                   name="cin7FallbackCost"
@@ -720,7 +718,7 @@ export default function Settings() {
                     fontSize: '14px',
                   }}
                 />
-                <s-text tone="subdued" variant="bodySm">
+                <s-text tone="neutral">
                   Default cost to use when product not found in Cin7
                 </s-text>
               </s-stack>
@@ -733,12 +731,12 @@ export default function Settings() {
 
           <s-divider />
 
-          <s-text variant="headingSm">Cache Statistics</s-text>
-          <s-stack direction="block" gap="tight">
-            <s-text variant="bodySm">
+          <s-text>Cache Statistics</s-text>
+          <s-stack direction="block" gap="base">
+            <s-text>
               Cache Hits: {cin7CacheStats.hits} | Misses: {cin7CacheStats.misses} | Hit Rate: {cin7CacheStats.hitRate}%
             </s-text>
-            <s-text variant="bodySm">
+            <s-text>
               Cached Items: {cin7CacheStats.size}
             </s-text>
           </s-stack>
@@ -761,8 +759,8 @@ export default function Settings() {
           <Form method="post">
             <input type="hidden" name="actionType" value="debugOrder" />
             <s-stack direction="block" gap="base">
-              <s-stack direction="block" gap="tight">
-                <s-text variant="bodySm">Order Number</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text>Order Number</s-text>
                 <input
                   type="text"
                   name="orderNumber"
@@ -776,7 +774,7 @@ export default function Settings() {
                     fontSize: '14px',
                   }}
                 />
-                <s-text tone="subdued" variant="bodySm">
+                <s-text tone="neutral">
                   Enter order number with or without # (e.g., 80819 or #80819)
                 </s-text>
               </s-stack>
@@ -787,26 +785,26 @@ export default function Settings() {
 
           {actionData?.success && actionData.filePath && (
             <s-banner tone="success">
-              <s-stack direction="block" gap="tight">
+              <s-stack direction="block" gap="base">
                 <s-text>
                   <strong>Order data saved successfully!</strong>
                 </s-text>
-                <s-text variant="bodySm">
+                <s-text>
                   <strong>Server File:</strong> {actionData.filePath}
                 </s-text>
-                <s-text variant="bodySm">
+                <s-text>
                   <strong>Order ID:</strong> {actionData.orderId}
                 </s-text>
-                <s-text variant="bodySm">
+                <s-text>
                   <strong>Created:</strong> {actionData.createdAt}
                 </s-text>
-                <s-text variant="bodySm">
+                <s-text>
                   <strong>Updated:</strong> {actionData.updatedAt}
                 </s-text>
-                <s-text variant="bodySm">
+                <s-text>
                   <strong>Financial Status:</strong> {actionData.financialStatus}
                 </s-text>
-                <s-text variant="bodySm">
+                <s-text>
                   <strong>Transactions:</strong> {actionData.transactionCount}
                 </s-text>
 
@@ -824,16 +822,16 @@ export default function Settings() {
       <s-section heading="Danger Zone">
         <s-stack direction="block" gap="large">
           <s-banner tone="critical">
-            <s-stack direction="block" gap="tight">
-              <s-text variant="bodySm">
+            <s-stack direction="block" gap="base">
+              <s-text>
                 <strong>⚠️ Warning:</strong> The actions below are permanent and cannot be undone.
               </s-text>
             </s-stack>
           </s-banner>
 
           <s-stack direction="block" gap="base">
-            <s-text variant="headingSm">Clear All Export Files</s-text>
-            <s-text variant="bodySm">
+            <s-text>Clear All Export Files</s-text>
+            <s-text>
               Permanently delete all export files (CSV and TXT) from the server.
               This will remove all historical export data.
             </s-text>
@@ -850,11 +848,7 @@ export default function Settings() {
               <s-button
                 type="submit"
                 variant="primary"
-                style={{
-                  backgroundColor: 'var(--p-color-bg-critical)',
-                  borderColor: 'var(--p-color-border-critical)',
-                  color: 'white',
-                }}
+                tone="critical"
               >
                 Delete All Exports
               </s-button>
@@ -865,13 +859,13 @@ export default function Settings() {
 
       <s-section heading="How It Works" slot="aside">
         <s-stack direction="block" gap="base">
-          <s-text variant="bodySm">
+          <s-text>
             <strong>Manual Export:</strong> Go to Export Center and select specific dates to generate CSV on-demand.
           </s-text>
-          <s-text variant="bodySm">
+          <s-text>
             <strong>Automatic Export:</strong> Enable nightly sync to generate CSV files at scheduled time.
           </s-text>
-          <s-text variant="bodySm">
+          <s-text>
             <strong>Payout-First:</strong> Starts with bank deposits and works backwards for perfect reconciliation.
           </s-text>
         </s-stack>

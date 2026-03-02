@@ -27,12 +27,13 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
 
     if (useRange && job.endDate) {
       // Date range processing
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       const allFiles: any[] = [];
       let totalEntries = 0;
       let allBalanced = true;
       const dates: string[] = [];
 
-      let currentDate = new Date(job.startDate);
+      const currentDate = new Date(job.startDate);
       const endDate = new Date(job.endDate);
 
       while (currentDate <= endDate) {
@@ -48,6 +49,7 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
 
         // Append date to filenames for clarity
         const dateLabel = format(currentDate, 'MMM-dd');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         result.files.forEach((file: any) => {
           const nameParts = file.filename.split('.');
           const ext = nameParts.pop();

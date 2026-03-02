@@ -91,6 +91,7 @@ export async function fetchBalanceTransactions(
 /**
  * Parse fee breakdown from Shopify response
  */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseFeeBreakdown(totalFee: string | number, feeBreakdownData?: any): FeeBreakdown {
   const total = new Decimal(totalFee || 0);
 

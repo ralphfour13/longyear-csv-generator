@@ -82,8 +82,10 @@ export async function fetchOrdersByIds(
 /**
  * Parse Shopify order API response into our Order type
  */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseOrder(orderData: any): Order {
   // Parse line items
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lineItems: OrderLineItem[] = (orderData.line_items || []).map((item: any) => ({
     id: item.id.toString(),
     productId: item.product_id?.toString() || '',
@@ -93,7 +95,9 @@ function parseOrder(orderData: any): Order {
     quantity: item.quantity,
     price: new Decimal(item.price),
     totalDiscount: new Decimal(item.total_discount || 0),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
     taxable: item.taxable,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     taxes: (item.tax_lines || []).map((tax: any) => ({
       title: tax.title,
       rate: parseFloat(tax.rate),
@@ -102,8 +106,10 @@ function parseOrder(orderData: any): Order {
   }));
 
   // Calculate shipping total
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shippingLines = orderData.shipping_lines || [];
   const totalShipping = shippingLines.reduce(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (sum: Decimal, line: any) => sum.plus(new Decimal(line.price || 0)),
     new Decimal(0)
   );
@@ -229,13 +235,16 @@ export async function fetchOrdersByDateRange(
  * Extracts refund line items for proper tax splitting
  * Note: Transactions are parsed separately, will be empty here
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseRefunds(refundsData: any[]): Refund[] {
   if (!refundsData || refundsData.length === 0) {
     return [];
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return refundsData.map((refund: any) => {
     // Parse refund line items
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const refund_line_items: RefundLineItem[] = (refund.refund_line_items || []).map((item: any) => ({
       id: item.id.toString(),
       line_item_id: item.line_item_id?.toString() || '',

@@ -11,7 +11,7 @@ import { processExport } from '../services/batch-processor.server';
 // Handle both GET and POST
 async function handleExport(request: Request) {
   try {
-    const { session, admin } = await authenticate.admin(request);
+    const { session } = await authenticate.admin(request);
     const shop = session.shop;
 
     // Get access token
@@ -40,7 +40,8 @@ async function handleExport(request: Request) {
     console.log(`Manual export requested for ${shop} for date ${date}`);
 
     // Process export
-    const result = await processExport(shop, accessToken, date);
+    const token = accessToken || '';
+    const result = await processExport(shop, token, date);
 
     return Response.json({
       success: true,

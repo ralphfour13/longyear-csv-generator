@@ -38,6 +38,7 @@ export async function fetchOrderTransactions(
     const data = await response.json();
 
     if (data.transactions && Array.isArray(data.transactions)) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return data.transactions.map((txn: any) => parseTransaction(txn));
     }
 
@@ -51,6 +52,7 @@ export async function fetchOrderTransactions(
 /**
  * Parse transaction data from Shopify API
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseTransaction(txnData: any): Transaction {
   // Parse fee breakdown from receipt or payment_details
   const fees = parseFees(txnData);
@@ -72,6 +74,7 @@ function parseTransaction(txnData: any): Transaction {
  * Parse fee details from transaction
  * Different gateways may return fees in different formats
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseFees(txnData: any): TransactionFee[] {
   const fees: TransactionFee[] = [];
 

@@ -10,8 +10,6 @@ import crypto from 'crypto';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // 128 bits
 const SALT_LENGTH = 64; // 512 bits
-const TAG_LENGTH = 16; // 128 bits
-const KEY_LENGTH = 32; // 256 bits
 
 /**
  * Get encryption key from environment
@@ -94,7 +92,7 @@ export function decrypt(ciphertext: string): string {
     throw new Error('Invalid encrypted format');
   }
 
-  const [saltHex, ivHex, encryptedHex, tagHex] = parts;
+  const [, ivHex, encryptedHex, tagHex] = parts;
 
   // Convert from hex
   const iv = Buffer.from(ivHex, 'hex');
