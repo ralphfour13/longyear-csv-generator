@@ -1,5 +1,5 @@
 import type { Route } from './+types/api.healthz';
-import prisma from '~/db.server';
+import prisma from '../db.server';
 
 export async function loader({ request }: Route.LoaderArgs) {
   try {
