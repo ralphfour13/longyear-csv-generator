@@ -1,8 +1,8 @@
-import type { LoaderFunctionArgs } from 'react-router';
-import { useLoaderData, useRevalidator } from 'react-router';
+import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
+import { useLoaderData, useRevalidator, useActionData, Form } from 'react-router';
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { getShopJobs, type ExportJob } from '../services/background-jobs.server';
+import { getShopJobs, clearCompletedJobs, cancelPendingJobs, type ExportJob } from '../services/background-jobs.server';
 import { format } from 'date-fns';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -15,8 +15,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { shop, jobs };
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+
+  const formData = await request.formData();
+  const actionType = formData.get('action');
+
+  if (actionType === 'clearCompleted') {
+    const count = await clearCompletedJobs(shop);
+    return { success: true, message: `Cleared ${count} completed/failed jobs`, count };
+  }
+
+  if (actionType === 'cancelPending') {
+    const count = await cancelPendingJobs(shop);
+    return { success: true, message: `Cancelled ${count} pending jobs`, count };
+  }
+
+  return { success: false, error: 'Unknown action' };
+};
+
 export default function Jobs() {
   const { shop, jobs: initialJobs } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const revalidator = useRevalidator();
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -121,6 +142,64 @@ export default function Jobs() {
       >
         New Export
       </s-button>
+
+      {/* Action feedback */}
+      {actionData?.success && (
+        <div style={{ marginBottom: '20px' }}>
+          <s-banner tone="success">
+            {actionData.message}
+          </s-banner>
+        </div>
+      )}
+
+      {/* Clear/Cancel Actions */}
+      <div style={{ marginBottom: '20px' }}>
+        <s-section>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, fontSize: '14px', color: '#202223' }}>Queue Actions:</span>
+            <Form method="post" style={{ display: 'inline' }}>
+              <input type="hidden" name="action" value="clearCompleted" />
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: '#ffffff',
+                  color: '#202223',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                disabled={statusCounts.completed + statusCounts.failed === 0}
+              >
+                🗑️ Clear Completed ({statusCounts.completed + statusCounts.failed})
+              </button>
+            </Form>
+            <Form method="post" style={{ display: 'inline' }}>
+              <input type="hidden" name="action" value="cancelPending" />
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: '#ffffff',
+                  color: '#D72C0D',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                disabled={statusCounts.pending === 0}
+              >
+                ❌ Cancel Pending ({statusCounts.pending})
+              </button>
+            </Form>
+          </div>
+        </s-section>
+      </div>
 
       {/* Status Filter Tabs */}
       <div style={{ marginBottom: '20px' }}>
