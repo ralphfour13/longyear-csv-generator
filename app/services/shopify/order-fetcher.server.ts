@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import type { Order, OrderLineItem } from '../../types/journal-entry';
+import type { Order, OrderLineItem, Refund, RefundLineItem } from '../../types/journal-entry';
 
 /**
  * Fetch order details by order ID
@@ -108,6 +108,9 @@ function parseOrder(orderData: any): Order {
     new Decimal(0)
   );
 
+  // Parse refunds (if any) - Note: transactions will be empty here, populated separately
+  const refunds = parseRefunds(orderData.refunds || []);
+
   return {
     id: orderData.id.toString(),
     orderNumber: orderData.order_number,
@@ -130,6 +133,7 @@ function parseOrder(orderData: any): Order {
     currency: orderData.currency,
     financialStatus: orderData.financial_status,
     lineItems,
+    refunds, // Refund details for proper tax splitting
   };
 }
 
@@ -218,4 +222,41 @@ export async function fetchOrdersByDateRange(
   }
 
   return orders;
+}
+
+/**
+ * Parse refunds from Shopify order data
+ * Extracts refund line items for proper tax splitting
+ * Note: Transactions are parsed separately, will be empty here
+ */
+function parseRefunds(refundsData: any[]): Refund[] {
+  if (!refundsData || refundsData.length === 0) {
+    return [];
+  }
+
+  return refundsData.map((refund: any) => {
+    // Parse refund line items
+    const refund_line_items: RefundLineItem[] = (refund.refund_line_items || []).map((item: any) => ({
+      id: item.id.toString(),
+      line_item_id: item.line_item_id?.toString() || '',
+      quantity: item.quantity,
+      restock_type: item.restock_type || 'no_restock',
+      subtotal: new Decimal(item.subtotal || 0),
+      total_tax: new Decimal(item.total_tax || 0),
+      line_item: {
+        id: item.line_item?.id?.toString() || '',
+        title: item.line_item?.title || '',
+        sku: item.line_item?.sku || undefined,
+      },
+    }));
+
+    return {
+      id: refund.id.toString(),
+      orderId: refund.order_id?.toString() || '',
+      createdAt: refund.created_at,
+      processedAt: refund.processed_at,
+      transactions: [], // Will be populated from order.transactions separately
+      refund_line_items,
+    };
+  });
 }

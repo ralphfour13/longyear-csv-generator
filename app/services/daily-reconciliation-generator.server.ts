@@ -7,12 +7,23 @@ import type { EnrichedTransaction, Order, OrderLineItem } from '../types/journal
  */
 interface DailyReconciliationRow {
   orderNumber: string;
-  sales: string;
+  originalSubtotal: string; // Subtotal before discounts
+  discount: string; // Total discount amount
+  netSubtotal: string; // Subtotal after discounts (what's used for sales)
   tax: string;
   shipping: string;
   area: string;
   notes: string;
   tender: string;
+  // Payment breakdown columns (NEW)
+  paymentCash: string;
+  paymentCard: string;
+  paymentGiftCard: string;
+  paymentStoreCredit: string;
+  paymentCheck: string;
+  paymentOther: string;
+  paymentTotal: string;
+  // Gift card info
   giftCardSold: string;
   giftCardUsed: string;
 }
@@ -129,16 +140,37 @@ function transformToReconciliationRow(
   // Check for gift cards
   const giftCardInfo = analyzeGiftCards(order, enrichedData.paymentBreakdown);
 
+  // Calculate discount information for transparency
+  const originalSubtotal = order.subtotalPrice;
+  const discount = order.totalDiscounts || new Decimal(0);
+  const netSubtotal = sales; // Already calculated as NET above
+
+  // Calculate payment breakdown
+  const paymentBreakdown = enrichedData.paymentBreakdown;
+  const paymentTotal = Object.values(paymentBreakdown).reduce(
+    (sum, amount) => sum.plus(amount),
+    new Decimal(0)
+  );
+
   // If refunded, create original sale row
   if (order.financialStatus === 'refunded') {
     rows.push({
       orderNumber: order.name,
-      sales: sales.neg().toFixed(2), // Negative for refund
+      originalSubtotal: originalSubtotal.neg().toFixed(2),
+      discount: discount.neg().toFixed(2),
+      netSubtotal: netSubtotal.neg().toFixed(2), // Negative for refund
       tax: order.totalTax.neg().toFixed(2),
       shipping: order.totalShipping.gt(0) ? order.totalShipping.neg().toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
+      paymentCash: paymentBreakdown.cash.neg().toFixed(2),
+      paymentCard: paymentBreakdown.card.neg().toFixed(2),
+      paymentGiftCard: paymentBreakdown.giftCard.neg().toFixed(2),
+      paymentStoreCredit: paymentBreakdown.storeCredit.neg().toFixed(2),
+      paymentCheck: paymentBreakdown.check.neg().toFixed(2),
+      paymentOther: paymentBreakdown.charge.neg().toFixed(2),
+      paymentTotal: paymentTotal.neg().toFixed(2),
       giftCardSold: giftCardInfo.sold,
       giftCardUsed: giftCardInfo.used,
     });
@@ -146,12 +178,21 @@ function transformToReconciliationRow(
     // Add back the original sale
     rows.push({
       orderNumber: order.name,
-      sales: sales.toFixed(2),
+      originalSubtotal: originalSubtotal.toFixed(2),
+      discount: discount.toFixed(2),
+      netSubtotal: netSubtotal.toFixed(2),
       tax: order.totalTax.toFixed(2),
       shipping: order.totalShipping.gt(0) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
+      paymentCash: paymentBreakdown.cash.toFixed(2),
+      paymentCard: paymentBreakdown.card.toFixed(2),
+      paymentGiftCard: paymentBreakdown.giftCard.toFixed(2),
+      paymentStoreCredit: paymentBreakdown.storeCredit.toFixed(2),
+      paymentCheck: paymentBreakdown.check.toFixed(2),
+      paymentOther: paymentBreakdown.charge.toFixed(2),
+      paymentTotal: paymentTotal.toFixed(2),
       giftCardSold: giftCardInfo.sold,
       giftCardUsed: giftCardInfo.used,
     });
@@ -159,12 +200,21 @@ function transformToReconciliationRow(
     // Normal order
     rows.push({
       orderNumber: order.name,
-      sales: sales.toFixed(2),
+      originalSubtotal: originalSubtotal.toFixed(2),
+      discount: discount.toFixed(2),
+      netSubtotal: netSubtotal.toFixed(2),
       tax: order.totalTax.toFixed(2),
       shipping: order.totalShipping.gt(0) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
+      paymentCash: paymentBreakdown.cash.toFixed(2),
+      paymentCard: paymentBreakdown.card.toFixed(2),
+      paymentGiftCard: paymentBreakdown.giftCard.toFixed(2),
+      paymentStoreCredit: paymentBreakdown.storeCredit.toFixed(2),
+      paymentCheck: paymentBreakdown.check.toFixed(2),
+      paymentOther: paymentBreakdown.charge.toFixed(2),
+      paymentTotal: paymentTotal.toFixed(2),
       giftCardSold: giftCardInfo.sold,
       giftCardUsed: giftCardInfo.used,
     });
@@ -319,15 +369,26 @@ function escapeCSVField(field: string): string {
 function generateCSV(rows: DailyReconciliationRow[]): string {
   const lines: string[] = [];
 
-  // Header row
+  // Header row - includes discount transparency and payment breakdown columns
   const headers = [
     '',
-    'sales',
+    'original subtotal',
+    'discount',
+    'net subtotal',
     'tax',
     'shipping',
     'area',
     'notes',
     'tender',
+    // Payment breakdown columns (NEW)
+    'payment cash',
+    'payment card',
+    'payment gift card',
+    'payment store credit',
+    'payment check',
+    'payment other',
+    'payment total',
+    // Gift card info
     'gift card sold',
     'gift card used',
   ];
@@ -337,17 +398,66 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
   for (const row of rows) {
     const fields = [
       row.orderNumber,
-      row.sales,
+      row.originalSubtotal,
+      row.discount,
+      row.netSubtotal,
       row.tax,
       row.shipping,
       row.area,
       row.notes,
       row.tender,
+      // Payment breakdown (NEW)
+      row.paymentCash,
+      row.paymentCard,
+      row.paymentGiftCard,
+      row.paymentStoreCredit,
+      row.paymentCheck,
+      row.paymentOther,
+      row.paymentTotal,
+      // Gift card info
       row.giftCardSold,
       row.giftCardUsed,
     ];
     lines.push(fields.map(escapeCSVField).join(','));
   }
+
+  // Calculate summary totals
+  const totalOriginalSubtotal = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.originalSubtotal || 0)),
+    new Decimal(0)
+  );
+  const totalDiscount = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.discount || 0)),
+    new Decimal(0)
+  );
+  const totalNetSubtotal = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.netSubtotal || 0)),
+    new Decimal(0)
+  );
+  const totalTax = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.tax || 0)),
+    new Decimal(0)
+  );
+  const totalShipping = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.shipping || 0)),
+    new Decimal(0)
+  );
+
+  // Add summary row
+  const summaryFields = [
+    `SUMMARY (${rows.length} orders)`,
+    totalOriginalSubtotal.toFixed(2),
+    totalDiscount.toFixed(2),
+    totalNetSubtotal.toFixed(2),
+    totalTax.toFixed(2),
+    totalShipping.toFixed(2),
+    '', // area
+    '', // notes
+    '', // tender
+    '', // gift card sold
+    '', // gift card used
+  ];
+  lines.push(summaryFields.map(escapeCSVField).join(','));
 
   return lines.join('\n');
 }

@@ -134,6 +134,7 @@ export interface Order {
   financialStatus: string; // "paid", "pending", "refunded", etc.
   lineItems: OrderLineItem[];
   transactions?: Transaction[]; // Payment transactions
+  refunds?: Refund[]; // Refund details (for proper tax splitting)
 }
 
 /**
@@ -178,6 +179,37 @@ export interface TransactionFee {
   type: 'shopify_fee' | 'gateway_fee' | 'chargeback_fee';
   amount: Decimal;
   currency: string;
+}
+
+/**
+ * Refund
+ * Contains refund transactions and line items for proper tax splitting
+ */
+export interface Refund {
+  id: string;
+  orderId: string;
+  createdAt: string;
+  processedAt: string;
+  transactions: Transaction[]; // Refund transactions
+  refund_line_items: RefundLineItem[]; // Line items being refunded
+}
+
+/**
+ * Refund Line Item
+ * Detailed breakdown of what was refunded (enables proper tax splitting)
+ */
+export interface RefundLineItem {
+  id: string;
+  line_item_id: string;
+  quantity: number;
+  restock_type: 'no_restock' | 'cancel' | 'return' | 'legacy_restock'; // Indicates if canceled vs refunded
+  subtotal: Decimal; // Subtotal amount refunded (pre-tax)
+  total_tax: Decimal; // Tax amount refunded
+  line_item: {
+    id: string;
+    title: string;
+    sku?: string;
+  };
 }
 
 /**

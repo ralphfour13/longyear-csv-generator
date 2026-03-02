@@ -198,3 +198,97 @@ export async function calculateBatchCogs(
 
   return results;
 }
+
+/**
+ * COGS Validation Result
+ */
+export interface CogsValidationResult {
+  isValid: boolean;
+  hasWarnings: boolean;
+  warnings: string[];
+  errors: string[];
+}
+
+/**
+ * Validate COGS calculation for an order
+ *
+ * Performs comprehensive validation checks on COGS calculations to catch
+ * data quality issues before export:
+ * - Missing COGS for physical products
+ * - COGS exceeding order total (unrealistic margins)
+ * - Individual line items with missing/zero costs
+ *
+ * @param order - The order being validated
+ * @param cogsCalculation - The calculated COGS data
+ * @returns Validation result with warnings and errors
+ */
+export function validateCogsCalculation(
+  order: Order,
+  cogsCalculation: CogsCalculation
+): CogsValidationResult {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  // Check 1: Missing COGS for physical products
+  // Orders with line items should have COGS (unless all digital products)
+  if (order.lineItems.length > 0 && cogsCalculation.totalCogs.eq(0)) {
+    warnings.push(
+      `No COGS calculated but order has ${order.lineItems.length} line items. ` +
+      `Check if products are missing cost data in Cin7.`
+    );
+  }
+
+  // Check 2: COGS exceeds order total (unrealistic margin)
+  // This indicates bad cost data or calculation errors
+  const orderTotal = order.totalPrice;
+  if (cogsCalculation.totalCogs.gt(orderTotal)) {
+    const diff = cogsCalculation.totalCogs.minus(orderTotal);
+    warnings.push(
+      `COGS ($${cogsCalculation.totalCogs.toFixed(2)}) exceeds order total ($${orderTotal.toFixed(2)}) ` +
+      `by $${diff.toFixed(2)}. Check product cost data.`
+    );
+  }
+
+  // Check 3: COGS is very close to order total (< 5% margin)
+  // This might indicate pricing issues or cost data problems
+  const margin = orderTotal.minus(cogsCalculation.totalCogs);
+  const marginPercent = orderTotal.gt(0) ? margin.dividedBy(orderTotal).times(100) : new Decimal(0);
+
+  if (cogsCalculation.totalCogs.gt(0) && marginPercent.lt(5) && marginPercent.gte(0)) {
+    warnings.push(
+      `Very low margin detected: ${marginPercent.toFixed(1)}% ` +
+      `(COGS: $${cogsCalculation.totalCogs.toFixed(2)}, Total: $${orderTotal.toFixed(2)}). ` +
+      `Verify pricing and cost data.`
+    );
+  }
+
+  // Check 4: Individual line items with missing or zero costs
+  for (const item of cogsCalculation.lineItems) {
+    if (!item.unitCost || item.unitCost.eq(0)) {
+      warnings.push(
+        `Missing or zero unit cost for SKU: ${item.sku} (${item.productTitle}). ` +
+        `COGS calculation will be incomplete.`
+      );
+    }
+
+    // Check for negative costs (data error)
+    if (item.unitCost.lt(0)) {
+      errors.push(
+        `Negative unit cost for SKU: ${item.sku} ($${item.unitCost.toFixed(2)}). ` +
+        `This indicates a data error.`
+      );
+    }
+  }
+
+  // Check 5: Warnings from COGS calculation itself
+  if (cogsCalculation.warnings.length > 0) {
+    warnings.push(...cogsCalculation.warnings);
+  }
+
+  return {
+    isValid: errors.length === 0,
+    hasWarnings: warnings.length > 0,
+    warnings,
+    errors,
+  };
+}

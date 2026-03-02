@@ -19,6 +19,9 @@ import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
 import { sendExportEmail, type ExportEmailData } from './email.server';
 import { validateCogsConsistency, logValidationResult } from './cogs/cogs-reconciliation-validator.server';
+import { generateConsistencyReport, generateErrorReportCsv } from './consistency-checker.server';
+import { saveReconciliationMetric } from './reconciliation-metrics.server';
+import { checkOrderChanges, saveOrderSnapshot } from './order-state-tracker.server';
 
 /**
  * File generation options
@@ -91,6 +94,42 @@ export async function processExport(
 
     await logInfo(shop, 'Export', `Reconciled ${result.orderCount} orders with ${result.captureCount} captures`)
 
+    // Step 1.25: Check for order changes (state tracking)
+    await logInfo(shop, 'Export', 'Checking for order changes since last export...');
+    let changedOrderCount = 0;
+    let ordersNeedingReexport: string[] = [];
+
+    for (const order of orders) {
+      try {
+        const changeResult = await checkOrderChanges(shop, order, targetDate);
+
+        if (changeResult.hasChanged) {
+          changedOrderCount++;
+          console.warn(`⚠️ Order ${order.name} has changed since last export:`);
+          for (const change of changeResult.changes) {
+            console.warn(`  - ${change}`);
+          }
+
+          if (changeResult.needsReexport) {
+            ordersNeedingReexport.push(order.name);
+          }
+        }
+      } catch (error) {
+        // Don't fail export if change detection fails
+        console.warn(`Failed to check changes for order ${order.name}:`, error);
+      }
+    }
+
+    if (changedOrderCount > 0) {
+      await logWarning(
+        shop,
+        'State Tracking',
+        `${changedOrderCount} orders have changed since last export${ordersNeedingReexport.length > 0 ? ` (${ordersNeedingReexport.length} need re-export)` : ''}`
+      );
+    } else {
+      await logInfo(shop, 'State Tracking', 'No order changes detected');
+    }
+
     // Step 1.5: Collect COGS data (if Cin7 enabled)
     const cin7Enabled = await isCin7Enabled(shop);
     let cogsDataMap = new Map();
@@ -150,6 +189,53 @@ export async function processExport(
       console.error('❌ IMBALANCE DETECTED:', errorMsg);
     } else {
       await logInfo(shop, 'Journal Balance', `✅ Journal entries balanced: Debits=$${totalDebitsCheck.toFixed(2)}, Credits=$${totalCreditsCheck.toFixed(2)}`);
+    }
+
+    // Step 4.75: Run comprehensive consistency checks (Phase 2 enhancement)
+    await logInfo(shop, 'Export', 'Running consistency checks...');
+    const consistencyReport = await generateConsistencyReport(orders, mappedEntries);
+
+    if (consistencyReport.hasErrors) {
+      console.error('⚠️ Consistency Issues Found:');
+      console.error(`  - ${consistencyReport.imbalancedEntries.length} imbalanced journal entries`);
+      console.error(`  - ${consistencyReport.salesMismatches.length} sales mismatches`);
+      console.error(`  - ${consistencyReport.cogsMismatches.length} COGS mismatches`);
+
+      // Log individual errors for tracking
+      for (const entry of consistencyReport.imbalancedEntries.filter(e => e.impact === 'HIGH')) {
+        const errorMsg = `Journal imbalance in ${entry.reference}: $${entry.difference.toFixed(2)} (${entry.impact} impact)`;
+        allErrors.push(errorMsg);
+        await logError(shop, 'Consistency Check', errorMsg);
+      }
+    }
+
+    if (consistencyReport.hasWarnings) {
+      console.warn('⚠️ Consistency Warnings:');
+      console.warn(`  - ${consistencyReport.salesMismatches.filter(m => m.impact !== 'HIGH').length} sales warnings`);
+      console.warn(`  - ${consistencyReport.taxMismatches.length} tax warnings`);
+      console.warn(`  - ${consistencyReport.paymentMismatches.length} payment warnings`);
+    }
+
+    // Log quality score
+    const qualityScore = consistencyReport.totalOrders > 0
+      ? (consistencyReport.cleanOrders / consistencyReport.totalOrders * 100).toFixed(1)
+      : '0.0';
+    await logInfo(
+      shop,
+      'Data Quality',
+      `Quality Score: ${qualityScore}% (${consistencyReport.cleanOrders} clean / ${consistencyReport.totalOrders} total orders)`
+    );
+
+    // Step 4.8: Save reconciliation metrics to database for historical tracking
+    try {
+      await saveReconciliationMetric(shop, targetDate, consistencyReport);
+      await logInfo(shop, 'Metrics', `Saved reconciliation metrics for ${targetDate}`);
+    } catch (error) {
+      await logWarning(
+        shop,
+        'Metrics',
+        `Failed to save metrics: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     // Step 5: Generate files based on options with error isolation
@@ -398,6 +484,31 @@ export async function processExport(
       }
     }
 
+    // File #7: Error Report (if consistency issues found)
+    if (consistencyReport.hasErrors || consistencyReport.hasWarnings) {
+      await logInfo(shop, 'Export', 'Generating Error Report...');
+      try {
+        const errorReportFilename = `error-report_${targetDate}.csv`;
+        const errorReportContent = generateErrorReportCsv(consistencyReport);
+        const errorReportPath = await writeExport(shop, errorReportFilename, errorReportContent);
+
+        const rowCount = errorReportContent.split('\n').length - 1; // Subtract header row
+        generatedFiles.push({
+          type: 'error-report',
+          filename: errorReportFilename,
+          downloadUrl: `/api/download-csv?shop=${shop}&filename=${errorReportFilename}`,
+          rowCount,
+        });
+
+        await logInfo(shop, 'Export', `Error Report saved: ${errorReportFilename} (${rowCount} issues found)`);
+      } catch (error) {
+        const errorMsg = `Error Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error('❌ Error Report error:', error);
+        await logError(shop, 'Export', errorMsg);
+        allWarnings.push(errorMsg);
+      }
+    }
+
     // Step 6: Calculate totals
     const totalDebit = mappedEntries.reduce(
       (sum, entry) => sum.plus(entry.debit),
@@ -439,6 +550,36 @@ export async function processExport(
 
     if (cogsWarnings.length > 0) {
       await logWarning(shop, 'COGS', 'COGS warnings detected', cogsWarnings);
+    }
+
+    // Step 7.5: Save order snapshots for state tracking
+    await logInfo(shop, 'State Tracking', 'Saving order snapshots...');
+    let snapshotsSaved = 0;
+    let snapshotErrors = 0;
+
+    for (const order of orders) {
+      try {
+        // Determine version number
+        const previousSnapshot = await checkOrderChanges(shop, order, targetDate);
+        const version = previousSnapshot.previousSnapshot
+          ? previousSnapshot.previousSnapshot.version + 1
+          : 1;
+
+        await saveOrderSnapshot(shop, order, targetDate, version);
+        snapshotsSaved++;
+      } catch (error) {
+        // Don't fail export if snapshot saving fails
+        snapshotErrors++;
+        console.warn(`Failed to save snapshot for order ${order.name}:`, error);
+      }
+    }
+
+    if (snapshotsSaved > 0) {
+      await logInfo(
+        shop,
+        'State Tracking',
+        `Saved ${snapshotsSaved} order snapshots${snapshotErrors > 0 ? ` (${snapshotErrors} failed)` : ''}`
+      );
     }
 
     // Step 8: Send email notification if enabled

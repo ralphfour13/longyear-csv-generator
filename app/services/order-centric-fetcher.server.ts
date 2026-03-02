@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import type { Order, Transaction } from '../types/journal-entry';
+import type { Order, Transaction, Refund, RefundLineItem } from '../types/journal-entry';
 
 /**
  * Order-Centric Fetcher Service
@@ -276,6 +276,9 @@ function parseOrder(orderData: any): Order {
     new Decimal(0)
   );
 
+  // Parse refunds (if any)
+  const refunds = parseRefunds(orderData.refunds || []);
+
   return {
     id: orderData.id.toString(),
     orderNumber: orderData.order_number,
@@ -299,6 +302,7 @@ function parseOrder(orderData: any): Order {
     financialStatus: orderData.financial_status,
     lineItems,
     transactions: [], // Will be populated separately
+    refunds, // Refund details for proper tax splitting
   };
 }
 
@@ -546,4 +550,43 @@ function formatDateOnly(isoTimestamp: string): string {
   // Parse MM/DD/YYYY format to YYYY-MM-DD
   const [month, day, year] = pacificDateString.split('/');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Parse refunds from Shopify order data
+ * Extracts refund transactions and line items for proper tax splitting
+ */
+function parseRefunds(refundsData: any[]): Refund[] {
+  if (!refundsData || refundsData.length === 0) {
+    return [];
+  }
+
+  return refundsData.map((refund: any) => {
+    // Parse refund transactions
+    const transactions = (refund.transactions || []).map((txn: any) => parseTransaction(txn));
+
+    // Parse refund line items
+    const refund_line_items: RefundLineItem[] = (refund.refund_line_items || []).map((item: any) => ({
+      id: item.id.toString(),
+      line_item_id: item.line_item_id?.toString() || '',
+      quantity: item.quantity,
+      restock_type: item.restock_type || 'no_restock',
+      subtotal: new Decimal(item.subtotal || 0),
+      total_tax: new Decimal(item.total_tax || 0),
+      line_item: {
+        id: item.line_item?.id?.toString() || '',
+        title: item.line_item?.title || '',
+        sku: item.line_item?.sku || undefined,
+      },
+    }));
+
+    return {
+      id: refund.id.toString(),
+      orderId: refund.order_id?.toString() || '',
+      createdAt: refund.created_at,
+      processedAt: refund.processed_at,
+      transactions,
+      refund_line_items,
+    };
+  });
 }

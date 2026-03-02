@@ -17,7 +17,7 @@ code app/services/reconciler.server.ts
 
 ---
 
-### 2. Commit Changes
+### 2. Commit and Push Changes
 
 ```bash
 # Stage changes
@@ -33,7 +33,7 @@ Details about what was fixed or added
 
 Co-Authored-By: Claude Sonnet 4.5 (1M context) <noreply@anthropic.com>"
 
-# Push to Production branch
+# Push to Production branch (triggers CI/CD)
 git push origin Production
 ```
 
@@ -46,7 +46,51 @@ git push origin Production
 
 ---
 
-### 3. Deploy to CapRover
+### 3. Automated CI/CD Pipeline (GitHub Actions)
+
+**What happens automatically when you push to Production**:
+
+1. **Pre-Deployment Checks** (~3 min)
+   - Type checking (`npm run typecheck`)
+   - Linting (`npm run lint`)
+   - Build verification (`npm run build`)
+
+2. **Change Detection**
+   - Detects if `shopify.app.toml` changed
+   - Determines whether Shopify deployment is needed
+
+3. **CapRover Deployment** (~5 min)
+   - Authenticates with CapRover
+   - Creates deployment tarball
+   - Deploys to production server
+   - Uploads deployment logs
+
+4. **Shopify Deployment** (~2 min, conditional)
+   - Only runs if `shopify.app.toml` changed
+   - Updates Shopify app configuration
+   - Updates webhooks and scopes
+
+5. **Post-Deployment Verification** (~2 min)
+   - Health check with retry logic (12 attempts over 2 minutes)
+   - Smoke tests (homepage, auth, health endpoint)
+   - Verifies app is functional
+
+6. **Notifications**
+   - Updates GitHub commit status (✓ or ✗)
+   - Sends Slack notification (if configured)
+
+**Total Time**: ~10 minutes (with caching: ~5 minutes)
+
+**Monitor Deployment**:
+- Go to: https://github.com/four13co/sage50-journal-entry-sync/actions
+- Click on the latest workflow run
+- View real-time logs for each job
+
+---
+
+### 4. Manual Deployment (Fallback)
+
+If CI/CD is down or you need to bypass it:
 
 ```bash
 # Deploy with default settings (uses last deployment config)
@@ -73,7 +117,7 @@ App is available at https://sage50-journal-entry-sync-prod.server.four13.dev
 
 ---
 
-### 4. Verify Deployment
+### 5. Verify Deployment
 
 **Check CapRover logs** (via Dozzle or dashboard):
 ```
@@ -108,6 +152,231 @@ App is available at https://sage50-journal-entry-sync-prod.server.four13.dev
 - Select container
 - Watch real-time logs
 - Download log files if needed
+
+---
+
+## 🤖 CI/CD Pipeline Details
+
+### Overview
+
+The GitHub Actions CI/CD pipeline automates the entire deployment process:
+- **Triggers**: Every push to `Production` branch
+- **Duration**: ~10 minutes (first run), ~5 minutes (cached)
+- **Status**: Check commit status on GitHub or Actions tab
+- **Logs**: Full deployment logs available in GitHub Actions
+
+### Pipeline Architecture
+
+```
+Push to Production
+    ↓
+Pre-Deployment Checks (parallel: typecheck, lint, build)
+    ↓
+Change Detection (detect if shopify.app.toml changed)
+    ↓
+    ├─→ CapRover Deployment (always)
+    └─→ Shopify Deployment (conditional)
+    ↓
+Post-Deployment Verification (health check, smoke tests)
+    ↓
+Notifications (success/failure alerts)
+```
+
+### Secret Management with 1Password
+
+The pipeline uses **1Password** as the single source of truth for all secrets.
+
+**Only one GitHub secret required**: `OP_SERVICE_ACCOUNT_TOKEN`
+
+**Secrets stored in 1Password**:
+- CapRover API token (`op://sage50-sync/caprover/api-token`)
+- Shopify CLI token (`op://sage50-sync/shopify/cli-token`)
+- Shopify API secret (`op://sage50-sync/shopify/api-secret`)
+- Slack webhook URL (`op://sage50-sync/slack/webhook-url`)
+
+**Benefits**:
+- ✅ Centralized secret management
+- ✅ Easy rotation (update in 1Password, no GitHub changes)
+- ✅ Better security (secrets never in GitHub)
+- ✅ Audit trail via 1Password
+
+**Setup**:
+1. Organize secrets in 1Password vault (sage50-sync)
+2. Create 1Password service account
+3. Add `OP_SERVICE_ACCOUNT_TOKEN` to GitHub secrets
+
+For detailed setup instructions, see: `GITHUB_SECRETS_SETUP.md`
+
+### Monitoring Deployments
+
+**View all deployments**:
+- GitHub Actions: https://github.com/four13co/sage50-journal-entry-sync/actions
+- Each workflow run shows:
+  - Overall status (✓ success or ✗ failed)
+  - Individual job statuses
+  - Detailed logs for each step
+  - Deployment artifacts (logs, health check results)
+
+**Check deployment status**:
+```bash
+# View latest workflow runs
+gh run list --limit 5
+
+# View specific run details
+gh run view <run-id>
+
+# View run logs
+gh run view <run-id> --log
+```
+
+**Health endpoint**:
+```bash
+# Check app health manually
+curl https://sage50-sync.four13.dev/api/healthz | jq '.'
+
+# Expected response:
+# {
+#   "status": "ok",
+#   "timestamp": "2026-02-28T...",
+#   "version": "1.0.0",
+#   "checks": {
+#     "database": "connected",
+#     "filesystem": "accessible",
+#     "prisma": "ready"
+#   }
+# }
+```
+
+### Conditional Deployments
+
+**CapRover deployment**: Always runs on every push to Production
+
+**Shopify deployment**: Only runs when `shopify.app.toml` is modified
+
+This happens when you change:
+- API scopes (read_orders, read_products, etc.)
+- Webhook subscriptions
+- App URL or domain
+- App metadata
+
+**Example scenarios**:
+
+| Change Type | CapRover | Shopify | Reason |
+|-------------|----------|---------|--------|
+| Fix reconciliation bug | ✓ | ✗ | Code only |
+| Update UI component | ✓ | ✗ | Frontend only |
+| Add new API scope | ✓ | ✓ | Config changed |
+| Change webhook topics | ✓ | ✓ | Config changed |
+| Update dependencies | ✓ | ✗ | Code only |
+
+### Troubleshooting Failed Deployments
+
+**If pre-checks fail**:
+1. Check the error in GitHub Actions logs
+2. Run the same check locally:
+   ```bash
+   npm run typecheck  # or lint, or build
+   ```
+3. Fix the errors
+4. Commit and push again
+
+**If CapRover deployment fails**:
+1. Check CapRover authentication secrets
+2. Verify CapRover server is accessible
+3. Review deployment logs artifact
+4. Check CapRover dashboard for errors
+5. Manual fallback: `caprover deploy --default`
+
+**If health check fails**:
+1. Check CapRover logs for startup errors
+2. Test health endpoint manually:
+   ```bash
+   curl https://sage50-sync.four13.dev/api/healthz
+   ```
+3. Verify database connection (DATABASE_URL)
+4. Check environment variables in CapRover
+5. Review recent code changes for breaking issues
+
+**If Shopify deployment fails**:
+1. Verify SHOPIFY_CLI_TOKEN is valid
+2. Check Shopify Partners dashboard
+3. Ensure shopify.app.toml is valid
+4. Manual fallback: `npm run deploy`
+
+### Rollback Procedures
+
+**Option 1: CapRover Dashboard (Fastest)**
+1. Go to https://captain.server.four13.dev
+2. Navigate to Apps → sage50-journal-entry-sync-prod
+3. Click "Deploy Previous Image"
+4. App reverts to last working version
+
+**Option 2: CapRover CLI**
+```bash
+caprover rollback --app sage50-journal-entry-sync-prod
+```
+
+**Option 3: Git Revert + Redeploy**
+```bash
+# Revert the bad commit
+git revert HEAD
+
+# Push to trigger CI/CD
+git push origin Production
+
+# CI/CD automatically deploys reverted version
+```
+
+**Recommended**: Option 1 (fastest, no git noise)
+
+### Helper Scripts
+
+The following CI helper scripts are available:
+
+**Health Check Script**:
+```bash
+# Check health with retry logic
+./scripts/ci-health-check.sh https://sage50-sync.four13.dev/api/healthz
+```
+
+**Smoke Tests**:
+```bash
+# Run comprehensive smoke tests
+./scripts/ci-smoke-tests.sh https://sage50-sync.four13.dev
+```
+
+**CapRover Deployment**:
+```bash
+# Deploy manually using the CI script
+CAPROVER_API_TOKEN=xxx ./scripts/ci-deploy-caprover.sh
+```
+
+### Performance Optimization
+
+**First deployment** (no cache):
+- Pre-checks: 5 minutes
+- CapRover deploy: 5 minutes
+- Health checks: 2 minutes
+- **Total**: ~12 minutes
+
+**Subsequent deployments** (with cache):
+- Pre-checks: 2 minutes (cached node_modules)
+- CapRover deploy: 3 minutes
+- Health checks: 2 minutes
+- **Total**: ~7 minutes
+
+**Shopify deployment** (when triggered):
+- Additional 2 minutes
+
+### CI/CD Best Practices
+
+1. **Always check GitHub Actions status** after pushing
+2. **Don't force push to Production** - breaks CI/CD tracking
+3. **Use descriptive commit messages** - shows in deployment notifications
+4. **Test locally first** with `npm run build` before pushing
+5. **Monitor first deployment** after pushing new code
+6. **Keep secrets up to date** - rotate tokens quarterly
+7. **Review failed deployment logs** before retrying
 
 ---
 
