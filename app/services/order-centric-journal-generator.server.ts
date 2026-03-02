@@ -2,7 +2,7 @@ import { Decimal } from 'decimal.js';
 import type { Order, JournalEntry, Transaction } from '../types/journal-entry';
 import type { PaymentMethodBreakdown } from './payment-method-analyzer.server';
 import { getAccountMappings } from './storage.server';
-import { calculateOrderCogs } from './cogs/cogs-calculator.server';
+import { calculateOrderCogs, validateCogsCalculation } from './cogs/cogs-calculator.server';
 import { createCogsJournalEntries } from './cogs/cogs-journal-generator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 
@@ -150,6 +150,25 @@ export async function createOrderJournalEntries(
       // NEW: Pass accessToken to enable fulfillment-based filtering
       const cogsCalculation = await calculateOrderCogs(shop, order, accessToken, true);
 
+      // VALIDATION: Check COGS calculation quality before adding entries
+      const validation = validateCogsCalculation(order, cogsCalculation);
+
+      // Log validation errors (critical issues)
+      if (validation.errors.length > 0) {
+        console.error(`❌ COGS Validation Errors for ${order.name}:`);
+        for (const error of validation.errors) {
+          console.error(`  ${error}`);
+        }
+      }
+
+      // Log validation warnings (quality issues)
+      if (validation.hasWarnings) {
+        console.warn(`⚠️ COGS Validation Warnings for ${order.name}:`);
+        for (const warning of validation.warnings) {
+          console.warn(`  ${warning}`);
+        }
+      }
+
       // Always create COGS entries if order has products, even if calculation is $0
       // This ensures journal completeness and highlights missing COGS data
       if (cogsCalculation.totalCogs.greaterThan(0)) {
@@ -166,13 +185,6 @@ export async function createOrderJournalEntries(
           `⚠️ Order ${order.name} has ${order.lineItems.length} line items but COGS is $0. ` +
           `Check Cin7 product cost data.`
         );
-      }
-
-      // Log all COGS warnings
-      if (cogsCalculation.warnings.length > 0) {
-        for (const warning of cogsCalculation.warnings) {
-          console.warn(warning);
-        }
       }
     }
   } catch (error) {

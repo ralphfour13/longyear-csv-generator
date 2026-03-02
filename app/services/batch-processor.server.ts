@@ -19,6 +19,7 @@ import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
 import { sendExportEmail, type ExportEmailData } from './email.server';
 import { validateCogsConsistency, logValidationResult } from './cogs/cogs-reconciliation-validator.server';
+import { generateConsistencyReport, generateErrorReportCsv } from './consistency-checker.server';
 
 /**
  * File generation options
@@ -151,6 +152,41 @@ export async function processExport(
     } else {
       await logInfo(shop, 'Journal Balance', `✅ Journal entries balanced: Debits=$${totalDebitsCheck.toFixed(2)}, Credits=$${totalCreditsCheck.toFixed(2)}`);
     }
+
+    // Step 4.75: Run comprehensive consistency checks (Phase 2 enhancement)
+    await logInfo(shop, 'Export', 'Running consistency checks...');
+    const consistencyReport = await generateConsistencyReport(orders, mappedEntries);
+
+    if (consistencyReport.hasErrors) {
+      console.error('⚠️ Consistency Issues Found:');
+      console.error(`  - ${consistencyReport.imbalancedEntries.length} imbalanced journal entries`);
+      console.error(`  - ${consistencyReport.salesMismatches.length} sales mismatches`);
+      console.error(`  - ${consistencyReport.cogsMismatches.length} COGS mismatches`);
+
+      // Log individual errors for tracking
+      for (const entry of consistencyReport.imbalancedEntries.filter(e => e.impact === 'HIGH')) {
+        const errorMsg = `Journal imbalance in ${entry.reference}: $${entry.difference.toFixed(2)} (${entry.impact} impact)`;
+        allErrors.push(errorMsg);
+        await logError(shop, 'Consistency Check', errorMsg);
+      }
+    }
+
+    if (consistencyReport.hasWarnings) {
+      console.warn('⚠️ Consistency Warnings:');
+      console.warn(`  - ${consistencyReport.salesMismatches.filter(m => m.impact !== 'HIGH').length} sales warnings`);
+      console.warn(`  - ${consistencyReport.taxMismatches.length} tax warnings`);
+      console.warn(`  - ${consistencyReport.paymentMismatches.length} payment warnings`);
+    }
+
+    // Log quality score
+    const qualityScore = consistencyReport.totalOrders > 0
+      ? (consistencyReport.cleanOrders / consistencyReport.totalOrders * 100).toFixed(1)
+      : '0.0';
+    await logInfo(
+      shop,
+      'Data Quality',
+      `Quality Score: ${qualityScore}% (${consistencyReport.cleanOrders} clean / ${consistencyReport.totalOrders} total orders)`
+    );
 
     // Step 5: Generate files based on options with error isolation
     await logInfo(shop, 'Export', 'Generating export files...');
@@ -395,6 +431,31 @@ export async function processExport(
           rowCount: 0,
           error: errorMsg,
         });
+      }
+    }
+
+    // File #7: Error Report (if consistency issues found)
+    if (consistencyReport.hasErrors || consistencyReport.hasWarnings) {
+      await logInfo(shop, 'Export', 'Generating Error Report...');
+      try {
+        const errorReportFilename = `error-report_${targetDate}.csv`;
+        const errorReportContent = generateErrorReportCsv(consistencyReport);
+        const errorReportPath = await writeExport(shop, errorReportFilename, errorReportContent);
+
+        const rowCount = errorReportContent.split('\n').length - 1; // Subtract header row
+        generatedFiles.push({
+          type: 'error-report',
+          filename: errorReportFilename,
+          downloadUrl: `/api/download-csv?shop=${shop}&filename=${errorReportFilename}`,
+          rowCount,
+        });
+
+        await logInfo(shop, 'Export', `Error Report saved: ${errorReportFilename} (${rowCount} issues found)`);
+      } catch (error) {
+        const errorMsg = `Error Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error('❌ Error Report error:', error);
+        await logError(shop, 'Export', errorMsg);
+        allWarnings.push(errorMsg);
       }
     }
 

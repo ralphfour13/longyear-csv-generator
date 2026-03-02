@@ -15,6 +15,15 @@ interface DailyReconciliationRow {
   area: string;
   notes: string;
   tender: string;
+  // Payment breakdown columns (NEW)
+  paymentCash: string;
+  paymentCard: string;
+  paymentGiftCard: string;
+  paymentStoreCredit: string;
+  paymentCheck: string;
+  paymentOther: string;
+  paymentTotal: string;
+  // Gift card info
   giftCardSold: string;
   giftCardUsed: string;
 }
@@ -136,6 +145,13 @@ function transformToReconciliationRow(
   const discount = order.totalDiscounts || new Decimal(0);
   const netSubtotal = sales; // Already calculated as NET above
 
+  // Calculate payment breakdown
+  const paymentBreakdown = enrichedData.paymentBreakdown;
+  const paymentTotal = Object.values(paymentBreakdown).reduce(
+    (sum, amount) => sum.plus(amount),
+    new Decimal(0)
+  );
+
   // If refunded, create original sale row
   if (order.financialStatus === 'refunded') {
     rows.push({
@@ -148,6 +164,13 @@ function transformToReconciliationRow(
       area,
       notes: notes || '',
       tender,
+      paymentCash: paymentBreakdown.cash.neg().toFixed(2),
+      paymentCard: paymentBreakdown.card.neg().toFixed(2),
+      paymentGiftCard: paymentBreakdown.giftCard.neg().toFixed(2),
+      paymentStoreCredit: paymentBreakdown.storeCredit.neg().toFixed(2),
+      paymentCheck: paymentBreakdown.check.neg().toFixed(2),
+      paymentOther: paymentBreakdown.charge.neg().toFixed(2),
+      paymentTotal: paymentTotal.neg().toFixed(2),
       giftCardSold: giftCardInfo.sold,
       giftCardUsed: giftCardInfo.used,
     });
@@ -163,6 +186,13 @@ function transformToReconciliationRow(
       area,
       notes: notes || '',
       tender,
+      paymentCash: paymentBreakdown.cash.toFixed(2),
+      paymentCard: paymentBreakdown.card.toFixed(2),
+      paymentGiftCard: paymentBreakdown.giftCard.toFixed(2),
+      paymentStoreCredit: paymentBreakdown.storeCredit.toFixed(2),
+      paymentCheck: paymentBreakdown.check.toFixed(2),
+      paymentOther: paymentBreakdown.charge.toFixed(2),
+      paymentTotal: paymentTotal.toFixed(2),
       giftCardSold: giftCardInfo.sold,
       giftCardUsed: giftCardInfo.used,
     });
@@ -178,6 +208,13 @@ function transformToReconciliationRow(
       area,
       notes: notes || '',
       tender,
+      paymentCash: paymentBreakdown.cash.toFixed(2),
+      paymentCard: paymentBreakdown.card.toFixed(2),
+      paymentGiftCard: paymentBreakdown.giftCard.toFixed(2),
+      paymentStoreCredit: paymentBreakdown.storeCredit.toFixed(2),
+      paymentCheck: paymentBreakdown.check.toFixed(2),
+      paymentOther: paymentBreakdown.charge.toFixed(2),
+      paymentTotal: paymentTotal.toFixed(2),
       giftCardSold: giftCardInfo.sold,
       giftCardUsed: giftCardInfo.used,
     });
@@ -332,7 +369,7 @@ function escapeCSVField(field: string): string {
 function generateCSV(rows: DailyReconciliationRow[]): string {
   const lines: string[] = [];
 
-  // Header row - includes new discount transparency columns
+  // Header row - includes discount transparency and payment breakdown columns
   const headers = [
     '',
     'original subtotal',
@@ -343,6 +380,15 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
     'area',
     'notes',
     'tender',
+    // Payment breakdown columns (NEW)
+    'payment cash',
+    'payment card',
+    'payment gift card',
+    'payment store credit',
+    'payment check',
+    'payment other',
+    'payment total',
+    // Gift card info
     'gift card sold',
     'gift card used',
   ];
@@ -360,6 +406,15 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
       row.area,
       row.notes,
       row.tender,
+      // Payment breakdown (NEW)
+      row.paymentCash,
+      row.paymentCard,
+      row.paymentGiftCard,
+      row.paymentStoreCredit,
+      row.paymentCheck,
+      row.paymentOther,
+      row.paymentTotal,
+      // Gift card info
       row.giftCardSold,
       row.giftCardUsed,
     ];
