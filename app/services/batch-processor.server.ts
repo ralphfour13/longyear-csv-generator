@@ -20,6 +20,8 @@ import { fetchOrdersByCaptureDateRange } from './order-centric-fetcher.server';
 import { sendExportEmail, type ExportEmailData } from './email.server';
 import { validateCogsConsistency, logValidationResult } from './cogs/cogs-reconciliation-validator.server';
 import { generateConsistencyReport, generateErrorReportCsv } from './consistency-checker.server';
+import { saveReconciliationMetric } from './reconciliation-metrics.server';
+import { checkOrderChanges, saveOrderSnapshot } from './order-state-tracker.server';
 
 /**
  * File generation options
@@ -91,6 +93,42 @@ export async function processExport(
     const cogsWarnings: string[] = result.cogsWarnings || [];
 
     await logInfo(shop, 'Export', `Reconciled ${result.orderCount} orders with ${result.captureCount} captures`)
+
+    // Step 1.25: Check for order changes (state tracking)
+    await logInfo(shop, 'Export', 'Checking for order changes since last export...');
+    let changedOrderCount = 0;
+    let ordersNeedingReexport: string[] = [];
+
+    for (const order of orders) {
+      try {
+        const changeResult = await checkOrderChanges(shop, order, targetDate);
+
+        if (changeResult.hasChanged) {
+          changedOrderCount++;
+          console.warn(`⚠️ Order ${order.name} has changed since last export:`);
+          for (const change of changeResult.changes) {
+            console.warn(`  - ${change}`);
+          }
+
+          if (changeResult.needsReexport) {
+            ordersNeedingReexport.push(order.name);
+          }
+        }
+      } catch (error) {
+        // Don't fail export if change detection fails
+        console.warn(`Failed to check changes for order ${order.name}:`, error);
+      }
+    }
+
+    if (changedOrderCount > 0) {
+      await logWarning(
+        shop,
+        'State Tracking',
+        `${changedOrderCount} orders have changed since last export${ordersNeedingReexport.length > 0 ? ` (${ordersNeedingReexport.length} need re-export)` : ''}`
+      );
+    } else {
+      await logInfo(shop, 'State Tracking', 'No order changes detected');
+    }
 
     // Step 1.5: Collect COGS data (if Cin7 enabled)
     const cin7Enabled = await isCin7Enabled(shop);
@@ -187,6 +225,18 @@ export async function processExport(
       'Data Quality',
       `Quality Score: ${qualityScore}% (${consistencyReport.cleanOrders} clean / ${consistencyReport.totalOrders} total orders)`
     );
+
+    // Step 4.8: Save reconciliation metrics to database for historical tracking
+    try {
+      await saveReconciliationMetric(shop, targetDate, consistencyReport);
+      await logInfo(shop, 'Metrics', `Saved reconciliation metrics for ${targetDate}`);
+    } catch (error) {
+      await logWarning(
+        shop,
+        'Metrics',
+        `Failed to save metrics: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
 
     // Step 5: Generate files based on options with error isolation
     await logInfo(shop, 'Export', 'Generating export files...');
@@ -500,6 +550,36 @@ export async function processExport(
 
     if (cogsWarnings.length > 0) {
       await logWarning(shop, 'COGS', 'COGS warnings detected', cogsWarnings);
+    }
+
+    // Step 7.5: Save order snapshots for state tracking
+    await logInfo(shop, 'State Tracking', 'Saving order snapshots...');
+    let snapshotsSaved = 0;
+    let snapshotErrors = 0;
+
+    for (const order of orders) {
+      try {
+        // Determine version number
+        const previousSnapshot = await checkOrderChanges(shop, order, targetDate);
+        const version = previousSnapshot.previousSnapshot
+          ? previousSnapshot.previousSnapshot.version + 1
+          : 1;
+
+        await saveOrderSnapshot(shop, order, targetDate, version);
+        snapshotsSaved++;
+      } catch (error) {
+        // Don't fail export if snapshot saving fails
+        snapshotErrors++;
+        console.warn(`Failed to save snapshot for order ${order.name}:`, error);
+      }
+    }
+
+    if (snapshotsSaved > 0) {
+      await logInfo(
+        shop,
+        'State Tracking',
+        `Saved ${snapshotsSaved} order snapshots${snapshotErrors > 0 ? ` (${snapshotErrors} failed)` : ''}`
+      );
     }
 
     // Step 8: Send email notification if enabled

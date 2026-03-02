@@ -197,6 +197,34 @@ export async function createOrderJournalEntries(
     // Operator should review warnings and investigate missing COGS
   }
 
+  // REAL-TIME VALIDATION: Validate entries before returning (Phase 3)
+  const validation = validateOrderEntries(entries, reference);
+  if (validation.length > 0) {
+    console.error(`❌ Journal entry validation failed for ${reference}:`);
+    for (const error of validation) {
+      console.error(`  ${error}`);
+    }
+
+    // Log detailed breakdown for debugging
+    console.error('Entry breakdown:');
+    for (const entry of entries) {
+      console.error(
+        `  ${entry.reference} | ${entry.accountName} | ` +
+        `DR: $${entry.debit.toFixed(2)} | CR: $${entry.credit.toFixed(2)}`
+      );
+    }
+
+    const totalDebits = entries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
+    const totalCredits = entries.reduce((sum, e) => sum.plus(e.credit), new Decimal(0));
+    console.error(
+      `Total Debits: $${totalDebits.toFixed(2)} | Total Credits: $${totalCredits.toFixed(2)}`
+    );
+
+    throw new Error(
+      `Journal entry validation failed for ${reference}: ${validation.join(', ')}`
+    );
+  }
+
   return entries;
 }
 

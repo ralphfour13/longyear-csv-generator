@@ -32,3 +32,39 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+// Phase 3: Reconciliation metrics tracking
+model ReconciliationMetric {
+  id              String   @id @default(cuid())
+  shop            String
+  date            String   // YYYY-MM-DD format
+  totalOrders     Int
+  cleanOrders     Int
+  errorOrders     Int
+  warningOrders   Int
+  qualityScore    Float    // cleanOrders / totalOrders * 100
+  errorBreakdown  Json     // { imbalanced: 11, salesMismatch: 18, ... }
+  createdAt       DateTime @default(now())
+
+  @@index([shop, date])
+  @@unique([shop, date])
+}
+
+// Phase 3: Order state tracking
+model OrderSnapshot {
+  id                 String   @id @default(cuid())
+  shop               String
+  orderId            String
+  orderNumber        String
+  exportDate         String   // YYYY-MM-DD format
+  snapshotData       Json     // Full order data at export time
+  totalPrice         Decimal  @db.Decimal(10, 2)
+  financialStatus    String
+  fulfillmentStatus  String?
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+
+  @@index([shop, orderId])
+  @@index([shop, exportDate])
+  @@unique([shop, orderId, exportDate, version])
+}
