@@ -12,7 +12,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Get all jobs for this shop
   const jobs = await getShopJobs(shop);
 
-  return Response.json({ shop, jobs });
+  return { shop, jobs };
 };
 
 export default function Jobs() {
@@ -123,38 +123,38 @@ export default function Jobs() {
       </s-button>
 
       {/* Status Filter Tabs */}
-      <s-section style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          {(['all', 'pending', 'processing', 'completed', 'failed'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: '1px solid #C9CCCF',
-                backgroundColor: statusFilter === status ? '#008060' : '#ffffff',
-                color: statusFilter === status ? '#ffffff' : '#202223',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: 'pointer',
-                textTransform: 'capitalize',
-                transition: 'all 0.2s',
-              }}
-            >
-              {status} ({statusCounts[status]})
-            </button>
-          ))}
-        </div>
-      </s-section>
+      <div style={{ marginBottom: '20px' }}>
+        <s-section>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {(['all', 'pending', 'processing', 'completed', 'failed'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: statusFilter === status ? '#008060' : '#ffffff',
+                  color: statusFilter === status ? '#ffffff' : '#202223',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  textTransform: 'capitalize',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {status} ({statusCounts[status]})
+              </button>
+            ))}
+          </div>
+        </s-section>
+      </div>
 
       {/* Jobs Table */}
       <s-section>
         {filteredJobs.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            <s-text variant="bodyMd" style={{ color: '#6D7175' }}>
-              No {statusFilter !== 'all' ? statusFilter : ''} jobs found.
-            </s-text>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#6D7175' }}>
+            No {statusFilter !== 'all' ? statusFilter : ''} jobs found.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -197,28 +197,20 @@ export default function Jobs() {
                       e.currentTarget.style.backgroundColor = '#ffffff';
                     }}
                   >
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm" style={{ fontFamily: 'monospace', fontSize: '11px' }}>
-                        {job.id.split('_').slice(-1)[0]}
-                      </s-text>
+                    <td style={{ padding: '12px', fontFamily: 'monospace', fontSize: '11px' }}>
+                      {job.id.split('_').slice(-1)[0]}
                     </td>
                     <td style={{ padding: '12px' }}>
                       {getStatusBadge(job.status)}
                     </td>
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm">
-                        {formatDateRange(job)}
-                      </s-text>
+                    <td style={{ padding: '12px', fontSize: '14px' }}>
+                      {formatDateRange(job)}
                     </td>
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm">
-                        {format(new Date(job.createdAt), 'MMM d, h:mm a')}
-                      </s-text>
+                    <td style={{ padding: '12px', fontSize: '14px' }}>
+                      {format(new Date(job.createdAt), 'MMM d, h:mm a')}
                     </td>
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm">
-                        {getDuration(job)}
-                      </s-text>
+                    <td style={{ padding: '12px', fontSize: '14px' }}>
+                      {getDuration(job)}
                     </td>
                     <td style={{ padding: '12px' }}>
                       {job.status === 'completed' && job.result?.files ? (
@@ -242,23 +234,23 @@ export default function Jobs() {
                             </button>
                           ))}
                           {job.result.files.length > 3 && (
-                            <s-text variant="bodySm" style={{ color: '#6D7175', fontSize: '11px' }}>
+                            <span style={{ color: '#6D7175', fontSize: '11px' }}>
                               +{job.result.files.length - 3} more
-                            </s-text>
+                            </span>
                           )}
                         </div>
                       ) : job.status === 'failed' ? (
-                        <s-text variant="bodySm" style={{ color: '#D72C0D', fontSize: '11px' }}>
+                        <span style={{ color: '#D72C0D', fontSize: '11px' }}>
                           {job.error || 'Unknown error'}
-                        </s-text>
+                        </span>
                       ) : job.status === 'processing' ? (
-                        <s-text variant="bodySm" style={{ color: '#0D5EAF', fontSize: '11px' }}>
+                        <span style={{ color: '#0D5EAF', fontSize: '11px' }}>
                           Processing...
-                        </s-text>
+                        </span>
                       ) : (
-                        <s-text variant="bodySm" style={{ color: '#6D7175', fontSize: '11px' }}>
+                        <span style={{ color: '#6D7175', fontSize: '11px' }}>
                           Pending
-                        </s-text>
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -271,11 +263,11 @@ export default function Jobs() {
 
       {/* Auto-refresh indicator */}
       {statusCounts.pending + statusCounts.processing > 0 && (
-        <s-banner tone="info" style={{ marginTop: '20px' }}>
-          <s-text variant="bodySm">
+        <div style={{ marginTop: '20px' }}>
+          <s-banner tone="info">
             🔄 Auto-refreshing every 15 seconds while jobs are active
-          </s-text>
-        </s-banner>
+          </s-banner>
+        </div>
       )}
     </s-page>
   );
