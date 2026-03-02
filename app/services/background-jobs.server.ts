@@ -139,3 +139,86 @@ export async function cleanupOldJobs(): Promise<void> {
     console.error('Error cleaning up old jobs:', error);
   }
 }
+
+/**
+ * Clear all completed/failed jobs for a shop
+ */
+export async function clearCompletedJobs(shop: string): Promise<number> {
+  try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
+    let deletedCount = 0;
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (
+          job.shop === shop &&
+          (job.status === 'completed' || job.status === 'failed')
+        ) {
+          await fs.unlink(filePath);
+          deletedCount++;
+        }
+      }
+    }
+
+    return deletedCount;
+  } catch (error) {
+    console.error('Error clearing completed jobs:', error);
+    return 0;
+  }
+}
+
+/**
+ * Cancel all pending jobs for a shop
+ */
+export async function cancelPendingJobs(shop: string): Promise<number> {
+  try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
+    let cancelledCount = 0;
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (job.shop === shop && job.status === 'pending') {
+          // Mark as failed with cancellation message
+          const cancelledJob = {
+            ...job,
+            status: 'failed' as const,
+            error: 'Cancelled by user',
+            completedAt: new Date().toISOString(),
+          };
+
+          await fs.writeFile(filePath, JSON.stringify(cancelledJob, null, 2));
+          cancelledCount++;
+        }
+      }
+    }
+
+    return cancelledCount;
+  } catch (error) {
+    console.error('Error cancelling pending jobs:', error);
+    return 0;
+  }
+}
+
+/**
+ * Delete a specific job
+ */
+export async function deleteJob(jobId: string): Promise<boolean> {
+  try {
+    const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+    await fs.unlink(jobPath);
+    return true;
+  } catch (error) {
+    console.error(`Error deleting job ${jobId}:`, error);
+    return false;
+  }
+}

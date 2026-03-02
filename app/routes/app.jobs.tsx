@@ -1,8 +1,8 @@
-import type { LoaderFunctionArgs } from 'react-router';
-import { useLoaderData, useRevalidator } from 'react-router';
+import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
+import { useLoaderData, useRevalidator, useActionData, Form } from 'react-router';
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { getShopJobs, type ExportJob } from '../services/background-jobs.server';
+import { getShopJobs, clearCompletedJobs, cancelPendingJobs, type ExportJob } from '../services/background-jobs.server';
 import { format } from 'date-fns';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -12,11 +12,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Get all jobs for this shop
   const jobs = await getShopJobs(shop);
 
-  return Response.json({ shop, jobs });
+  return { shop, jobs };
+};
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+
+  const formData = await request.formData();
+  const actionType = formData.get('action');
+
+  if (actionType === 'clearCompleted') {
+    const count = await clearCompletedJobs(shop);
+    return { success: true, message: `Cleared ${count} completed/failed jobs`, count };
+  }
+
+  if (actionType === 'cancelPending') {
+    const count = await cancelPendingJobs(shop);
+    return { success: true, message: `Cancelled ${count} pending jobs`, count };
+  }
+
+  return { success: false, error: 'Unknown action' };
 };
 
 export default function Jobs() {
   const { shop, jobs: initialJobs } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const revalidator = useRevalidator();
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -122,39 +143,97 @@ export default function Jobs() {
         New Export
       </s-button>
 
-      {/* Status Filter Tabs */}
-      <s-section style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          {(['all', 'pending', 'processing', 'completed', 'failed'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: '1px solid #C9CCCF',
-                backgroundColor: statusFilter === status ? '#008060' : '#ffffff',
-                color: statusFilter === status ? '#ffffff' : '#202223',
-                fontWeight: 600,
-                fontSize: '14px',
-                cursor: 'pointer',
-                textTransform: 'capitalize',
-                transition: 'all 0.2s',
-              }}
-            >
-              {status} ({statusCounts[status]})
-            </button>
-          ))}
+      {/* Action feedback */}
+      {actionData?.success && (
+        <div style={{ marginBottom: '20px' }}>
+          <s-banner tone="success">
+            {actionData.message}
+          </s-banner>
         </div>
-      </s-section>
+      )}
+
+      {/* Clear/Cancel Actions */}
+      <div style={{ marginBottom: '20px' }}>
+        <s-section>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, fontSize: '14px', color: '#202223' }}>Queue Actions:</span>
+            <Form method="post" style={{ display: 'inline' }}>
+              <input type="hidden" name="action" value="clearCompleted" />
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: '#ffffff',
+                  color: '#202223',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                disabled={statusCounts.completed + statusCounts.failed === 0}
+              >
+                🗑️ Clear Completed ({statusCounts.completed + statusCounts.failed})
+              </button>
+            </Form>
+            <Form method="post" style={{ display: 'inline' }}>
+              <input type="hidden" name="action" value="cancelPending" />
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: '#ffffff',
+                  color: '#D72C0D',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                disabled={statusCounts.pending === 0}
+              >
+                ❌ Cancel Pending ({statusCounts.pending})
+              </button>
+            </Form>
+          </div>
+        </s-section>
+      </div>
+
+      {/* Status Filter Tabs */}
+      <div style={{ marginBottom: '20px' }}>
+        <s-section>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {(['all', 'pending', 'processing', 'completed', 'failed'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: statusFilter === status ? '#008060' : '#ffffff',
+                  color: statusFilter === status ? '#ffffff' : '#202223',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  textTransform: 'capitalize',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {status} ({statusCounts[status]})
+              </button>
+            ))}
+          </div>
+        </s-section>
+      </div>
 
       {/* Jobs Table */}
       <s-section>
         {filteredJobs.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center' }}>
-            <s-text variant="bodyMd" style={{ color: '#6D7175' }}>
-              No {statusFilter !== 'all' ? statusFilter : ''} jobs found.
-            </s-text>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#6D7175' }}>
+            No {statusFilter !== 'all' ? statusFilter : ''} jobs found.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -197,33 +276,25 @@ export default function Jobs() {
                       e.currentTarget.style.backgroundColor = '#ffffff';
                     }}
                   >
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm" style={{ fontFamily: 'monospace', fontSize: '11px' }}>
-                        {job.id.split('_').slice(-1)[0]}
-                      </s-text>
+                    <td style={{ padding: '12px', fontFamily: 'monospace', fontSize: '11px' }}>
+                      {job.id.split('_').slice(-1)[0]}
                     </td>
                     <td style={{ padding: '12px' }}>
                       {getStatusBadge(job.status)}
                     </td>
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm">
-                        {formatDateRange(job)}
-                      </s-text>
+                    <td style={{ padding: '12px', fontSize: '14px' }}>
+                      {formatDateRange(job)}
                     </td>
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm">
-                        {format(new Date(job.createdAt), 'MMM d, h:mm a')}
-                      </s-text>
+                    <td style={{ padding: '12px', fontSize: '14px' }}>
+                      {format(new Date(job.createdAt), 'MMM d, h:mm a')}
                     </td>
-                    <td style={{ padding: '12px' }}>
-                      <s-text variant="bodySm">
-                        {getDuration(job)}
-                      </s-text>
+                    <td style={{ padding: '12px', fontSize: '14px' }}>
+                      {getDuration(job)}
                     </td>
                     <td style={{ padding: '12px' }}>
                       {job.status === 'completed' && job.result?.files ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {job.result.files.slice(0, 3).map((file: any, idx: number) => (
+                          {job.result.files.slice(0, 3).map((file: { filename: string; error?: string }, idx: number) => (
                             <button
                               key={idx}
                               onClick={() => handleDownload(file.filename)}
@@ -242,23 +313,23 @@ export default function Jobs() {
                             </button>
                           ))}
                           {job.result.files.length > 3 && (
-                            <s-text variant="bodySm" style={{ color: '#6D7175', fontSize: '11px' }}>
+                            <span style={{ color: '#6D7175', fontSize: '11px' }}>
                               +{job.result.files.length - 3} more
-                            </s-text>
+                            </span>
                           )}
                         </div>
                       ) : job.status === 'failed' ? (
-                        <s-text variant="bodySm" style={{ color: '#D72C0D', fontSize: '11px' }}>
+                        <span style={{ color: '#D72C0D', fontSize: '11px' }}>
                           {job.error || 'Unknown error'}
-                        </s-text>
+                        </span>
                       ) : job.status === 'processing' ? (
-                        <s-text variant="bodySm" style={{ color: '#0D5EAF', fontSize: '11px' }}>
+                        <span style={{ color: '#0D5EAF', fontSize: '11px' }}>
                           Processing...
-                        </s-text>
+                        </span>
                       ) : (
-                        <s-text variant="bodySm" style={{ color: '#6D7175', fontSize: '11px' }}>
+                        <span style={{ color: '#6D7175', fontSize: '11px' }}>
                           Pending
-                        </s-text>
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -271,11 +342,11 @@ export default function Jobs() {
 
       {/* Auto-refresh indicator */}
       {statusCounts.pending + statusCounts.processing > 0 && (
-        <s-banner tone="info" style={{ marginTop: '20px' }}>
-          <s-text variant="bodySm">
+        <div style={{ marginTop: '20px' }}>
+          <s-banner tone="info">
             🔄 Auto-refreshing every 15 seconds while jobs are active
-          </s-text>
-        </s-banner>
+          </s-banner>
+        </div>
       )}
     </s-page>
   );

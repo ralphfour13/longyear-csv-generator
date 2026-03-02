@@ -169,7 +169,7 @@ export default function Exports() {
   const [generateJournalSummary, setGenerateJournalSummary] = useState(true);
   const [generateCogsDetails, setGenerateCogsDetails] = useState(true);
   const [generateReconciliation, setGenerateReconciliation] = useState(true);
-  const [currentJob, setCurrentJob] = useState<any>(null);
+  const [currentJob, setCurrentJob] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string>('');
   const fetcher = useFetcher();
 
@@ -188,7 +188,7 @@ export default function Exports() {
 
   // Track which jobs have already triggered downloads to prevent repeated downloads
   const downloadedJobsRef = useRef<Set<string>>(new Set());
-  const lastActionDataRef = useRef<any>(null);
+  const lastActionDataRef = useRef<unknown>(null);
 
   // Poll for job status when job is created
   useEffect(() => {
@@ -234,7 +234,7 @@ export default function Exports() {
         if (autoDownload && job.result?.files && !downloadedJobsRef.current.has(job.id)) {
           downloadedJobsRef.current.add(job.id);
           setTimeout(() => {
-            job.result.files.forEach((file: any, index: number) => {
+            job.result.files.forEach((file: { filename: string; error?: string }, index: number) => {
               if (!file.error) {
                 setTimeout(() => {
                   const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${file.filename}`;
@@ -274,7 +274,7 @@ export default function Exports() {
 
         // Small delay to ensure UI updates before downloads start
         setTimeout(() => {
-          actionData.files.forEach((file: any, index: number) => {
+          actionData.files.forEach((file: { filename: string; error?: string }, index: number) => {
             if (!file.error) {
               // Stagger downloads slightly to avoid browser blocking
               setTimeout(() => {
@@ -306,7 +306,7 @@ export default function Exports() {
             <s-text variant="headingSm">{fetcher.data.job.result.message}</s-text>
             {fetcher.data.job.result.files && fetcher.data.job.result.files.length > 0 && (
               <s-stack direction="block" gap="tight">
-                {fetcher.data.job.result.files.map((file: any) => {
+                {fetcher.data.job.result.files.map((file: { filename: string; error?: string }) => {
                   let label = '';
                   let description = '';
                   if (file.type === 'daily-sales') {
@@ -379,7 +379,7 @@ export default function Exports() {
             <s-text variant="headingSm">{actionData.message}</s-text>
             {actionData.files && actionData.files.length > 0 && (
               <s-stack direction="block" gap="tight">
-                {actionData.files.map((file: any) => {
+                {actionData.files.map((file: { filename: string; error?: string }) => {
                   // Get file type label
                   let label = '';
                   let description = '';
@@ -595,7 +595,7 @@ export default function Exports() {
               <s-text variant="headingSm">How it works</s-text>
               <s-stack direction="block" gap="tight">
                 <s-text>1. Select the date (transactions captured on this day)</s-text>
-                <s-text>2. Click "Generate CSV" to create four export files:</s-text>
+                <s-text>2. Click &quot;Generate CSV&quot; to create four export files:</s-text>
                 <s-text style={{ paddingLeft: '20px' }}>• Detailed Sales Report - Transaction-level detail for bookkeeping</s-text>
                 <s-text style={{ paddingLeft: '20px' }}>• Payouts with Orders - Reconciliation view of payout breakdown</s-text>
                 <s-text style={{ paddingLeft: '20px' }}>• Journal Entry Details - Detailed transaction entries</s-text>
