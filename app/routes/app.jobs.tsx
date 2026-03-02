@@ -215,7 +215,7 @@ export default function Jobs() {
                     <td style={{ padding: '12px' }}>
                       {job.status === 'completed' && job.result?.files ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {job.result.files.slice(0, 3).map((file: any, idx: number) => (
+                          {job.result.files.slice(0, 3).map((file: { filename: string; error?: string }, idx: number) => (
                             <button
                               key={idx}
                               onClick={() => handleDownload(file.filename)}
