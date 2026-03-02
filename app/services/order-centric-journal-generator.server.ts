@@ -223,10 +223,81 @@ export async function createRefundJournalEntries(
   for (const refundTxn of refundTransactions) {
     const refundAmount = refundTxn.amount.abs();
 
+    // Find the matching refund object from order.refunds
+    const refund = order.refunds?.find(r =>
+      r.transactions.some(t => t.id === refundTxn.id)
+    );
+
+    // Check if this is a cancellation (no money refunded)
+    const isCancellation = refund?.refund_line_items?.some(
+      item => item.restock_type === 'cancel'
+    ) && refund.transactions.length === 0;
+
+    if (isCancellation) {
+      // This is a CANCELLATION (no money refunded)
+      console.log(`Order ${order.name}: Cancellation detected (no money refunded)`);
+
+      // Check if payment was captured
+      const wasCaptured = order.transactions?.some(
+        t => t.kind === 'capture' && t.status === 'success'
+      );
+
+      if (!wasCaptured) {
+        // Cancellation before capture: Only reverse AR, not cash
+        // Calculate amounts from refund line items
+        const refundedSubtotal = refund.refund_line_items.reduce(
+          (sum, item) => sum.plus(item.subtotal), new Decimal(0)
+        );
+        const refundedTax = refund.refund_line_items.reduce(
+          (sum, item) => sum.plus(item.total_tax), new Decimal(0)
+        );
+
+        entries.push({
+          date: targetDate,
+          reference: `CANCEL-${order.name}`,
+          account: accountMappings.accounts_receivable.accountCode,
+          accountName: accountMappings.accounts_receivable.accountName,
+          debit: new Decimal(0),
+          credit: refundedSubtotal.plus(refundedTax),
+          memo: `Cancellation AR Reversal - Order ${order.name}`,
+        });
+
+        // Reverse sales revenue
+        if (refundedSubtotal.greaterThan(0)) {
+          entries.push({
+            date: targetDate,
+            reference: `SO-${order.name}`,
+            account: accountMappings.sales_revenue.accountCode,
+            accountName: accountMappings.sales_revenue.accountName,
+            debit: refundedSubtotal,
+            credit: new Decimal(0),
+            memo: `Sales Cancellation - Order ${order.name}`,
+          });
+        }
+
+        // Reverse tax
+        if (refundedTax.greaterThan(0)) {
+          entries.push({
+            date: targetDate,
+            reference: `SO-${order.name}`,
+            account: accountMappings.sales_tax.accountCode,
+            accountName: accountMappings.sales_tax.accountName,
+            debit: refundedTax,
+            credit: new Decimal(0),
+            memo: `Tax Cancellation - Order ${order.name}`,
+          });
+        }
+
+        continue; // Skip RF- entry creation for cancellations
+      }
+    }
+
+    // NORMAL REFUND PROCESSING (not a cancellation)
     // RF- ENTRY: Payment reversal (credit payment account)
     const { account, accountName } = await getRefundAccount(
       shop,
-      refundTxn.gateway,
+      refundTxn, // Pass full transaction to get actual refund gateway
+      order, // Pass order to check for gateway mismatch
       accountMappings
     );
 
@@ -240,42 +311,62 @@ export async function createRefundJournalEntries(
       memo: `Refund ${accountName} - Order ${order.name}`,
     });
 
-    // SO- REVERSAL ENTRIES: Reverse revenue and tax PROPORTIONALLY
-    // Calculate amounts from order
-    const netSales = calculateNetSalesForRefund(order);
-    const taxAmount = order.totalTax || new Decimal(0);
-    const shippingAmount = order.totalShipping || new Decimal(0);
+    // SO- REVERSAL ENTRIES: Use ACTUAL refund breakdown from refund_line_items
+    let refundedSubtotal = new Decimal(0);
+    let refundedTax = new Decimal(0);
 
-    // Calculate refund ratio (what % of order is being refunded)
-    const orderTotal = order.totalPrice;
-    const refundRatio = refundAmount.dividedBy(orderTotal);
+    if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
+      // PREFERRED METHOD: Calculate actual subtotal and tax from refund line items
+      refundedSubtotal = refund.refund_line_items.reduce(
+        (sum, item) => sum.plus(item.subtotal), new Decimal(0)
+      );
+      refundedTax = refund.refund_line_items.reduce(
+        (sum, item) => sum.plus(item.total_tax), new Decimal(0)
+      );
 
-    // Calculate proportional amounts based on refund ratio
-    const refundedSales = netSales.times(refundRatio);
-    const refundedTax = taxAmount.times(refundRatio);
-    const refundedShipping = shippingAmount.times(refundRatio);
+      // Validate that subtotal + tax = refund amount
+      const calculatedTotal = refundedSubtotal.plus(refundedTax);
+      const diff = calculatedTotal.minus(refundAmount).abs();
 
-    console.log(
-      `Refund ${order.name}: $${refundAmount.toFixed(2)} / $${orderTotal.toFixed(2)} = ` +
-      `${refundRatio.times(100).toFixed(2)}% ` +
-      `(Sales: $${refundedSales.toFixed(2)}, Tax: $${refundedTax.toFixed(2)}, ` +
-      `Shipping: $${refundedShipping.toFixed(2)})`
-    );
+      if (diff.greaterThan(new Decimal('0.02'))) {
+        console.warn(
+          `⚠️ Refund amount mismatch for ${order.name}: ` +
+          `Calculated ${calculatedTotal.toFixed(2)} != Transaction ${refundAmount.toFixed(2)} ` +
+          `(Diff: $${diff.toFixed(2)})`
+        );
+      }
 
-    // DEBIT: Sales Revenue (reverse proportional credit)
-    if (refundedSales.greaterThan(0)) {
+      console.log(
+        `Refund ${order.name}: $${refundAmount.toFixed(2)} = ` +
+        `Subtotal: $${refundedSubtotal.toFixed(2)} + Tax: $${refundedTax.toFixed(2)}`
+      );
+    } else {
+      // FALLBACK: Use proportional method if refund_line_items not available
+      console.warn(`⚠️ No refund_line_items for ${order.name}, using proportional calculation`);
+
+      const netSales = calculateNetSalesForRefund(order);
+      const taxAmount = order.totalTax || new Decimal(0);
+      const orderTotal = order.totalPrice;
+      const refundRatio = refundAmount.dividedBy(orderTotal);
+
+      refundedSubtotal = netSales.times(refundRatio);
+      refundedTax = taxAmount.times(refundRatio);
+    }
+
+    // DEBIT: Sales Revenue (reverse credit)
+    if (refundedSubtotal.greaterThan(0)) {
       entries.push({
         date: targetDate,
         reference: `SO-${order.name}`,
         account: accountMappings.sales_revenue.accountCode,
         accountName: accountMappings.sales_revenue.accountName,
-        debit: refundedSales,
+        debit: refundedSubtotal,
         credit: new Decimal(0),
         memo: `Sales Refund - Order ${order.name}`,
       });
     }
 
-    // DEBIT: Sales Tax (reverse proportional credit)
+    // DEBIT: Sales Tax (reverse credit)
     if (refundedTax.greaterThan(0)) {
       entries.push({
         date: targetDate,
@@ -288,18 +379,8 @@ export async function createRefundJournalEntries(
       });
     }
 
-    // DEBIT: Shipping Revenue (reverse proportional credit, if applicable)
-    if (refundedShipping.greaterThan(0)) {
-      entries.push({
-        date: targetDate,
-        reference: `SO-${order.name}`,
-        account: accountMappings.shipping_revenue.accountCode,
-        accountName: accountMappings.shipping_revenue.accountName,
-        debit: refundedShipping,
-        credit: new Decimal(0),
-        memo: `Shipping Refund - Order ${order.name}`,
-      });
-    }
+    // NOTE: Shipping refunds are included in refund_line_items.subtotal
+    // No separate shipping entry needed
   }
 
   // NOTE: COGS entries are NOT reversed for refunds
@@ -311,14 +392,34 @@ export async function createRefundJournalEntries(
 }
 
 /**
- * Get the account to credit for a refund based on gateway
+ * Get the account to credit for a refund based on the ACTUAL refund gateway
+ * (not the original payment gateway, which may differ)
+ *
+ * @param shop - Shop domain
+ * @param refundTransaction - The refund transaction (contains actual gateway)
+ * @param order - The order being refunded (to check for gateway mismatch)
+ * @param accountMappings - Account mappings
+ * @returns Account code and name for the refund
  */
 async function getRefundAccount(
   shop: string,
-  gateway: string,
+  refundTransaction: Transaction,
+  order: Order,
   accountMappings: any
 ): Promise<{ account: string; accountName: string }> {
-  const normalizedGateway = gateway.toLowerCase();
+  const normalizedGateway = refundTransaction.gateway.toLowerCase();
+
+  // Log warning if refund gateway differs from original payment
+  const originalGateways = order.transactions
+    ?.filter(t => (t.kind === 'capture' || t.kind === 'sale') && t.status === 'success')
+    .map(t => t.gateway) || [];
+
+  if (originalGateways.length > 0 && !originalGateways.includes(refundTransaction.gateway)) {
+    console.warn(
+      `⚠️ Refund gateway mismatch for ${order.name}: ` +
+      `Original: ${originalGateways.join(', ')} | Refund: ${refundTransaction.gateway}`
+    );
+  }
 
   switch (normalizedGateway) {
     case 'shopify_payments':
@@ -360,7 +461,7 @@ async function getRefundAccount(
       };
 
     default:
-      console.warn(`Unknown refund gateway: ${gateway}. Defaulting to clearing account.`);
+      console.warn(`Unknown refund gateway: ${refundTransaction.gateway}. Defaulting to clearing account.`);
       return {
         account: accountMappings.clearing_account.accountCode,
         accountName: accountMappings.clearing_account.accountName,
