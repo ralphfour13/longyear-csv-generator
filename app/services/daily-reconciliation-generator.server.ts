@@ -7,7 +7,9 @@ import type { EnrichedTransaction, Order, OrderLineItem } from '../types/journal
  */
 interface DailyReconciliationRow {
   orderNumber: string;
-  sales: string;
+  originalSubtotal: string; // Subtotal before discounts
+  discount: string; // Total discount amount
+  netSubtotal: string; // Subtotal after discounts (what's used for sales)
   tax: string;
   shipping: string;
   area: string;
@@ -129,11 +131,18 @@ function transformToReconciliationRow(
   // Check for gift cards
   const giftCardInfo = analyzeGiftCards(order, enrichedData.paymentBreakdown);
 
+  // Calculate discount information for transparency
+  const originalSubtotal = order.subtotalPrice;
+  const discount = order.totalDiscounts || new Decimal(0);
+  const netSubtotal = sales; // Already calculated as NET above
+
   // If refunded, create original sale row
   if (order.financialStatus === 'refunded') {
     rows.push({
       orderNumber: order.name,
-      sales: sales.neg().toFixed(2), // Negative for refund
+      originalSubtotal: originalSubtotal.neg().toFixed(2),
+      discount: discount.neg().toFixed(2),
+      netSubtotal: netSubtotal.neg().toFixed(2), // Negative for refund
       tax: order.totalTax.neg().toFixed(2),
       shipping: order.totalShipping.gt(0) ? order.totalShipping.neg().toFixed(2) : '',
       area,
@@ -146,7 +155,9 @@ function transformToReconciliationRow(
     // Add back the original sale
     rows.push({
       orderNumber: order.name,
-      sales: sales.toFixed(2),
+      originalSubtotal: originalSubtotal.toFixed(2),
+      discount: discount.toFixed(2),
+      netSubtotal: netSubtotal.toFixed(2),
       tax: order.totalTax.toFixed(2),
       shipping: order.totalShipping.gt(0) ? order.totalShipping.toFixed(2) : '',
       area,
@@ -159,7 +170,9 @@ function transformToReconciliationRow(
     // Normal order
     rows.push({
       orderNumber: order.name,
-      sales: sales.toFixed(2),
+      originalSubtotal: originalSubtotal.toFixed(2),
+      discount: discount.toFixed(2),
+      netSubtotal: netSubtotal.toFixed(2),
       tax: order.totalTax.toFixed(2),
       shipping: order.totalShipping.gt(0) ? order.totalShipping.toFixed(2) : '',
       area,
@@ -319,10 +332,12 @@ function escapeCSVField(field: string): string {
 function generateCSV(rows: DailyReconciliationRow[]): string {
   const lines: string[] = [];
 
-  // Header row
+  // Header row - includes new discount transparency columns
   const headers = [
     '',
-    'sales',
+    'original subtotal',
+    'discount',
+    'net subtotal',
     'tax',
     'shipping',
     'area',
@@ -337,7 +352,9 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
   for (const row of rows) {
     const fields = [
       row.orderNumber,
-      row.sales,
+      row.originalSubtotal,
+      row.discount,
+      row.netSubtotal,
       row.tax,
       row.shipping,
       row.area,
@@ -348,6 +365,44 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
     ];
     lines.push(fields.map(escapeCSVField).join(','));
   }
+
+  // Calculate summary totals
+  const totalOriginalSubtotal = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.originalSubtotal || 0)),
+    new Decimal(0)
+  );
+  const totalDiscount = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.discount || 0)),
+    new Decimal(0)
+  );
+  const totalNetSubtotal = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.netSubtotal || 0)),
+    new Decimal(0)
+  );
+  const totalTax = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.tax || 0)),
+    new Decimal(0)
+  );
+  const totalShipping = rows.reduce(
+    (sum, row) => sum.plus(new Decimal(row.shipping || 0)),
+    new Decimal(0)
+  );
+
+  // Add summary row
+  const summaryFields = [
+    `SUMMARY (${rows.length} orders)`,
+    totalOriginalSubtotal.toFixed(2),
+    totalDiscount.toFixed(2),
+    totalNetSubtotal.toFixed(2),
+    totalTax.toFixed(2),
+    totalShipping.toFixed(2),
+    '', // area
+    '', // notes
+    '', // tender
+    '', // gift card sold
+    '', // gift card used
+  ];
+  lines.push(summaryFields.map(escapeCSVField).join(','));
 
   return lines.join('\n');
 }

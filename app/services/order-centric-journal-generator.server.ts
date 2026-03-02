@@ -97,6 +97,12 @@ export async function createOrderJournalEntries(
   }
 
   // CREDIT: Sales Revenue (NET - post-discount amount)
+  // Add discount info to memo for transparency
+  const hasDiscount = order.totalDiscounts && order.totalDiscounts.gt(0);
+  const discountInfo = hasDiscount
+    ? ` (Net: $${netSales.toFixed(2)}, Discount: $${order.totalDiscounts.toFixed(2)})`
+    : '';
+
   entries.push({
     date: targetDate,
     reference,
@@ -104,7 +110,7 @@ export async function createOrderJournalEntries(
     accountName: accountMappings.sales_revenue.accountName,
     debit: new Decimal(0),
     credit: netSales,
-    memo: `Sales - Order ${order.name}`,
+    memo: `Sales - Order ${order.name}${discountInfo}`,
   });
 
   // NO DISCOUNT ENTRY - discounts are already reflected in NET sales amount
