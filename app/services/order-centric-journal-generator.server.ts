@@ -3,8 +3,11 @@ import type { Order, JournalEntry, Transaction } from '../types/journal-entry';
 import type { PaymentMethodBreakdown } from './payment-method-analyzer.server';
 import { getAccountMappings } from './storage.server';
 import { calculateOrderCogs, validateCogsCalculation } from './cogs/cogs-calculator.server';
-import { createCogsJournalEntries } from './cogs/cogs-journal-generator.server';
+import { createCogsJournalEntries, createCogsRefundEntries } from './cogs/cogs-journal-generator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
+import { Cin7ProductService } from './cin7/cin7-product-service.server';
+import { extractSkuFromLineItem } from './cogs/product-matcher.server';
+import type { CogsCalculation } from '../types/cin7';
 
 /**
  * Order-Centric Journal Entry Generator
@@ -423,10 +426,41 @@ export async function createRefundJournalEntries(
     // No separate shipping entry needed
   }
 
-  // NOTE: COGS entries are NOT reversed for refunds
-  // When items are refunded, the COGS remains recognized (expense already incurred)
-  // Inventory doesn't necessarily return (could be damaged, restocking fee, etc.)
-  // Only the revenue side (sales and payment) is reversed
+  // COGS REVERSAL: Only for items returned to inventory
+  // Check if Cin7 is enabled and if any items were restocked
+  try {
+    const cin7Enabled = await isCin7Enabled(shop);
+    if (cin7Enabled) {
+      // Calculate COGS for refunded items that were returned to inventory
+      const refundCogsCalculation = await calculateRefundCogs(shop, order, refundTransactions);
+
+      if (refundCogsCalculation.totalCogs.greaterThan(0)) {
+        console.log(
+          `📦 Order ${order.name}: Reversing COGS for returned items: $${refundCogsCalculation.totalCogs.toFixed(2)}`
+        );
+
+        // Create COGS reversal entries
+        const cogsReversalEntries = await createCogsRefundEntries(
+          shop,
+          order.name,
+          refundCogsCalculation,
+          targetDate
+        );
+
+        entries.push(...cogsReversalEntries);
+      } else {
+        console.log(
+          `ℹ️  Order ${order.name}: No COGS reversal needed (no items returned to inventory)`
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      `❌ Failed to calculate refund COGS for ${order.name}:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    // Continue without COGS reversal - operator should review warnings
+  }
 
   return entries;
 }
@@ -508,6 +542,112 @@ async function getRefundAccount(
         accountName: accountMappings.clearing_account.accountName,
       };
   }
+}
+
+/**
+ * Calculate COGS for refunded items that were returned to inventory
+ *
+ * Only calculates COGS for line items with restock_type === 'return'.
+ * Items that are not restocked (damaged, no_restock, cancel) are excluded.
+ *
+ * @param shop - Shop domain
+ * @param order - Order being refunded
+ * @param refundTransactions - Refund transactions for target date
+ * @returns COGS calculation for returned items only
+ */
+async function calculateRefundCogs(
+  shop: string,
+  order: Order,
+  refundTransactions: Transaction[]
+): Promise<CogsCalculation> {
+  const calculation: CogsCalculation = {
+    orderId: order.id,
+    orderName: order.name,
+    totalCogs: new Decimal(0),
+    lineItems: [],
+    warnings: [],
+  };
+
+  // Initialize Cin7 service
+  const cin7Service = new Cin7ProductService(shop);
+  await cin7Service.initialize();
+
+  // Process each refund transaction
+  for (const refundTxn of refundTransactions) {
+    // Find the matching refund object
+    const refund = order.refunds?.find(r =>
+      r.transactions.some(t => t.id === refundTxn.id)
+    );
+
+    if (!refund?.refund_line_items) {
+      continue;
+    }
+
+    // Process refund line items
+    for (const refundItem of refund.refund_line_items) {
+      // Only process items that were returned to inventory
+      if (refundItem.restock_type !== 'return' || refundItem.quantity <= 0) {
+        console.log(
+          `  ⏭️  Skipping COGS reversal for ${order.name}: ` +
+          `restock_type=${refundItem.restock_type}, qty=${refundItem.quantity}`
+        );
+        continue;
+      }
+
+      // Find the original line item
+      const lineItem = order.lineItems.find(li => li.id === refundItem.line_item_id);
+      if (!lineItem) {
+        calculation.warnings.push(
+          `⚠️ Could not find original line item ${refundItem.line_item_id} for refund`
+        );
+        continue;
+      }
+
+      // Extract SKU and get unit cost
+      try {
+        const sku = extractSkuFromLineItem(lineItem);
+        if (!sku) {
+          calculation.warnings.push(
+            `⚠️ No SKU found for refunded item: ${lineItem.title} (Qty: ${refundItem.quantity})`
+          );
+          continue;
+        }
+
+        const unitCost = await cin7Service.getProductCost(sku);
+        if (unitCost === null) {
+          calculation.warnings.push(
+            `⚠️ COGS not found for refunded item: "${lineItem.title}" (SKU: ${sku}, Qty: ${refundItem.quantity})`
+          );
+          continue;
+        }
+
+        // Calculate total cost for refunded quantity
+        const totalCost = unitCost.times(refundItem.quantity);
+
+        console.log(
+          `  ✓ Refund COGS: SKU "${sku}" - $${unitCost.toFixed(2)} x${refundItem.quantity} = $${totalCost.toFixed(2)}`
+        );
+
+        calculation.lineItems.push({
+          productTitle: lineItem.title,
+          sku,
+          quantity: refundItem.quantity,
+          unitCost,
+          totalCost,
+        });
+
+        calculation.totalCogs = calculation.totalCogs.plus(totalCost);
+      } catch (error) {
+        calculation.warnings.push(
+          `⚠️ Error calculating refund COGS for "${lineItem.title}": ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
+  }
+
+  return calculation;
 }
 
 /**
