@@ -137,16 +137,25 @@ export default function Jobs() {
     );
   };
 
-  // Format date range
+  // Format date range - parse YYYY-MM-DD strings without timezone conversion
   const formatDateRange = (job: ExportJob) => {
-    // Parse dates as UTC to avoid timezone shifting (YYYY-MM-DD strings are UTC midnight)
-    const startDate = new Date(job.startDate + 'T00:00:00Z');
+    // Helper to format YYYY-MM-DD string directly without timezone conversion
+    const formatDateString = (dateStr: string): string => {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${monthNames[month - 1]} ${day}`;
+    };
+
+    const formatDateStringFull = (dateStr: string): string => {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${monthNames[month - 1]} ${day}, ${year}`;
+    };
 
     if (job.endDate) {
-      const endDate = new Date(job.endDate + 'T00:00:00Z');
-      return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
+      return `${formatDateString(job.startDate)} - ${formatDateStringFull(job.endDate)}`;
     }
-    return format(startDate, 'MMM d, yyyy');
+    return formatDateStringFull(job.startDate);
   };
 
   // Calculate duration
