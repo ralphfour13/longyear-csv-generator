@@ -30,6 +30,15 @@ export interface ConsistencyCheckResult {
 }
 
 /**
+ * Severity levels for validation issues
+ * CRITICAL: Accounting errors that MUST be fixed (e.g., imbalanced journals)
+ * ERROR: Significant mismatches that should be investigated
+ * WARNING: Data quality issues or minor mismatches
+ * INFO: Informational items, typically rounding differences
+ */
+export type Severity = 'CRITICAL' | 'ERROR' | 'WARNING' | 'INFO';
+
+/**
  * Imbalanced Journal Entry
  */
 export interface ImbalancedEntry {
@@ -38,6 +47,7 @@ export interface ImbalancedEntry {
   totalDebits: Decimal;
   totalCredits: Decimal;
   difference: Decimal;
+  severity: Severity;
   impact: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
@@ -49,6 +59,7 @@ export interface SalesMismatch {
   reportedSales: Decimal;
   journalSales: Decimal;
   difference: Decimal;
+  severity: Severity;
   impact: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
@@ -60,6 +71,7 @@ export interface CogsMismatch {
   detailsCogs: Decimal;
   journalCogs: Decimal;
   difference: Decimal;
+  severity: Severity;
   impact: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
@@ -71,6 +83,7 @@ export interface TaxMismatch {
   orderTax: Decimal;
   journalTax: Decimal;
   difference: Decimal;
+  severity: Severity;
   impact: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
@@ -82,6 +95,7 @@ export interface PaymentMismatch {
   orderTotal: Decimal;
   paymentTotal: Decimal;
   difference: Decimal;
+  severity: Severity;
   impact: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
@@ -228,6 +242,7 @@ export async function generateConsistencyReport(
           totalDebits,
           totalCredits,
           difference: balanceCheck.difference,
+          severity: 'CRITICAL', // Journal imbalances are critical accounting errors
           impact: balanceCheck.difference.gt(10) ? 'HIGH' : balanceCheck.difference.gt(1) ? 'MEDIUM' : 'LOW',
         });
       }
@@ -243,6 +258,7 @@ export async function generateConsistencyReport(
           .filter((e) => e.accountName?.toLowerCase().includes('sales'))
           .reduce((sum, e) => sum.plus(e.credit).minus(e.debit), new Decimal(0)),
         difference: salesCheck.difference,
+        severity: 'WARNING', // Sales mismatches are data validation warnings
         impact: salesCheck.difference.gt(50) ? 'HIGH' : salesCheck.difference.gt(5) ? 'MEDIUM' : 'LOW',
       });
     }
@@ -260,6 +276,7 @@ export async function generateConsistencyReport(
         orderTax,
         journalTax,
         difference: taxDiff,
+        severity: 'WARNING', // Tax mismatches are data validation warnings
         impact: taxDiff.gt(10) ? 'HIGH' : taxDiff.gt(1) ? 'MEDIUM' : 'LOW',
       });
     }
@@ -277,6 +294,7 @@ export async function generateConsistencyReport(
         orderTotal: order.totalPrice,
         paymentTotal,
         difference: paymentDiff,
+        severity: 'WARNING', // Payment mismatches are data validation warnings
         impact: paymentDiff.gt(50) ? 'HIGH' : paymentDiff.gt(5) ? 'MEDIUM' : 'LOW',
       });
     }
@@ -322,40 +340,40 @@ export function generateErrorReportCsv(report: ConsistencyCheckResult): string {
   const lines: string[] = [];
 
   // Header
-  lines.push('Order,Error Type,Description,Difference,Impact');
+  lines.push('Order,Severity,Error Type,Description,Difference,Impact');
 
   // Imbalanced entries
   for (const entry of report.imbalancedEntries) {
     lines.push(
-      `${entry.orderName},Journal Imbalance,Debits != Credits,$${entry.difference.toFixed(2)},${entry.impact}`
+      `${entry.orderName},${entry.severity},Journal Imbalance,Debits != Credits,$${entry.difference.toFixed(2)},${entry.impact}`
     );
   }
 
   // Sales mismatches
   for (const mismatch of report.salesMismatches) {
     lines.push(
-      `${mismatch.orderName},Sales Mismatch,Report != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
+      `${mismatch.orderName},${mismatch.severity},Sales Mismatch,Report != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
     );
   }
 
   // COGS mismatches
   for (const mismatch of report.cogsMismatches) {
     lines.push(
-      `${mismatch.orderName},COGS Mismatch,Details != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
+      `${mismatch.orderName},${mismatch.severity},COGS Mismatch,Details != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
     );
   }
 
   // Tax mismatches
   for (const mismatch of report.taxMismatches) {
     lines.push(
-      `${mismatch.orderName},Tax Mismatch,Order != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
+      `${mismatch.orderName},${mismatch.severity},Tax Mismatch,Order != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
     );
   }
 
   // Payment mismatches
   for (const mismatch of report.paymentMismatches) {
     lines.push(
-      `${mismatch.orderName},Payment Mismatch,Total != Payment,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
+      `${mismatch.orderName},${mismatch.severity},Payment Mismatch,Total != Payment,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
     );
   }
 
