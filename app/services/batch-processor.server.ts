@@ -29,6 +29,7 @@ export interface FileGenerationOptions {
   generateJournalSummary?: boolean;
   generateCogsDetails?: boolean;
   generateReconciliation?: boolean;
+  generateOrderJson?: boolean;
 }
 
 /**
@@ -60,6 +61,7 @@ export async function processExport(
     generateJournalSummary: fileOptions?.generateJournalSummary ?? true,
     generateCogsDetails: fileOptions?.generateCogsDetails ?? true,
     generateReconciliation: fileOptions?.generateReconciliation ?? true,
+    generateOrderJson: fileOptions?.generateOrderJson ?? true,
   };
   await logInfo(shop, 'Export', `Starting order-centric export for ${targetDate}`);
 
@@ -501,6 +503,39 @@ export async function processExport(
         console.error('❌ Error Report error:', error);
         await logError(shop, 'Export', errorMsg);
         allWarnings.push(errorMsg);
+      }
+    }
+
+    // File #8: Order JSON Data (complete Shopify order details for troubleshooting)
+    if (options.generateOrderJson) {
+      await logInfo(shop, 'Export', 'Generating Order JSON Data...');
+      try {
+        const orderJsonFilename = `order-data_${targetDate}.json`;
+        const orderJsonContent = JSON.stringify(orders, null, 2);
+        await writeExport(shop, orderJsonFilename, orderJsonContent);
+
+        const orderCount = orders.length;
+        generatedFiles.push({
+          type: 'order-json',
+          filename: orderJsonFilename,
+          downloadUrl: `/api/download-csv?shop=${shop}&filename=${orderJsonFilename}`,
+          rowCount: orderCount,
+        });
+
+        await logInfo(shop, 'Export', `Order JSON Data saved: ${orderJsonFilename} (${orderCount} orders)`);
+      } catch (error) {
+        const errorMsg = `Order JSON Data generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error('❌ Order JSON Data error:', error);
+        await logError(shop, 'Export', errorMsg);
+        allWarnings.push(errorMsg);
+
+        generatedFiles.push({
+          type: 'order-json',
+          filename: `order-data_${targetDate}.json`,
+          downloadUrl: '',
+          rowCount: 0,
+          error: errorMsg,
+        });
       }
     }
 

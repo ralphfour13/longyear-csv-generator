@@ -17,8 +17,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return new Response('Missing shop or filename parameter', { status: 400 });
     }
 
-    // Validate filename (only allow CSV and TXT files, no path traversal)
-    const validExtensions = ['.csv', '.txt'];
+    // Validate filename (only allow CSV, TXT, and JSON files, no path traversal)
+    const validExtensions = ['.csv', '.txt', '.json'];
     const hasValidExtension = validExtensions.some(ext => filename.endsWith(ext));
 
     if (!hasValidExtension || filename.includes('..') || filename.includes('/')) {
@@ -49,11 +49,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     console.log(`Downloaded ${filename} for ${shop} (${content.length} bytes)`);
 
-    // Return CSV file
+    // Determine Content-Type based on file extension
+    let contentType = 'text/csv; charset=utf-8';
+    if (filename.endsWith('.json')) {
+      contentType = 'application/json; charset=utf-8';
+    } else if (filename.endsWith('.txt')) {
+      contentType = 'text/plain; charset=utf-8';
+    }
+
+    // Return file with appropriate content type
     return new Response(content, {
       status: 200,
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Type': contentType,
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Cache-Control': 'no-cache',
       },

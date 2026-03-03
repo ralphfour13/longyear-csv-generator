@@ -45,7 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const filename = file.filename;
 
       // Validate filename
-      const validExtensions = ['.csv', '.txt'];
+      const validExtensions = ['.csv', '.txt', '.json'];
       const hasValidExtension = validExtensions.some(ext => filename.endsWith(ext));
 
       if (!hasValidExtension || filename.includes('..') || filename.includes('/')) {
