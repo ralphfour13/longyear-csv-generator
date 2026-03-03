@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useRevalidator, useActionData, Form } from 'react-router';
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { getShopJobs, clearCompletedJobs, cancelPendingJobs, cancelOrphanedProcessingJobs, type ExportJob } from '../services/background-jobs.server';
+import { getShopJobs, clearCompletedJobs, cancelPendingJobs, cancelAllProcessingJobs, type ExportJob } from '../services/background-jobs.server';
 import { format } from 'date-fns';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -33,9 +33,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (actionType === 'cancelProcessing') {
-    // Cancel jobs that have been processing for more than 1 hour (default)
-    const count = await cancelOrphanedProcessingJobs(shop);
-    return { success: true, message: `Cancelled ${count} orphaned processing jobs`, count };
+    // Cancel ALL processing jobs (user-initiated, no time limit)
+    const count = await cancelAllProcessingJobs(shop);
+    return { success: true, message: `Cancelled ${count} processing jobs`, count };
   }
 
   return { success: false, error: 'Unknown action' };
