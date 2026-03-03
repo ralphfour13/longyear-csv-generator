@@ -400,7 +400,7 @@ export async function createRefundJournalEntries(
     if (refundedSubtotal.greaterThan(0)) {
       entries.push({
         date: targetDate,
-        reference: `SO-${order.name}`,
+        reference: `RF-${order.name}`,
         account: accountMappings.sales_revenue.accountCode,
         accountName: accountMappings.sales_revenue.accountName,
         debit: refundedSubtotal,
@@ -413,7 +413,7 @@ export async function createRefundJournalEntries(
     if (refundedTax.greaterThan(0)) {
       entries.push({
         date: targetDate,
-        reference: `SO-${order.name}`,
+        reference: `RF-${order.name}`,
         account: accountMappings.sales_tax.accountCode,
         accountName: accountMappings.sales_tax.accountName,
         debit: refundedTax,
