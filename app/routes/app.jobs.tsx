@@ -133,9 +133,9 @@ export default function Jobs() {
     }
   };
 
-  // Download handler
-  const handleDownload = (filename: string) => {
-    const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${filename}`;
+  // Download handler for job zip
+  const handleDownloadJobZip = (jobId: string) => {
+    const url = `https://sage50-sync.four13.dev/api/download-job-zip?shop=${shop}&jobId=${jobId}`;
     window.open(url, '_blank');
   };
 
@@ -318,32 +318,25 @@ export default function Jobs() {
                       {getDuration(job)}
                     </td>
                     <td style={{ padding: '12px' }}>
-                      {job.status === 'completed' && job.result?.files ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {job.result.files.slice(0, 3).map((file: { filename: string; error?: string }, idx: number) => (
-                            <button
-                              key={idx}
-                              onClick={() => handleDownload(file.filename)}
-                              style={{
-                                padding: '4px 8px',
-                                fontSize: '11px',
-                                color: '#008060',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                textDecoration: 'underline',
-                              }}
-                            >
-                              {file.filename.split('_')[0]}
-                            </button>
-                          ))}
-                          {job.result.files.length > 3 && (
-                            <span style={{ color: '#6D7175', fontSize: '11px' }}>
-                              +{job.result.files.length - 3} more
-                            </span>
-                          )}
-                        </div>
+                      {job.status === 'completed' && job.result?.files && job.result.files.length > 0 ? (
+                        <button
+                          onClick={() => handleDownloadJobZip(job.id)}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            color: '#008060',
+                            backgroundColor: '#E3F5ED',
+                            border: '1px solid #B3E0D1',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          📦 Download ({job.result.files.length} {job.result.files.length === 1 ? 'file' : 'files'})
+                        </button>
                       ) : job.status === 'failed' ? (
                         <span style={{ color: '#D72C0D', fontSize: '11px' }}>
                           {job.error || 'Unknown error'}
