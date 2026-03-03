@@ -2,7 +2,9 @@ import { getJobStatus, updateJobStatus, cleanupOldJobs, getShopJobs } from './ba
 import { processExport } from './batch-processor.server';
 import { format } from 'date-fns';
 
-let isProcessing = false;
+// Track processing state per shop to prevent concurrent processing of the same shop's jobs
+// Key: shop domain, Value: true if currently processing
+const processingShops = new Map<string, boolean>();
 
 /**
  * Process a single export job
@@ -121,12 +123,14 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
  * Process pending jobs for a shop
  */
 export async function processPendingJobs(shop: string, accessToken: string): Promise<void> {
-  if (isProcessing) {
+  // Check if this shop is already processing jobs
+  if (processingShops.get(shop)) {
     console.log(`[Job Processor] Already processing jobs for ${shop}`);
     return;
   }
 
-  isProcessing = true;
+  // Mark this shop as processing
+  processingShops.set(shop, true);
 
   try {
     const jobs = await getShopJobs(shop);
@@ -143,6 +147,7 @@ export async function processPendingJobs(shop: string, accessToken: string): Pro
   } catch (error) {
     console.error('[Job Processor] Error processing jobs:', error);
   } finally {
-    isProcessing = false;
+    // Mark this shop as no longer processing
+    processingShops.delete(shop);
   }
 }
