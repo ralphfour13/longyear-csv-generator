@@ -139,10 +139,14 @@ export default function Jobs() {
 
   // Format date range
   const formatDateRange = (job: ExportJob) => {
+    // Parse dates as UTC to avoid timezone shifting (YYYY-MM-DD strings are UTC midnight)
+    const startDate = new Date(job.startDate + 'T00:00:00Z');
+
     if (job.endDate) {
-      return `${format(new Date(job.startDate), 'MMM d')} - ${format(new Date(job.endDate), 'MMM d, yyyy')}`;
+      const endDate = new Date(job.endDate + 'T00:00:00Z');
+      return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`;
     }
-    return format(new Date(job.startDate), 'MMM d, yyyy');
+    return format(startDate, 'MMM d, yyyy');
   };
 
   // Calculate duration
