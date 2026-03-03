@@ -3,6 +3,7 @@ import { useLoaderData, useRevalidator, useActionData, Form } from 'react-router
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
 import { getShopJobs, clearCompletedJobs, cancelPendingJobs, cancelAllProcessingJobs, type ExportJob } from '../services/background-jobs.server';
+import { processPendingJobs } from '../services/job-processor.server';
 import { format } from 'date-fns';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -36,6 +37,38 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Cancel ALL processing jobs (user-initiated, no time limit)
     const count = await cancelAllProcessingJobs(shop);
     return { success: true, message: `Cancelled ${count} processing jobs`, count };
+  }
+
+  if (actionType === 'processPending') {
+    // Manually trigger job processing for pending jobs
+    try {
+      const accessToken = session.accessToken || '';
+
+      // Get pending job count before processing
+      const jobs = await getShopJobs(shop);
+      const pendingCount = jobs.filter(j => j.status === 'pending').length;
+
+      if (pendingCount === 0) {
+        return { success: true, message: 'No pending jobs to process' };
+      }
+
+      // Trigger job processing in background (don't await to avoid blocking)
+      processPendingJobs(shop, accessToken).catch((error) => {
+        console.error('Manual job processing error:', error);
+      });
+
+      return {
+        success: true,
+        message: `Started processing ${pendingCount} pending job${pendingCount === 1 ? '' : 's'}. Refresh to see progress.`,
+        count: pendingCount
+      };
+    } catch (error) {
+      console.error('Process pending jobs error:', error);
+      return {
+        success: false,
+        error: `Failed to start job processing: ${error instanceof Error ? error.message : String(error)}`
+      };
+    }
   }
 
   return { success: false, error: 'Unknown action' };
@@ -221,6 +254,26 @@ export default function Jobs() {
                 disabled={statusCounts.processing === 0}
               >
                 ⏹️ Cancel Processing ({statusCounts.processing})
+              </button>
+            </Form>
+            <Form method="post" style={{ display: 'inline' }}>
+              <input type="hidden" name="action" value="processPending" />
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #008060',
+                  backgroundColor: '#008060',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                disabled={statusCounts.pending === 0}
+              >
+                ▶️ Process Pending ({statusCounts.pending})
               </button>
             </Form>
           </div>
