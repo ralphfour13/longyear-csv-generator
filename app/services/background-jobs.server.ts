@@ -211,6 +211,104 @@ export async function cancelPendingJobs(shop: string): Promise<number> {
 }
 
 /**
+ * Cancel orphaned processing jobs for a shop
+ *
+ * Cancels jobs that have been in "processing" status for longer than the timeout threshold.
+ * Default timeout is 1 hour (3600000 ms).
+ *
+ * @param shop - Shop domain
+ * @param timeoutMs - Max time a job can be processing before being considered orphaned (default: 1 hour)
+ * @returns Number of jobs cancelled
+ */
+export async function cancelOrphanedProcessingJobs(
+  shop: string,
+  timeoutMs: number = 3600000 // 1 hour default
+): Promise<number> {
+  try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
+    let cancelledCount = 0;
+    const now = Date.now();
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (job.shop === shop && job.status === 'processing') {
+          // Check if job has been processing too long
+          const startedAt = job.startedAt ? new Date(job.startedAt).getTime() : now;
+          const processingDuration = now - startedAt;
+
+          if (processingDuration > timeoutMs) {
+            // Mark as failed with timeout message
+            const cancelledJob = {
+              ...job,
+              status: 'failed' as const,
+              error: `Cancelled - orphaned (processing for ${Math.round(processingDuration / 3600000)}h)`,
+              completedAt: new Date().toISOString(),
+            };
+
+            await fs.writeFile(filePath, JSON.stringify(cancelledJob, null, 2));
+            cancelledCount++;
+
+            console.log(
+              `Cancelled orphaned job ${job.id} (processing for ${Math.round(processingDuration / 3600000)}h ${Math.round((processingDuration % 3600000) / 60000)}m)`
+            );
+          }
+        }
+      }
+    }
+
+    return cancelledCount;
+  } catch (error) {
+    console.error('Error cancelling orphaned processing jobs:', error);
+    return 0;
+  }
+}
+
+/**
+ * Cancel ALL processing jobs for a shop (use with caution!)
+ *
+ * @param shop - Shop domain
+ * @returns Number of jobs cancelled
+ */
+export async function cancelAllProcessingJobs(shop: string): Promise<number> {
+  try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
+    let cancelledCount = 0;
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (job.shop === shop && job.status === 'processing') {
+          // Mark as failed with cancellation message
+          const cancelledJob = {
+            ...job,
+            status: 'failed' as const,
+            error: 'Cancelled by user',
+            completedAt: new Date().toISOString(),
+          };
+
+          await fs.writeFile(filePath, JSON.stringify(cancelledJob, null, 2));
+          cancelledCount++;
+        }
+      }
+    }
+
+    return cancelledCount;
+  } catch (error) {
+    console.error('Error cancelling all processing jobs:', error);
+    return 0;
+  }
+}
+
+/**
  * Delete a specific job
  */
 export async function deleteJob(jobId: string): Promise<boolean> {

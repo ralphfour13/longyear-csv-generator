@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useRevalidator, useActionData, Form } from 'react-router';
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { getShopJobs, clearCompletedJobs, cancelPendingJobs, type ExportJob } from '../services/background-jobs.server';
+import { getShopJobs, clearCompletedJobs, cancelPendingJobs, cancelOrphanedProcessingJobs, type ExportJob } from '../services/background-jobs.server';
 import { format } from 'date-fns';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -30,6 +30,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (actionType === 'cancelPending') {
     const count = await cancelPendingJobs(shop);
     return { success: true, message: `Cancelled ${count} pending jobs`, count };
+  }
+
+  if (actionType === 'cancelProcessing') {
+    // Cancel jobs that have been processing for more than 1 hour (default)
+    const count = await cancelOrphanedProcessingJobs(shop);
+    return { success: true, message: `Cancelled ${count} orphaned processing jobs`, count };
   }
 
   return { success: false, error: 'Unknown action' };
@@ -195,6 +201,26 @@ export default function Jobs() {
                 disabled={statusCounts.pending === 0}
               >
                 ❌ Cancel Pending ({statusCounts.pending})
+              </button>
+            </Form>
+            <Form method="post" style={{ display: 'inline' }}>
+              <input type="hidden" name="action" value="cancelProcessing" />
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: '#ffffff',
+                  color: '#D72C0D',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                disabled={statusCounts.processing === 0}
+              >
+                ⏹️ Cancel Processing ({statusCounts.processing})
               </button>
             </Form>
           </div>
