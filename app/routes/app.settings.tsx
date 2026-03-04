@@ -182,17 +182,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (actionType === 'debugOrder') {
     try {
       const orderNumber = formData.get('orderNumber') as string;
+      console.log('🔍 DEBUG ORDER: Fetching order:', orderNumber);
 
       if (!orderNumber) {
-        return Response.json(
-          { success: false, error: 'Order number is required' },
-          { status: 400 }
-        );
+        console.log('❌ DEBUG ORDER: No order number provided');
+        return {
+          success: false,
+          error: 'Order number is required',
+        };
       }
 
       // Fetch order details from Shopify
       const url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(orderNumber)}&status=any`;
       const accessToken = session.accessToken || '';
+      console.log('🔍 DEBUG ORDER: Calling Shopify API:', url.replace(accessToken, 'REDACTED'));
 
       const response = await fetch(url, {
         headers: {
@@ -206,8 +209,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       const data = await response.json();
+      console.log('🔍 DEBUG ORDER: Found orders:', data.orders?.length || 0);
 
       if (!data.orders || data.orders.length === 0) {
+        console.log('❌ DEBUG ORDER: Order not found');
         return {
           success: false,
           error: `Order ${orderNumber} not found`,
@@ -215,6 +220,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       const order = data.orders[0];
+      console.log('🔍 DEBUG ORDER: Order ID:', order.id, 'Created:', order.created_at);
 
       // Fetch transactions for this order
       const txnUrl = `https://${shop}/admin/api/2024-10/orders/${order.id}/transactions.json`;
@@ -240,6 +246,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       const jsonString = JSON.stringify(order, null, 2);
       await fs.writeFile(filePath, jsonString);
+      console.log('✅ DEBUG ORDER: Saved to:', filePath);
 
       return {
         success: true,
@@ -254,7 +261,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         jsonData: jsonString, // Include JSON for client-side download
       };
     } catch (error) {
-      console.error('Debug order error:', error);
+      console.error('❌ DEBUG ORDER ERROR:', error);
       return {
         success: false,
         error: `Failed to fetch order: ${error instanceof Error ? error.message : String(error)}`,
