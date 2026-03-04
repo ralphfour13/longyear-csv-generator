@@ -270,13 +270,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       let totalOrders = 0;
       let taggedOrders = 0;
       const errors: string[] = [];
+      const debugInfo: string[] = [];
 
       for (const date of targetDates) {
-        // Fetch orders for this date
-        const startDate = `${date}T00:00:00-08:00`; // PST timezone
-        const endDate = `${date}T23:59:59-08:00`;
+        // Fetch orders for this date - use UTC format
+        // Convert PST date to UTC (PST is UTC-8)
+        const startDate = `${date}T08:00:00Z`; // Midnight PST = 8am UTC
+        const endDate = `${date}T07:59:59Z`; // Just before midnight next day in PST
 
         const url = `https://${shop}/admin/api/2024-10/orders.json?status=any&created_at_min=${encodeURIComponent(startDate)}&created_at_max=${encodeURIComponent(endDate)}&limit=250`;
+        debugInfo.push(`Querying: ${url.replace(accessToken, 'REDACTED')}`);
 
         const response = await fetch(url, {
           headers: {
@@ -286,11 +289,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
         if (!response.ok) {
+          const errorText = await response.text();
+          debugInfo.push(`API Error ${response.status}: ${errorText}`);
           throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         const orders = data.orders || [];
+        debugInfo.push(`Found ${orders.length} orders for ${date}`);
         totalOrders += orders.length;
 
         // Tag each order
@@ -339,6 +345,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           error: `Tagged ${taggedOrders}/${totalOrders} orders. Errors: ${errors.slice(0, 5).join(', ')}${errors.length > 5 ? '...' : ''}`,
           taggedOrders,
           totalOrders,
+          debugInfo,
         };
       }
 
@@ -347,11 +354,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         message: `Successfully tagged ${taggedOrders} orders from 12/22/2025 and 12/23/2025 as "Imported"`,
         taggedOrders,
         totalOrders,
+        debugInfo,
       };
     } catch (error) {
       return {
         success: false,
         error: `Failed to bulk tag orders: ${error instanceof Error ? error.message : String(error)}`,
+        debugInfo: debugInfo || [],
       };
     }
   }
@@ -936,6 +945,14 @@ export default function Settings() {
                     <s-text>
                       Total orders found: {actionData.totalOrders}
                     </s-text>
+                    {actionData.debugInfo && actionData.debugInfo.length > 0 && (
+                      <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f6f6f7', borderRadius: '4px', fontSize: '12px', fontFamily: 'monospace' }}>
+                        <s-text><strong>Debug Info:</strong></s-text>
+                        {actionData.debugInfo.map((info: string, idx: number) => (
+                          <div key={idx} style={{ marginTop: '4px' }}>{info}</div>
+                        ))}
+                      </div>
+                    )}
                   </s-stack>
                 </s-banner>
               )}
