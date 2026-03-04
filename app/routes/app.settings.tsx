@@ -192,8 +192,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         };
       }
 
+      // Normalize order number: ensure it starts with #
+      const normalizedOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
+      console.log('🔍 DEBUG ORDER: Normalized order number:', normalizedOrderNumber);
+
       // Fetch order details from Shopify
-      const url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(orderNumber)}&status=any`;
+      const url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(normalizedOrderNumber)}&status=any`;
       const accessToken = session.accessToken || '';
       console.log('🔍 DEBUG ORDER: Calling Shopify API:', url.replace(accessToken, 'REDACTED'));
 
@@ -215,7 +219,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log('❌ DEBUG ORDER: Order not found');
         return {
           success: false,
-          error: `Order ${orderNumber} not found`,
+          error: `Order ${normalizedOrderNumber} not found`,
         };
       }
 
@@ -241,7 +245,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       await fs.mkdir(dataDir, { recursive: true });
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `order-${orderNumber.replace('#', '')}-${timestamp}.json`;
+      const filename = `order-${normalizedOrderNumber.replace('#', '')}-${timestamp}.json`;
       const filePath = path.join(dataDir, filename);
 
       const jsonString = JSON.stringify(order, null, 2);
@@ -250,7 +254,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       return {
         success: true,
-        message: `Order ${orderNumber} data saved successfully`,
+        message: `Order ${normalizedOrderNumber} data saved successfully`,
         filePath: filePath,
         filename: filename,
         orderId: order.id,
