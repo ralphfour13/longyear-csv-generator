@@ -262,6 +262,100 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
+  // Handle bulk tag orders
+  if (actionType === 'bulkTagOrders') {
+    try {
+      const accessToken = session.accessToken || '';
+      const targetDates = ['2025-12-22', '2025-12-23'];
+      let totalOrders = 0;
+      let taggedOrders = 0;
+      const errors: string[] = [];
+
+      for (const date of targetDates) {
+        // Fetch orders for this date
+        const startDate = `${date}T00:00:00-08:00`; // PST timezone
+        const endDate = `${date}T23:59:59-08:00`;
+
+        const url = `https://${shop}/admin/api/2024-10/orders.json?status=any&created_at_min=${encodeURIComponent(startDate)}&created_at_max=${encodeURIComponent(endDate)}&limit=250`;
+
+        const response = await fetch(url, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const orders = data.orders || [];
+        totalOrders += orders.length;
+
+        // Tag each order
+        for (const order of orders) {
+          try {
+            // Check if order already has "Imported" tag
+            const existingTags = order.tags ? order.tags.split(',').map((t: string) => t.trim()) : [];
+
+            if (existingTags.includes('Imported')) {
+              taggedOrders++; // Already tagged
+              continue;
+            }
+
+            // Add "Imported" tag
+            const newTags = [...existingTags, 'Imported'].join(', ');
+
+            const updateUrl = `https://${shop}/admin/api/2024-10/orders/${order.id}.json`;
+            const updateResponse = await fetch(updateUrl, {
+              method: 'PUT',
+              headers: {
+                'X-Shopify-Access-Token': accessToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                order: {
+                  id: order.id,
+                  tags: newTags,
+                },
+              }),
+            });
+
+            if (updateResponse.ok) {
+              taggedOrders++;
+            } else {
+              errors.push(`Failed to tag order ${order.name}: ${updateResponse.status}`);
+            }
+          } catch (error) {
+            errors.push(`Error tagging order ${order.name}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+      }
+
+      if (errors.length > 0) {
+        return {
+          success: false,
+          error: `Tagged ${taggedOrders}/${totalOrders} orders. Errors: ${errors.slice(0, 5).join(', ')}${errors.length > 5 ? '...' : ''}`,
+          taggedOrders,
+          totalOrders,
+        };
+      }
+
+      return {
+        success: true,
+        message: `Successfully tagged ${taggedOrders} orders from 12/22/2025 and 12/23/2025 as "Imported"`,
+        taggedOrders,
+        totalOrders,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to bulk tag orders: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
   // Handle settings save action (existing logic)
   try {
     const config: SyncConfig = {
@@ -816,6 +910,37 @@ export default function Settings() {
               </s-stack>
             </s-banner>
           )}
+
+          <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid var(--p-color-border)' }}>
+            <s-stack direction="block" gap="large">
+              <s-stack direction="block" gap="base">
+                <s-text><strong>Bulk Tag Orders</strong></s-text>
+                <s-paragraph>
+                  Tag all orders from December 22-23, 2025 as "Imported" for tracking purposes.
+                </s-paragraph>
+              </s-stack>
+
+              <Form method="post">
+                <input type="hidden" name="actionType" value="bulkTagOrders" />
+                <s-button type="submit" variant="primary">
+                  Tag 12/22-23/2025 Orders as "Imported"
+                </s-button>
+              </Form>
+
+              {actionData?.success && actionData.taggedOrders !== undefined && (
+                <s-banner tone="success">
+                  <s-stack direction="block" gap="base">
+                    <s-text>
+                      <strong>Successfully tagged {actionData.taggedOrders} orders!</strong>
+                    </s-text>
+                    <s-text>
+                      Total orders found: {actionData.totalOrders}
+                    </s-text>
+                  </s-stack>
+                </s-banner>
+              )}
+            </s-stack>
+          </div>
         </s-stack>
       </s-section>
 
