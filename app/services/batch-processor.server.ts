@@ -539,6 +539,51 @@ export async function processExport(
       }
     }
 
+    // File #9: Error Orders JSON (only orders with errors/warnings for easier debugging)
+    if (options.generateOrderJson && (consistencyReport.hasErrors || consistencyReport.hasWarnings)) {
+      await logInfo(shop, 'Export', 'Generating Error Orders JSON (orders with errors/warnings only)...');
+      try {
+        // Collect all order names that have errors or warnings
+        const errorOrderNames = new Set<string>();
+
+        consistencyReport.imbalancedEntries.forEach(entry => errorOrderNames.add(entry.orderName));
+        consistencyReport.salesMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
+        consistencyReport.cogsMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
+        consistencyReport.taxMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
+        consistencyReport.paymentMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
+
+        // Filter orders to only those with errors/warnings
+        const errorOrders = orders.filter(order => errorOrderNames.has(order.name));
+
+        const errorOrdersFilename = `error-orders_${targetDate}.json`;
+        const errorOrdersContent = JSON.stringify(errorOrders, null, 2);
+        await writeExport(shop, errorOrdersFilename, errorOrdersContent);
+
+        const errorOrderCount = errorOrders.length;
+        generatedFiles.push({
+          type: 'error-orders-json',
+          filename: errorOrdersFilename,
+          downloadUrl: `/api/download-csv?shop=${shop}&filename=${errorOrdersFilename}`,
+          rowCount: errorOrderCount,
+        });
+
+        await logInfo(shop, 'Export', `Error Orders JSON saved: ${errorOrdersFilename} (${errorOrderCount} orders with errors/warnings)`);
+      } catch (error) {
+        const errorMsg = `Error Orders JSON generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        console.error('❌ Error Orders JSON error:', error);
+        await logError(shop, 'Export', errorMsg);
+        allWarnings.push(errorMsg);
+
+        generatedFiles.push({
+          type: 'error-orders-json',
+          filename: `error-orders_${targetDate}.json`,
+          downloadUrl: '',
+          rowCount: 0,
+          error: errorMsg,
+        });
+      }
+    }
+
     // Step 6: Calculate totals
     const totalDebit = mappedEntries.reduce(
       (sum, entry) => sum.plus(entry.debit),
