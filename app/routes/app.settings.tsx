@@ -275,8 +275,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       for (const date of targetDates) {
         // Fetch orders for this date - use UTC format
         // Convert PST date to UTC (PST is UTC-8)
+        // Example: Dec 22 00:00:00 PST = Dec 22 08:00:00 UTC
+        //          Dec 22 23:59:59 PST = Dec 23 07:59:59 UTC (next day!)
         const startDate = `${date}T08:00:00Z`; // Midnight PST = 8am UTC
-        const endDate = `${date}T07:59:59Z`; // Just before midnight next day in PST
+
+        // Calculate next day for end date
+        const dateParts = date.split('-');
+        const year = parseInt(dateParts[0]);
+        const month = parseInt(dateParts[1]);
+        const day = parseInt(dateParts[2]);
+        const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
+        const nextDateStr = nextDay.toISOString().split('T')[0]; // YYYY-MM-DD
+
+        const endDate = `${nextDateStr}T07:59:59Z`; // Just before midnight next day in PST
 
         const url = `https://${shop}/admin/api/2024-10/orders.json?status=any&created_at_min=${encodeURIComponent(startDate)}&created_at_max=${encodeURIComponent(endDate)}&limit=250`;
         debugInfo.push(`Querying: ${url.replace(accessToken, 'REDACTED')}`);
