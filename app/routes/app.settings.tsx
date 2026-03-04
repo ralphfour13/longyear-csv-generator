@@ -196,10 +196,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const normalizedOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
       console.log('🔍 DEBUG ORDER: Normalized order number:', normalizedOrderNumber);
 
-      // Fetch order details from Shopify
-      const url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(normalizedOrderNumber)}&status=any`;
+      // Try multiple search strategies
+      // Strategy 1: Search by name parameter
+      let url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(normalizedOrderNumber)}&status=any&limit=1`;
       const accessToken = session.accessToken || '';
-      console.log('🔍 DEBUG ORDER: Calling Shopify API:', url.replace(accessToken, 'REDACTED'));
+      console.log('🔍 DEBUG ORDER: Strategy 1 - Search by name:', url.replace(accessToken, 'REDACTED'));
 
       const response = await fetch(url, {
         headers: {
@@ -213,18 +214,54 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       const data = await response.json();
-      console.log('🔍 DEBUG ORDER: Found orders:', data.orders?.length || 0);
+      console.log('🔍 DEBUG ORDER: Strategy 1 found orders:', data.orders?.length || 0);
 
-      if (!data.orders || data.orders.length === 0) {
-        console.log('❌ DEBUG ORDER: Order not found');
+      let order = null;
+
+      // Strategy 1 succeeded
+      if (data.orders && data.orders.length > 0) {
+        order = data.orders[0];
+        console.log('✅ DEBUG ORDER: Found via Strategy 1');
+      } else {
+        // Strategy 2: Fetch recent orders and search client-side
+        console.log('🔍 DEBUG ORDER: Strategy 2 - Fetch recent orders and filter client-side');
+        const recentUrl = `https://${shop}/admin/api/2024-10/orders.json?status=any&limit=250`;
+        console.log('🔍 DEBUG ORDER: Strategy 2 URL:', recentUrl.replace(accessToken, 'REDACTED'));
+
+        const recentResponse = await fetch(recentUrl, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (recentResponse.ok) {
+          const recentData = await recentResponse.json();
+          console.log('🔍 DEBUG ORDER: Strategy 2 fetched:', recentData.orders?.length || 0, 'orders');
+
+          // Search for matching order name
+          const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+          order = recentData.orders?.find((o: any) =>
+            o.name === normalizedOrderNumber ||
+            o.name === numericOrderNumber ||
+            o.order_number?.toString() === numericOrderNumber
+          );
+
+          if (order) {
+            console.log('✅ DEBUG ORDER: Found via Strategy 2 - client-side filter');
+          }
+        }
+      }
+
+      if (!order) {
+        console.log('❌ DEBUG ORDER: Order not found after all strategies');
         return {
           success: false,
-          error: `Order ${normalizedOrderNumber} not found`,
+          error: `Order ${normalizedOrderNumber} not found. Tried searching by name and in recent 250 orders.`,
         };
       }
 
-      const order = data.orders[0];
-      console.log('🔍 DEBUG ORDER: Order ID:', order.id, 'Created:', order.created_at);
+      console.log('🔍 DEBUG ORDER: Order ID:', order.id, 'Name:', order.name, 'Created:', order.created_at);
 
       // Fetch transactions for this order
       const txnUrl = `https://${shop}/admin/api/2024-10/orders/${order.id}/transactions.json`;
