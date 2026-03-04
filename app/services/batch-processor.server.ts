@@ -507,11 +507,13 @@ export async function processExport(
     }
 
     // File #8: Order JSON Data (complete Shopify order details for troubleshooting)
+    console.log(`🔍 DEBUG: generateOrderJson = ${options.generateOrderJson}, orders.length = ${orders.length}`);
     if (options.generateOrderJson) {
       await logInfo(shop, 'Export', 'Generating Order JSON Data...');
       try {
         const orderJsonFilename = `order-data_${targetDate}.json`;
         const orderJsonContent = JSON.stringify(orders, null, 2);
+        console.log(`🔍 DEBUG: Writing order JSON, content length = ${orderJsonContent.length} bytes`);
         await writeExport(shop, orderJsonFilename, orderJsonContent);
 
         const orderCount = orders.length;
@@ -522,6 +524,7 @@ export async function processExport(
           rowCount: orderCount,
         });
 
+        console.log(`✅ DEBUG: Order JSON saved successfully: ${orderJsonFilename} (${orderCount} orders)`);
         await logInfo(shop, 'Export', `Order JSON Data saved: ${orderJsonFilename} (${orderCount} orders)`);
       } catch (error) {
         const errorMsg = `Order JSON Data generation failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -537,6 +540,8 @@ export async function processExport(
           error: errorMsg,
         });
       }
+    } else {
+      console.log(`⚠️ DEBUG: Skipping order JSON generation (generateOrderJson = false)`);
     }
 
     // File #9: Error Orders JSON (only orders with errors/warnings for easier debugging)
