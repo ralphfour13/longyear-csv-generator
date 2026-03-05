@@ -192,110 +192,146 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         };
       }
 
-      // Normalize order number: ensure it starts with #
-      const normalizedOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
-      console.log('🔍 DEBUG ORDER: Normalized order number:', normalizedOrderNumber);
-
-      // Try multiple search strategies
-      // Strategy 1: Search by name parameter
-      let url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(normalizedOrderNumber)}&status=any&limit=1`;
       const accessToken = session.accessToken || '';
-      console.log('🔍 DEBUG ORDER: Strategy 1 - Search by name:', url.replace(accessToken, 'REDACTED'));
-
-      const response = await fetch(url, {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('🔍 DEBUG ORDER: Strategy 1 found orders:', data.orders?.length || 0);
-
       let order = null;
 
-      // Strategy 1 succeeded
-      if (data.orders && data.orders.length > 0) {
-        order = data.orders[0];
-        console.log('✅ DEBUG ORDER: Found via Strategy 1');
-      } else {
-        // Strategy 2: Fetch recent orders and search client-side
-        console.log('🔍 DEBUG ORDER: Strategy 2 - Fetch recent orders and filter client-side');
-        const recentUrl = `https://${shop}/admin/api/2024-10/orders.json?status=any&limit=250`;
-        console.log('🔍 DEBUG ORDER: Strategy 2 URL:', recentUrl.replace(accessToken, 'REDACTED'));
+      // Normalize order number for later use
+      const normalizedOrderNumber = orderNumber.startsWith('#') ? orderNumber : `#${orderNumber}`;
 
-        const recentResponse = await fetch(recentUrl, {
-          headers: {
-            'X-Shopify-Access-Token': accessToken,
-            'Content-Type': 'application/json',
-          },
-        });
+      // Check if this looks like an order ID (long numeric value)
+      const isOrderId = /^\d{10,}$/.test(orderNumber.trim());
 
-        if (recentResponse.ok) {
-          const recentData = await recentResponse.json();
-          console.log('🔍 DEBUG ORDER: Strategy 2 fetched:', recentData.orders?.length || 0, 'orders');
+      if (isOrderId) {
+        // Strategy 0: Direct fetch by ID (most reliable)
+        console.log('🔍 DEBUG ORDER: Detected order ID format, fetching directly...');
+        const idUrl = `https://${shop}/admin/api/2024-10/orders/${orderNumber}.json`;
+        console.log('🔍 DEBUG ORDER: Strategy 0 - Direct ID fetch:', idUrl.replace(accessToken, 'REDACTED'));
 
-          // Log first 5 order names to see format
-          if (recentData.orders && recentData.orders.length > 0) {
-            const sampleNames = recentData.orders.slice(0, 5).map((o: any) =>
-              `name="${o.name}" order_number=${o.order_number}`
-            );
-            console.log('🔍 DEBUG ORDER: Sample order formats:', sampleNames);
+        try {
+          const idResponse = await fetch(idUrl, {
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (idResponse.ok) {
+            const idData = await idResponse.json();
+            order = idData.order;
+            console.log('✅ DEBUG ORDER: Found via Strategy 0 - Direct ID fetch');
+            console.log('🔍 DEBUG ORDER: Order name:', order.name, 'order_number:', order.order_number);
+          } else {
+            console.log('⚠️ DEBUG ORDER: Strategy 0 failed, trying other strategies...');
           }
-
-          // Search for matching order name
-          const numericOrderNumber = normalizedOrderNumber.replace('#', '');
-          order = recentData.orders?.find((o: any) =>
-            o.name === normalizedOrderNumber ||
-            o.name === numericOrderNumber ||
-            o.order_number?.toString() === numericOrderNumber
-          );
-
-          if (order) {
-            console.log('✅ DEBUG ORDER: Found via Strategy 2 - client-side filter');
-          }
+        } catch (error) {
+          console.log('⚠️ DEBUG ORDER: Strategy 0 error:', error);
         }
       }
 
-      // Strategy 3: Search by date range (Dec 22-23, 2025 based on screenshot)
+      // If not found by ID, try other strategies
       if (!order) {
-        console.log('🔍 DEBUG ORDER: Strategy 3 - Search by date range (Dec 22-23, 2025)');
-        const dateUrl = `https://${shop}/admin/api/2024-10/orders.json?created_at_min=2025-12-22T00:00:00Z&created_at_max=2025-12-24T00:00:00Z&status=any&limit=250`;
-        console.log('🔍 DEBUG ORDER: Strategy 3 URL:', dateUrl.replace(accessToken, 'REDACTED'));
+        console.log('🔍 DEBUG ORDER: Using normalized order number:', normalizedOrderNumber);
 
-        const dateResponse = await fetch(dateUrl, {
+        // Try multiple search strategies
+        // Strategy 1: Search by name parameter
+        let url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(normalizedOrderNumber)}&status=any&limit=1`;
+        console.log('🔍 DEBUG ORDER: Strategy 1 - Search by name:', url.replace(accessToken, 'REDACTED'));
+
+        const response = await fetch(url, {
           headers: {
             'X-Shopify-Access-Token': accessToken,
             'Content-Type': 'application/json',
           },
         });
 
-        if (dateResponse.ok) {
-          const dateData = await dateResponse.json();
-          console.log('🔍 DEBUG ORDER: Strategy 3 fetched:', dateData.orders?.length || 0, 'orders from Dec 22-23');
+        if (!response.ok) {
+          throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
+        }
 
-          const numericOrderNumber = normalizedOrderNumber.replace('#', '');
-          order = dateData.orders?.find((o: any) =>
-            o.name === normalizedOrderNumber ||
-            o.name === numericOrderNumber ||
-            o.order_number?.toString() === numericOrderNumber
-          );
+        const data = await response.json();
+        console.log('🔍 DEBUG ORDER: Strategy 1 found orders:', data.orders?.length || 0);
 
-          if (order) {
-            console.log('✅ DEBUG ORDER: Found via Strategy 3 - date range search');
+        // Strategy 1 succeeded
+        if (data.orders && data.orders.length > 0) {
+          order = data.orders[0];
+          console.log('✅ DEBUG ORDER: Found via Strategy 1');
+        }
+
+        // Strategy 2: Fetch recent orders and search client-side
+        if (!order) {
+          console.log('🔍 DEBUG ORDER: Strategy 2 - Fetch recent orders and filter client-side');
+          const recentUrl = `https://${shop}/admin/api/2024-10/orders.json?status=any&limit=250`;
+          console.log('🔍 DEBUG ORDER: Strategy 2 URL:', recentUrl.replace(accessToken, 'REDACTED'));
+
+          const recentResponse = await fetch(recentUrl, {
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (recentResponse.ok) {
+            const recentData = await recentResponse.json();
+            console.log('🔍 DEBUG ORDER: Strategy 2 fetched:', recentData.orders?.length || 0, 'orders');
+
+            // Log first 5 order names to see format
+            if (recentData.orders && recentData.orders.length > 0) {
+              const sampleNames = recentData.orders.slice(0, 5).map((o: any) =>
+                `name="${o.name}" order_number=${o.order_number}`
+              );
+              console.log('🔍 DEBUG ORDER: Sample order formats:', sampleNames);
+            }
+
+            // Search for matching order name
+            const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            order = recentData.orders?.find((o: any) =>
+              o.name === normalizedOrderNumber ||
+              o.name === numericOrderNumber ||
+              o.order_number?.toString() === numericOrderNumber
+            );
+
+            if (order) {
+              console.log('✅ DEBUG ORDER: Found via Strategy 2 - client-side filter');
+            }
           }
         }
-      }
+
+        // Strategy 3: Search by date range (Dec 22-23, 2025 based on screenshot)
+        if (!order) {
+          console.log('🔍 DEBUG ORDER: Strategy 3 - Search by date range (Dec 22-23, 2025)');
+          const dateUrl = `https://${shop}/admin/api/2024-10/orders.json?created_at_min=2025-12-22T00:00:00Z&created_at_max=2025-12-24T00:00:00Z&status=any&limit=250`;
+          console.log('🔍 DEBUG ORDER: Strategy 3 URL:', dateUrl.replace(accessToken, 'REDACTED'));
+
+          const dateResponse = await fetch(dateUrl, {
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (dateResponse.ok) {
+            const dateData = await dateResponse.json();
+            console.log('🔍 DEBUG ORDER: Strategy 3 fetched:', dateData.orders?.length || 0, 'orders from Dec 22-23');
+
+            const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            order = dateData.orders?.find((o: any) =>
+              o.name === normalizedOrderNumber ||
+              o.name === numericOrderNumber ||
+              o.order_number?.toString() === numericOrderNumber
+            );
+
+            if (order) {
+              console.log('✅ DEBUG ORDER: Found via Strategy 3 - date range search');
+            }
+          }
+        }
+      } // End of if (!order) - all strategies
 
       if (!order) {
         console.log('❌ DEBUG ORDER: Order not found after all strategies');
         return {
           success: false,
-          error: `Order ${normalizedOrderNumber} not found. Tried: (1) name search, (2) recent 250 orders, (3) Dec 22-23 date range.`,
+          error: `Order not found. Tried: (1) Direct ID fetch (if ID provided), (2) name search, (3) recent 250 orders, (4) Dec 22-23 date range.`,
         };
       }
 
@@ -350,13 +386,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   // Handle bulk tag orders
   if (actionType === 'bulkTagOrders') {
+    const debugInfo: string[] = [];
     try {
       const accessToken = session.accessToken || '';
       const targetDates = ['2025-12-22', '2025-12-23'];
       let totalOrders = 0;
       let taggedOrders = 0;
       const errors: string[] = [];
-      const debugInfo: string[] = [];
 
       for (const date of targetDates) {
         // Fetch orders for this date - use UTC format
