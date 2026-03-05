@@ -325,13 +325,43 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
           }
         }
+
+        // Strategy 4: Search ARCHIVED orders by date range
+        if (!order) {
+          console.log('🔍 DEBUG ORDER: Strategy 4 - Search archived orders (Dec 22-23, 2025)');
+          const archivedUrl = `https://${shop}/admin/api/2024-10/orders.json?created_at_min=2025-12-22T00:00:00Z&created_at_max=2025-12-24T00:00:00Z&status=archived&limit=250`;
+          console.log('🔍 DEBUG ORDER: Strategy 4 URL:', archivedUrl.replace(accessToken, 'REDACTED'));
+
+          const archivedResponse = await fetch(archivedUrl, {
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (archivedResponse.ok) {
+            const archivedData = await archivedResponse.json();
+            console.log('🔍 DEBUG ORDER: Strategy 4 fetched:', archivedData.orders?.length || 0, 'archived orders from Dec 22-23');
+
+            const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            order = archivedData.orders?.find((o: any) =>
+              o.name === normalizedOrderNumber ||
+              o.name === numericOrderNumber ||
+              o.order_number?.toString() === numericOrderNumber
+            );
+
+            if (order) {
+              console.log('✅ DEBUG ORDER: Found via Strategy 4 - archived orders search');
+            }
+          }
+        }
       } // End of if (!order) - all strategies
 
       if (!order) {
         console.log('❌ DEBUG ORDER: Order not found after all strategies');
         return {
           success: false,
-          error: `Order not found. Tried: (1) Direct ID fetch (if ID provided), (2) name search, (3) recent 250 orders, (4) Dec 22-23 date range.`,
+          error: `Order not found. Tried: (0) Direct ID fetch, (1) name search, (2) recent 250 orders, (3) Dec 22-23 date range, (4) archived orders Dec 22-23.`,
         };
       }
 
