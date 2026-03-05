@@ -409,10 +409,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         // Strategy 6: Use GraphQL API to search by name (better search than REST)
         if (!order) {
-          console.log('🔍 DEBUG ORDER: Strategy 6 - GraphQL search by order name');
+          console.log('🔍 DEBUG ORDER: Strategy 6 - GraphQL search by order name and number');
+          const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+
+          // Try both name and order_number in query
           const graphqlQuery = `
             query {
-              orders(first: 10, query: "name:${normalizedOrderNumber}") {
+              orders(first: 10, query: "name:${normalizedOrderNumber} OR order_number:${numericOrderNumber}") {
                 edges {
                   node {
                     id
@@ -420,6 +423,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     name
                     createdAt
                     displayFinancialStatus
+                    cancelledAt
+                    closedAt
                   }
                 }
               }
@@ -473,13 +478,95 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             console.log('⚠️ DEBUG ORDER: Strategy 6 exception:', error);
           }
         }
+
+        // Strategy 7: Check if order might be cancelled/deleted - try broader GraphQL query
+        if (!order) {
+          console.log('🔍 DEBUG ORDER: Strategy 7 - Broad GraphQL search for orders from Dec 2025');
+          const broadQuery = `
+            query {
+              orders(first: 50, query: "created_at:>=2025-12-01 created_at:<=2025-12-31", reverse: true) {
+                edges {
+                  node {
+                    id
+                    legacyResourceId
+                    name
+                    createdAt
+                    displayFinancialStatus
+                    cancelledAt
+                    closed
+                  }
+                }
+              }
+            }
+          `;
+
+          const graphqlUrl = `https://${shop}/admin/api/2024-10/graphql.json`;
+          console.log('🔍 DEBUG ORDER: Strategy 7 - Searching December 2025 orders');
+
+          try {
+            const broadResponse = await fetch(graphqlUrl, {
+              method: 'POST',
+              headers: {
+                'X-Shopify-Access-Token': accessToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ query: broadQuery }),
+            });
+
+            if (broadResponse.ok) {
+              const broadData = await broadResponse.json();
+              const decOrders = broadData.data?.orders?.edges || [];
+              console.log(`🔍 DEBUG ORDER: Strategy 7 found ${decOrders.length} orders from December 2025`);
+
+              if (decOrders.length > 0) {
+                const sample = decOrders.slice(0, 5).map((edge: any) =>
+                  `${edge.node.name} (created: ${edge.node.createdAt})`
+                ).join(', ');
+                console.log('🔍 DEBUG ORDER: Strategy 7 sample:', sample);
+
+                // Look for our order in the results
+                const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+                const foundEdge = decOrders.find((edge: any) =>
+                  edge.node.name === normalizedOrderNumber ||
+                  edge.node.legacyResourceId === numericOrderNumber
+                );
+
+                if (foundEdge) {
+                  const gqlOrder = foundEdge.node;
+                  const orderId = gqlOrder.legacyResourceId;
+                  console.log('✅ DEBUG ORDER: Found in December orders! ID:', orderId);
+
+                  // Fetch full order details
+                  const orderUrl = `https://${shop}/admin/api/2024-10/orders/${orderId}.json`;
+                  const orderResponse = await fetch(orderUrl, {
+                    headers: {
+                      'X-Shopify-Access-Token': accessToken,
+                      'Content-Type': 'application/json',
+                    },
+                  });
+
+                  if (orderResponse.ok) {
+                    const orderData = await orderResponse.json();
+                    order = orderData.order;
+                    console.log('✅ DEBUG ORDER: Fetched full order details via Strategy 7');
+                  }
+                }
+              }
+            } else {
+              const errorText = await broadResponse.text();
+              console.log('⚠️ DEBUG ORDER: Strategy 7 error:', broadResponse.status, errorText.substring(0, 200));
+            }
+          } catch (error) {
+            console.log('⚠️ DEBUG ORDER: Strategy 7 exception:', error);
+          }
+        }
       } // End of if (!order) - all strategies
 
       if (!order) {
         console.log('❌ DEBUG ORDER: Order not found after all strategies');
         return {
           success: false,
-          error: `Order not found. Tried: (0) Direct ID, (1) REST name search, (2) recent 250 active, (3) Dec 22-23 active, (4) Dec 22-23 archived, (5) recent 250 archived, (6) GraphQL search.`,
+          error: `Order not found. Tried: (0) Direct ID, (1) REST name, (2) recent 250, (3) Dec 22-23 active, (4) Dec 22-23 archived, (5) recent archived, (6) GraphQL name/number, (7) All Dec 2025 orders.`,
         };
       }
 
