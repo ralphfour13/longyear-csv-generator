@@ -24,8 +24,8 @@ api_version = "2026-01"
 # Required scopes for Sage 50 Journal Entry Sync:
 # - read_shopify_payments_payouts: Access payout data (what hit the bank)
 # - read_shopify_payments_accounts: Access payment account and balance transactions
-# - read_orders: Access order details for reconciliation
-scopes = "read_shopify_payments_payouts,read_shopify_payments_accounts,read_orders"
+# - read_all_orders: Access ALL order details (no 60-day limit) for reconciliation and archived orders
+scopes = "read_shopify_payments_payouts,read_shopify_payments_accounts,read_all_orders"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 
