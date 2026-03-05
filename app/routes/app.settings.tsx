@@ -407,13 +407,79 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
           }
         }
+        // Strategy 6: Use GraphQL API to search by name (better search than REST)
+        if (!order) {
+          console.log('🔍 DEBUG ORDER: Strategy 6 - GraphQL search by order name');
+          const graphqlQuery = `
+            query {
+              orders(first: 10, query: "name:${normalizedOrderNumber}") {
+                edges {
+                  node {
+                    id
+                    legacyResourceId
+                    name
+                    createdAt
+                    displayFinancialStatus
+                  }
+                }
+              }
+            }
+          `;
+
+          const graphqlUrl = `https://${shop}/admin/api/2024-10/graphql.json`;
+          console.log('🔍 DEBUG ORDER: Strategy 6 URL:', graphqlUrl);
+
+          try {
+            const graphqlResponse = await fetch(graphqlUrl, {
+              method: 'POST',
+              headers: {
+                'X-Shopify-Access-Token': accessToken,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ query: graphqlQuery }),
+            });
+
+            if (graphqlResponse.ok) {
+              const graphqlData = await graphqlResponse.json();
+              console.log('🔍 DEBUG ORDER: Strategy 6 response:', JSON.stringify(graphqlData).substring(0, 300));
+
+              if (graphqlData.data?.orders?.edges?.length > 0) {
+                const gqlOrder = graphqlData.data.orders.edges[0].node;
+                const orderId = gqlOrder.legacyResourceId;
+                console.log('✅ DEBUG ORDER: Found via GraphQL! Legacy ID:', orderId, 'Name:', gqlOrder.name);
+
+                // Now fetch full order details using the ID
+                const orderUrl = `https://${shop}/admin/api/2024-10/orders/${orderId}.json`;
+                const orderResponse = await fetch(orderUrl, {
+                  headers: {
+                    'X-Shopify-Access-Token': accessToken,
+                    'Content-Type': 'application/json',
+                  },
+                });
+
+                if (orderResponse.ok) {
+                  const orderData = await orderResponse.json();
+                  order = orderData.order;
+                  console.log('✅ DEBUG ORDER: Fetched full order details via GraphQL strategy');
+                }
+              } else {
+                console.log('⚠️ DEBUG ORDER: Strategy 6 - No results from GraphQL');
+              }
+            } else {
+              const errorText = await graphqlResponse.text();
+              console.log('⚠️ DEBUG ORDER: Strategy 6 GraphQL error:', graphqlResponse.status, errorText.substring(0, 200));
+            }
+          } catch (error) {
+            console.log('⚠️ DEBUG ORDER: Strategy 6 exception:', error);
+          }
+        }
       } // End of if (!order) - all strategies
 
       if (!order) {
         console.log('❌ DEBUG ORDER: Order not found after all strategies');
         return {
           success: false,
-          error: `Order not found. Tried: (0) Direct ID, (1) name search, (2) recent 250 active, (3) Dec 22-23 active, (4) Dec 22-23 archived, (5) recent 250 archived.`,
+          error: `Order not found. Tried: (0) Direct ID, (1) REST name search, (2) recent 250 active, (3) Dec 22-23 active, (4) Dec 22-23 archived, (5) recent 250 archived, (6) GraphQL search.`,
         };
       }
 
