@@ -239,6 +239,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           const recentData = await recentResponse.json();
           console.log('🔍 DEBUG ORDER: Strategy 2 fetched:', recentData.orders?.length || 0, 'orders');
 
+          // Log first 5 order names to see format
+          if (recentData.orders && recentData.orders.length > 0) {
+            const sampleNames = recentData.orders.slice(0, 5).map((o: any) =>
+              `name="${o.name}" order_number=${o.order_number}`
+            );
+            console.log('🔍 DEBUG ORDER: Sample order formats:', sampleNames);
+          }
+
           // Search for matching order name
           const numericOrderNumber = normalizedOrderNumber.replace('#', '');
           order = recentData.orders?.find((o: any) =>
@@ -253,11 +261,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       }
 
+      // Strategy 3: Search by date range (Dec 22-23, 2025 based on screenshot)
+      if (!order) {
+        console.log('🔍 DEBUG ORDER: Strategy 3 - Search by date range (Dec 22-23, 2025)');
+        const dateUrl = `https://${shop}/admin/api/2024-10/orders.json?created_at_min=2025-12-22T00:00:00Z&created_at_max=2025-12-24T00:00:00Z&status=any&limit=250`;
+        console.log('🔍 DEBUG ORDER: Strategy 3 URL:', dateUrl.replace(accessToken, 'REDACTED'));
+
+        const dateResponse = await fetch(dateUrl, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (dateResponse.ok) {
+          const dateData = await dateResponse.json();
+          console.log('🔍 DEBUG ORDER: Strategy 3 fetched:', dateData.orders?.length || 0, 'orders from Dec 22-23');
+
+          const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+          order = dateData.orders?.find((o: any) =>
+            o.name === normalizedOrderNumber ||
+            o.name === numericOrderNumber ||
+            o.order_number?.toString() === numericOrderNumber
+          );
+
+          if (order) {
+            console.log('✅ DEBUG ORDER: Found via Strategy 3 - date range search');
+          }
+        }
+      }
+
       if (!order) {
         console.log('❌ DEBUG ORDER: Order not found after all strategies');
         return {
           success: false,
-          error: `Order ${normalizedOrderNumber} not found. Tried searching by name and in recent 250 orders.`,
+          error: `Order ${normalizedOrderNumber} not found. Tried: (1) name search, (2) recent 250 orders, (3) Dec 22-23 date range.`,
         };
       }
 
