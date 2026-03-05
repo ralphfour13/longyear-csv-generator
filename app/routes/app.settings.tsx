@@ -441,25 +441,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         const endDate = `${nextDateStr}T07:59:59Z`; // Just before midnight next day in PST
 
-        const url = `https://${shop}/admin/api/2024-10/orders.json?status=any&created_at_min=${encodeURIComponent(startDate)}&created_at_max=${encodeURIComponent(endDate)}&limit=250`;
-        debugInfo.push(`Querying: ${url.replace(accessToken, 'REDACTED')}`);
+        // Fetch active orders
+        const anyUrl = `https://${shop}/admin/api/2024-10/orders.json?status=any&created_at_min=${encodeURIComponent(startDate)}&created_at_max=${encodeURIComponent(endDate)}&limit=250`;
+        debugInfo.push(`Querying active orders: ${anyUrl.replace(accessToken, 'REDACTED')}`);
 
-        const response = await fetch(url, {
+        const anyResponse = await fetch(anyUrl, {
           headers: {
             'X-Shopify-Access-Token': accessToken,
             'Content-Type': 'application/json',
           },
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          debugInfo.push(`API Error ${response.status}: ${errorText}`);
-          throw new Error(`Shopify API error: ${response.status} ${response.statusText}`);
+        if (!anyResponse.ok) {
+          const errorText = await anyResponse.text();
+          debugInfo.push(`API Error ${anyResponse.status}: ${errorText}`);
+          throw new Error(`Shopify API error: ${anyResponse.status} ${anyResponse.statusText}`);
         }
 
-        const data = await response.json();
-        const orders = data.orders || [];
-        debugInfo.push(`Found ${orders.length} orders for ${date}`);
+        const anyData = await anyResponse.json();
+        const activeOrders = anyData.orders || [];
+        debugInfo.push(`Found ${activeOrders.length} active orders for ${date}`);
+
+        // Fetch archived orders (not included in status=any)
+        const archivedUrl = `https://${shop}/admin/api/2024-10/orders.json?status=archived&created_at_min=${encodeURIComponent(startDate)}&created_at_max=${encodeURIComponent(endDate)}&limit=250`;
+        debugInfo.push(`Querying archived orders: ${archivedUrl.replace(accessToken, 'REDACTED')}`);
+
+        const archivedResponse = await fetch(archivedUrl, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        let archivedOrders: any[] = [];
+        if (archivedResponse.ok) {
+          const archivedData = await archivedResponse.json();
+          archivedOrders = archivedData.orders || [];
+          debugInfo.push(`Found ${archivedOrders.length} archived orders for ${date}`);
+        } else {
+          debugInfo.push(`Archived orders query failed: ${archivedResponse.status}`);
+        }
+
+        // Combine active and archived orders
+        const orders = [...activeOrders, ...archivedOrders];
+        debugInfo.push(`Total: ${orders.length} orders for ${date} (${activeOrders.length} active + ${archivedOrders.length} archived)`);
         totalOrders += orders.length;
 
         // Tag each order
