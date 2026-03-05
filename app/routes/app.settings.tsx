@@ -355,13 +355,51 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
           }
         }
+
+        // Strategy 5: Search recent archived orders (no date filter)
+        if (!order) {
+          console.log('🔍 DEBUG ORDER: Strategy 5 - Search recent archived orders (no date filter)');
+          const recentArchivedUrl = `https://${shop}/admin/api/2024-10/orders.json?status=archived&limit=250`;
+          console.log('🔍 DEBUG ORDER: Strategy 5 URL:', recentArchivedUrl.replace(accessToken, 'REDACTED'));
+
+          const recentArchivedResponse = await fetch(recentArchivedUrl, {
+            headers: {
+              'X-Shopify-Access-Token': accessToken,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (recentArchivedResponse.ok) {
+            const recentArchivedData = await recentArchivedResponse.json();
+            console.log('🔍 DEBUG ORDER: Strategy 5 fetched:', recentArchivedData.orders?.length || 0, 'recent archived orders');
+
+            // Log first 5 archived order names to see format and numbers
+            if (recentArchivedData.orders && recentArchivedData.orders.length > 0) {
+              const archivedSampleNames = recentArchivedData.orders.slice(0, 5).map((o: any) =>
+                `name="${o.name}" order_number=${o.order_number} created=${o.created_at}`
+              );
+              console.log('🔍 DEBUG ORDER: Sample archived orders:', archivedSampleNames);
+            }
+
+            const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            order = recentArchivedData.orders?.find((o: any) =>
+              o.name === normalizedOrderNumber ||
+              o.name === numericOrderNumber ||
+              o.order_number?.toString() === numericOrderNumber
+            );
+
+            if (order) {
+              console.log('✅ DEBUG ORDER: Found via Strategy 5 - recent archived orders');
+            }
+          }
+        }
       } // End of if (!order) - all strategies
 
       if (!order) {
         console.log('❌ DEBUG ORDER: Order not found after all strategies');
         return {
           success: false,
-          error: `Order not found. Tried: (0) Direct ID fetch, (1) name search, (2) recent 250 orders, (3) Dec 22-23 date range, (4) archived orders Dec 22-23.`,
+          error: `Order not found. Tried: (0) Direct ID, (1) name search, (2) recent 250 active, (3) Dec 22-23 active, (4) Dec 22-23 archived, (5) recent 250 archived.`,
         };
       }
 
