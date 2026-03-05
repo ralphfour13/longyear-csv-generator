@@ -221,7 +221,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             console.log('✅ DEBUG ORDER: Found via Strategy 0 - Direct ID fetch');
             console.log('🔍 DEBUG ORDER: Order name:', order.name, 'order_number:', order.order_number);
           } else {
-            console.log('⚠️ DEBUG ORDER: Strategy 0 failed, trying other strategies...');
+            const errorText = await idResponse.text();
+            console.log('⚠️ DEBUG ORDER: Strategy 0 failed:', idResponse.status, idResponse.statusText);
+            console.log('⚠️ DEBUG ORDER: Error response:', errorText.substring(0, 200));
           }
         } catch (error) {
           console.log('⚠️ DEBUG ORDER: Strategy 0 error:', error);
@@ -296,7 +298,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }
         }
 
-        // Strategy 3: Search by date range (Dec 22-23, 2025 based on screenshot)
+        // Strategy 3: Search by date range (Dec 22-23, 2025)
         if (!order) {
           console.log('🔍 DEBUG ORDER: Strategy 3 - Search by date range (Dec 22-23, 2025)');
           const dateUrl = `https://${shop}/admin/api/2024-10/orders.json?created_at_min=2025-12-22T00:00:00Z&created_at_max=2025-12-24T00:00:00Z&status=any&limit=250`;
@@ -311,7 +313,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
           if (dateResponse.ok) {
             const dateData = await dateResponse.json();
-            console.log('🔍 DEBUG ORDER: Strategy 3 fetched:', dateData.orders?.length || 0, 'orders from Dec 22-23');
+            console.log('🔍 DEBUG ORDER: Strategy 3 fetched:', dateData.orders?.length || 0, 'orders from Dec 22-23, 2025');
 
             const numericOrderNumber = normalizedOrderNumber.replace('#', '');
             order = dateData.orders?.find((o: any) =>
@@ -341,7 +343,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
           if (archivedResponse.ok) {
             const archivedData = await archivedResponse.json();
-            console.log('🔍 DEBUG ORDER: Strategy 4 fetched:', archivedData.orders?.length || 0, 'archived orders from Dec 22-23');
+            console.log('🔍 DEBUG ORDER: Strategy 4 fetched:', archivedData.orders?.length || 0, 'archived orders from Dec 22-23, 2025');
+
+            // Log a sample of what we got back
+            if (archivedData.orders && archivedData.orders.length > 0) {
+              const sample = archivedData.orders.slice(0, 3).map((o: any) =>
+                `#${o.order_number} (${o.created_at})`
+              ).join(', ');
+              console.log('🔍 DEBUG ORDER: Strategy 4 sample:', sample);
+            }
 
             const numericOrderNumber = normalizedOrderNumber.replace('#', '');
             order = archivedData.orders?.find((o: any) =>
@@ -353,6 +363,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (order) {
               console.log('✅ DEBUG ORDER: Found via Strategy 4 - archived orders search');
             }
+          } else {
+            const errorText = await archivedResponse.text();
+            console.log('⚠️ DEBUG ORDER: Strategy 4 API error:', archivedResponse.status, archivedResponse.statusText);
+            console.log('⚠️ DEBUG ORDER: Error details:', errorText.substring(0, 200));
           }
         }
 
