@@ -155,7 +155,7 @@ export async function isCin7Enabled(shop: string): Promise<boolean> {
   try {
     const config = await getCin7Config(shop);
     return config.enabled && !!config.accountId && !!config.apiKey;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

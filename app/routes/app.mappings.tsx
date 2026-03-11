@@ -31,7 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await saveAccountMappings(shop, mappings);
 
         return { success: true, message: 'Account mappings saved successfully' };
-      } catch (error) {
+      } catch {
         return { success: false, error: 'Invalid mappings format', status: 400 };
       }
     }

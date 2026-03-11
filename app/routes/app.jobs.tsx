@@ -141,7 +141,7 @@ export default function Jobs() {
   const formatDateRange = (job: ExportJob) => {
     // Helper to format YYYY-MM-DD string directly without timezone conversion
     const formatDateString = (dateStr: string): string => {
-      const [year, month, day] = dateStr.split('-').map(Number);
+      const [, month, day] = dateStr.split('-').map(Number);
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return `${monthNames[month - 1]} ${day}`;
     };

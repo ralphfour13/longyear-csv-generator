@@ -292,7 +292,7 @@ export async function getScheduledExportLogs(
         }
       })
       .filter((entry) => entry !== null);
-  } catch (error) {
+  } catch {
     // Log file doesn't exist yet
     return [];
   }

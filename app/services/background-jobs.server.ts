@@ -63,7 +63,7 @@ export async function getJobStatus(jobId: string): Promise<ExportJob | null> {
     const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
     const content = await fs.readFile(jobPath, 'utf-8');
     return JSON.parse(content);
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -108,7 +108,7 @@ export async function getShopJobs(shop: string): Promise<ExportJob[]> {
     return jobs.sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  } catch (error) {
+  } catch {
     return [];
   }
 }

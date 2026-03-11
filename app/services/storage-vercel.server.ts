@@ -125,7 +125,7 @@ export async function getShopConfig(shop: string): Promise<SyncConfig> {
 
     // Return default if not found
     return getDefaultConfig(shop);
-  } catch (error) {
+  } catch {
     return getDefaultConfig(shop);
   }
 }
@@ -155,7 +155,7 @@ export async function getAccountMappings(shop: string): Promise<AccountMappings>
     }
 
     return getDefaultMappings();
-  } catch (error) {
+  } catch {
     return getDefaultMappings();
   }
 }
@@ -188,7 +188,7 @@ export async function listExports(shop: string): Promise<string[]> {
       .filter((name) => name.endsWith('.csv'))
       .sort()
       .reverse();
-  } catch (error) {
+  } catch {
     return [];
   }
 }
@@ -253,7 +253,7 @@ export async function getExportStats(shop: string, filename: string) {
       created: new Date(metadata.uploadedAt),
       modified: new Date(metadata.uploadedAt),
     };
-  } catch (error) {
+  } catch {
     throw new Error(`Export file not found: ${filename}`);
   }
 }

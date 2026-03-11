@@ -236,7 +236,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         // Try multiple search strategies
         // Strategy 1: Search by name parameter
-        let url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(normalizedOrderNumber)}&status=any&limit=1`;
+        const url = `https://${shop}/admin/api/2024-10/orders.json?name=${encodeURIComponent(normalizedOrderNumber)}&status=any&limit=1`;
         console.log('🔍 DEBUG ORDER: Strategy 1 - Search by name:', url.replace(accessToken, 'REDACTED'));
 
         const response = await fetch(url, {
@@ -278,6 +278,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             // Log first 5 order names to see format
             if (recentData.orders && recentData.orders.length > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const sampleNames = recentData.orders.slice(0, 5).map((o: any) =>
                 `name="${o.name}" order_number=${o.order_number}`
               );
@@ -286,6 +287,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             // Search for matching order name
             const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             order = recentData.orders?.find((o: any) =>
               o.name === normalizedOrderNumber ||
               o.name === numericOrderNumber ||
@@ -316,6 +318,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             console.log('🔍 DEBUG ORDER: Strategy 3 fetched:', dateData.orders?.length || 0, 'orders from Dec 22-23, 2025');
 
             const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             order = dateData.orders?.find((o: any) =>
               o.name === normalizedOrderNumber ||
               o.name === numericOrderNumber ||
@@ -347,6 +350,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             // Log a sample of what we got back
             if (archivedData.orders && archivedData.orders.length > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const sample = archivedData.orders.slice(0, 3).map((o: any) =>
                 `#${o.order_number} (${o.created_at})`
               ).join(', ');
@@ -354,6 +358,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             order = archivedData.orders?.find((o: any) =>
               o.name === normalizedOrderNumber ||
               o.name === numericOrderNumber ||
@@ -389,6 +394,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             // Log first 5 archived order names to see format and numbers
             if (recentArchivedData.orders && recentArchivedData.orders.length > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const archivedSampleNames = recentArchivedData.orders.slice(0, 5).map((o: any) =>
                 `name="${o.name}" order_number=${o.order_number} created=${o.created_at}`
               );
@@ -396,6 +402,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             order = recentArchivedData.orders?.find((o: any) =>
               o.name === normalizedOrderNumber ||
               o.name === numericOrderNumber ||
@@ -519,6 +526,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               console.log(`🔍 DEBUG ORDER: Strategy 7 found ${decOrders.length} orders from December 2025`);
 
               if (decOrders.length > 0) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const sample = decOrders.slice(0, 5).map((edge: any) =>
                   `${edge.node.name} (created: ${edge.node.createdAt})`
                 ).join(', ');
@@ -526,6 +534,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
                 // Look for our order in the results
                 const numericOrderNumber = normalizedOrderNumber.replace('#', '');
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const foundEdge = decOrders.find((edge: any) =>
                   edge.node.name === normalizedOrderNumber ||
                   edge.node.legacyResourceId === numericOrderNumber
@@ -678,6 +687,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let archivedOrders: any[] = [];
         if (archivedResponse.ok) {
           const archivedData = await archivedResponse.json();
@@ -792,7 +802,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await updateShopSchedule(shop, config, getAccessToken);
 
     return { success: true, message: 'Settings saved successfully' };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to save settings' };
   }
 };
@@ -1318,14 +1328,14 @@ export default function Settings() {
               <s-stack direction="block" gap="base">
                 <s-text><strong>Bulk Tag Orders</strong></s-text>
                 <s-paragraph>
-                  Tag all orders from December 22-23, 2025 as "Imported" for tracking purposes.
+                  Tag all orders from December 22-23, 2025 as &quot;Imported&quot; for tracking purposes.
                 </s-paragraph>
               </s-stack>
 
               <Form method="post">
                 <input type="hidden" name="actionType" value="bulkTagOrders" />
                 <s-button type="submit" variant="primary">
-                  Tag 12/22-23/2025 Orders as "Imported"
+                  Tag 12/22-23/2025 Orders as &quot;Imported&quot;
                 </s-button>
               </Form>
 
