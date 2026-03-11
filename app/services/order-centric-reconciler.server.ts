@@ -401,8 +401,8 @@ async function processOrderCaptures(
   }
 
   // Rate limiting delay: prevents rapid sequential enrichment calls
-  // when processing multiple orders
-  await sleep(300);
+  // when processing multiple orders (500ms = 2 calls/second max)
+  await sleep(500);
 }
 
 /**
@@ -469,8 +469,8 @@ async function processOrderRefunds(
   }
 
   // Rate limiting delay: prevents rapid sequential enrichment calls
-  // when processing multiple orders
-  await sleep(300);
+  // when processing multiple orders (500ms = 2 calls/second max)
+  await sleep(500);
 }
 
 /**

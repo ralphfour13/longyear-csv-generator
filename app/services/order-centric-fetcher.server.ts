@@ -237,9 +237,9 @@ async function fetchOrdersByDate(
           orderMap.set(order.id, order);
           fetchedCount++;
 
-          // Rate limiting: Wait 250ms between calls
+          // Rate limiting: Wait 500ms between calls (2 calls/second to stay well under limit)
           if (i < data.orders.length - 1) {
-            await sleep(250);
+            await sleep(500);
           }
         }
 
@@ -250,7 +250,7 @@ async function fetchOrdersByDate(
           if (match) {
             pageInfo = match[1];
             // Add delay before fetching next page to stay under rate limits
-            await sleep(300);
+            await sleep(500);
           } else {
             hasNextPage = false;
           }
