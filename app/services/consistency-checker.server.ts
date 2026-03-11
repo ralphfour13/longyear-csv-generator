@@ -11,6 +11,7 @@
 
 import { Decimal } from 'decimal.js';
 import type { Order, JournalEntry } from '../types/journal-entry';
+import { getOriginalTaxAmount } from './order-centric-journal-generator.server';
 
 /**
  * Consistency Check Result
@@ -200,6 +201,35 @@ export function checkCogsVsInventory(
 }
 
 /**
+ * Format ISO date to YYYY-MM-DD
+ */
+function formatDateOnly(isoDate: string): string {
+  const date = new Date(isoDate);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Check if order has refunds that occurred AFTER the target export date.
+ * These future refunds should be IGNORED in point-in-time exports.
+ */
+function hasFutureRefunds(order: Order, targetDate: string): boolean {
+  if (!order.transactions || order.transactions.length === 0) {
+    return false;
+  }
+
+  const futureRefunds = order.transactions.filter((txn) => {
+    if (txn.kind !== 'refund' || txn.status !== 'success') return false;
+    const refundDate = formatDateOnly(txn.processedAt);
+    return refundDate > targetDate;
+  });
+
+  return futureRefunds.length > 0;
+}
+
+/**
  * Generate comprehensive consistency report
  *
  * @param orders - Orders to check
@@ -208,13 +238,15 @@ export function checkCogsVsInventory(
  */
 export async function generateConsistencyReport(
   orders: Order[],
-  entries: JournalEntry[]
+  entries: JournalEntry[],
+  targetDate?: string
 ): Promise<ConsistencyCheckResult> {
   const imbalancedEntries: ImbalancedEntry[] = [];
   const salesMismatches: SalesMismatch[] = [];
   const cogsMismatches: CogsMismatch[] = [];
   const taxMismatches: TaxMismatch[] = [];
   const paymentMismatches: PaymentMismatch[] = [];
+  const warnings: Array<{ orderId: string; orderName: string; type: string; message: string }> = [];
 
   const processedOrders = new Set<string>();
 
@@ -263,8 +295,18 @@ export async function generateConsistencyReport(
       });
     }
 
+    // Point-in-time validation: Check for future refunds
+    if (targetDate && hasFutureRefunds(order, targetDate)) {
+      warnings.push({
+        orderId: order.id,
+        orderName: order.name,
+        type: 'future_refund',
+        message: 'Order has refunds after export date - using original totals',
+      });
+    }
+
     // 3. Check tax amounts
-    const orderTax = order.totalTax;
+    const orderTax = getOriginalTaxAmount(order);
     const journalTax = orderEntries
       .filter((e) => e.accountName?.toLowerCase().includes('tax'))
       .reduce((sum, e) => sum.plus(e.credit).minus(e.debit), new Decimal(0));

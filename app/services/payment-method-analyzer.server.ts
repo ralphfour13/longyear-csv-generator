@@ -165,17 +165,9 @@ export function validatePaymentTotal(
     new Decimal(0)
   );
 
-  // For refunded orders, use original total (before refund)
-  // For active orders, use current total (reflects edits)
-  let orderTotal: Decimal;
-  if (order.financialStatus === 'refunded' ||
-      order.financialStatus === 'partially_refunded') {
-    // Use original total for refunded orders
-    orderTotal = order.totalPrice;
-  } else {
-    // Use current total for active orders (reflects post-purchase edits)
-    orderTotal = order.currentTotalPrice || order.totalPrice;
-  }
+  // POINT-IN-TIME SNAPSHOT: Always use original total
+  // Exports represent data as it appeared at 3-4 AM morning after close of business
+  const orderTotal = order.totalPrice;
 
   // Check if totals match (allow 1 cent rounding difference)
   const diff = totalPayments.minus(orderTotal).abs();

@@ -35,6 +35,17 @@ import type { CogsCalculation } from '../types/cin7';
  */
 
 /**
+ * Get the original tax amount for an order.
+ * POINT-IN-TIME SNAPSHOT: Always returns original tax amount.
+ *
+ * Exports represent data as it appeared at 3-4 AM morning after close of business.
+ * We ALWAYS use original totals, never current totals.
+ */
+export function getOriginalTaxAmount(order: Order): Decimal {
+  return order.totalTax;
+}
+
+/**
  * Create journal entries for an order
  *
  * @param shop - Shop domain (for account mappings)
@@ -68,36 +79,9 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // Calculate NET sales (post-discount)
-  // CRITICAL: For refunded orders, use ORIGINAL subtotal (not current)
-  let netSales: Decimal;
-
-  // Check if order has been refunded
-  const isRefunded =
-    order.financialStatus === 'refunded' ||
-    order.financialStatus === 'partially_refunded';
-
-  if (isRefunded) {
-    // For refunded orders: Use ORIGINAL subtotal (before refunds)
-    // This ensures SO- entry reflects the original captured transaction
-    // The RF- entry will handle the refund reversal separately
-    netSales = order.subtotalPrice;
-
-    console.log(
-      `ℹ️  Order ${order.name} (${order.financialStatus}): ` +
-      `Using ORIGINAL subtotal $${netSales.toFixed(2)} ` +
-      `(current would be $${order.currentSubtotalPrice?.toFixed(2) || 'N/A'})`
-    );
-  } else if (order.currentSubtotalPrice) {
-    // For non-refunded orders: currentSubtotalPrice is NET (after discounts)
-    netSales = order.currentSubtotalPrice;
-  } else {
-    // Fallback: Calculate NET from total payment minus tax and shipping
-    // NET Sales = Total Payment - Tax - Shipping
-    netSales = order.totalPrice
-      .minus(order.totalTax || new Decimal(0))
-      .minus(order.totalShipping || new Decimal(0));
-  }
+  // POINT-IN-TIME SNAPSHOT: Always use original subtotal
+  // Exports represent data as it appeared at 3-4 AM morning after close of business
+  const netSales = order.subtotalPrice;
 
   // CREDIT: Sales Revenue (NET - post-discount amount)
   // Add discount info to memo for transparency
@@ -119,7 +103,7 @@ export async function createOrderJournalEntries(
   // NO DISCOUNT ENTRY - discounts are already reflected in NET sales amount
 
   // CREDIT: Sales Tax (only if > 0)
-  const taxAmount = order.totalTax;
+  const taxAmount = getOriginalTaxAmount(order);
   if (taxAmount && taxAmount.greaterThan(0)) {
     entries.push({
       date: targetDate,
