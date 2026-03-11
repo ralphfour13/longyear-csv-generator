@@ -21,7 +21,12 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
       startedAt: new Date().toISOString(),
     });
 
-    console.log(`[Job ${jobId}] Starting export for ${shop} (${job.startDate})`);
+    const startTime = Date.now();
+    console.log(
+      `[Job ${jobId}] Starting export for ${shop}`,
+      `\n  Date: ${job.startDate}`,
+      `\n  Files: ${Object.entries(job.fileOptions).filter(([, v]) => v).map(([k]) => k).join(', ')}`
+    );
 
     // All jobs are now single-date exports (date ranges are split into separate jobs)
     const result = await processExport(
@@ -45,7 +50,13 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
       },
     });
 
-    console.log(`[Job ${jobId}] Completed: ${result.entryCount} entries`);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(
+      `[Job ${jobId}] ✓ Completed in ${duration}s`,
+      `\n  Entries: ${result.entryCount}`,
+      `\n  Files: ${result.files.length}`,
+      `\n  Balanced: ${result.balanced ? 'YES' : 'NO'}`
+    );
   } catch (error) {
     console.error(`[Job ${jobId}] Failed:`, error);
 

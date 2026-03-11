@@ -137,17 +137,36 @@ export async function retryShopifyAPI<T>(
   fn: () => Promise<T>,
   context: string = 'Shopify API'
 ): Promise<T> {
-  return retryWithCondition(
-    fn,
-    isRetryableError,
-    {
-      maxAttempts: 5,
-      delayMs: 2000,
-      backoffMultiplier: 2,
-      maxDelayMs: 30000,
-      onRetry: (attempt, error) => {
-        console.warn(`${context} - Retry attempt ${attempt}:`, error.message);
-      },
-    }
-  );
+  const startTime = Date.now();
+  console.log(`[Retry] ${context} - Starting API call`);
+
+  try {
+    const result = await retryWithCondition(
+      fn,
+      isRetryableError,
+      {
+        maxAttempts: 5,
+        delayMs: 2000,
+        backoffMultiplier: 2,
+        maxDelayMs: 30000,
+        onRetry: (attempt, error) => {
+          const delay = Math.min(2000 * Math.pow(2, attempt - 1), 30000);
+          console.warn(
+            `[Retry] ${context} - Attempt ${attempt}/5 failed: ${error.message}. Retrying in ${delay}ms...`
+          );
+        },
+      }
+    );
+
+    const duration = Date.now() - startTime;
+    console.log(`[Retry] ${context} - Success after ${duration}ms`);
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(
+      `[Retry] ${context} - Failed after ${duration}ms and 5 attempts:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    throw error;
+  }
 }

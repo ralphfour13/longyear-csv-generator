@@ -81,6 +81,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // Create separate job for each day in the range
+        console.log(
+          `[Export] Creating date range export for ${shop}`,
+          `\n  Range: ${startDateParam} to ${endDateParam}`,
+          `\n  Files: ${Object.entries(fileOptions).filter(([, v]) => v).map(([k]) => k).join(', ')}`
+        );
+
         const jobIds: string[] = [];
         const currentDate = new Date(startDate);
 
@@ -95,16 +101,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           );
 
           jobIds.push(jobId);
+          console.log(`[Export] Created job ${jobId} for ${dateStr}`);
           currentDate.setDate(currentDate.getDate() + 1);
         }
 
+        const dayCount = jobIds.length;
+        console.log(
+          `[Export] ✓ Created ${dayCount} jobs for date range`,
+          `\n  Job IDs: ${jobIds.map(id => id.split('_')[2]).join(', ')}`
+        );
+
         // Start processing in background (don't await)
         const accessToken = session.accessToken || '';
+        console.log(`[Export] Starting background processing for ${dayCount} jobs`);
         processPendingJobs(shop, accessToken).catch((error) => {
-          console.error('Background job processing error:', error);
+          console.error('[Export] Background job processing error:', error);
         });
-
-        const dayCount = jobIds.length;
 
         return {
           success: true,
@@ -122,6 +134,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           return { success: false, error: 'Export date is required', status: 400 };
         }
 
+        console.log(
+          `[Export] Creating single date export for ${shop}`,
+          `\n  Date: ${dateParam}`,
+          `\n  Files: ${Object.entries(fileOptions).filter(([, v]) => v).map(([k]) => k).join(', ')}`
+        );
+
         // Create background job
         const jobId = await createExportJob(
           shop,
@@ -130,8 +148,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           fileOptions
         );
 
+        console.log(`[Export] Created job ${jobId} for ${dateParam}`);
+
         // Start processing in background (don't await)
         const accessToken = session.accessToken || '';
+        console.log(`[Export] Starting background processing for job ${jobId}`);
         processPendingJobs(shop, accessToken).catch((error) => {
           console.error('Background job processing error:', error);
         });

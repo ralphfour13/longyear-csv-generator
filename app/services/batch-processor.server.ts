@@ -693,6 +693,17 @@ export async function processExport(
       }
     }
 
+    // Log final summary to console
+    console.log(
+      `[Export] ✅ Export complete for ${targetDate}`,
+      `\n  Orders: ${result.orderCount} (${result.captureCount} captures)`,
+      `\n  Entries: ${exportEntry.entryCount}`,
+      `\n  Files: ${generatedFiles.length}`,
+      `\n  Balanced: ${exportEntry.balanced ? 'YES' : 'NO'}`,
+      `\n  Errors: ${allErrors.length}`,
+      `\n  Warnings: ${allWarnings.length + cogsWarnings.length}`
+    );
+
     return exportEntry;
   } catch (error) {
     await logError(shop, 'Export', error as Error);

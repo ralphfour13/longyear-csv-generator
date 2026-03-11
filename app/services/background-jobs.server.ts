@@ -52,6 +52,18 @@ export async function createExportJob(
   const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
   await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
 
+  const dateRange = endDate ? `${startDate} to ${endDate}` : startDate;
+  const fileTypes = Object.entries(fileOptions)
+    .filter(([, enabled]) => enabled)
+    .map(([type]) => type)
+    .join(', ');
+
+  console.log(
+    `[Job] Created job ${jobId} for shop ${shop}`,
+    `\n  Date range: ${dateRange}`,
+    `\n  File options: ${fileTypes}`
+  );
+
   return jobId;
 }
 
@@ -83,6 +95,24 @@ export async function updateJobStatus(
   const updatedJob = { ...job, ...updates };
   const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
   await fs.writeFile(jobPath, JSON.stringify(updatedJob, null, 2));
+
+  // Log status changes
+  if (updates.status && updates.status !== job.status) {
+    const dateRange = job.endDate ? `${job.startDate} to ${job.endDate}` : job.startDate;
+    console.log(
+      `[Job] ${jobId} status changed: ${job.status} → ${updates.status}`,
+      `(${dateRange})`
+    );
+
+    if (updates.status === 'completed' && job.startedAt) {
+      const duration = Date.now() - new Date(job.startedAt).getTime();
+      console.log(`[Job] ${jobId} completed in ${(duration / 1000).toFixed(1)}s`);
+    }
+
+    if (updates.status === 'failed' && updates.error) {
+      console.error(`[Job] ${jobId} failed:`, updates.error);
+    }
+  }
 }
 
 /**
