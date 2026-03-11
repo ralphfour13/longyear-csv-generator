@@ -165,9 +165,10 @@ export function validatePaymentTotal(
     new Decimal(0)
   );
 
-  // POINT-IN-TIME SNAPSHOT: Always use original total
-  // Exports represent data as it appeared at 3-4 AM morning after close of business
-  const orderTotal = order.totalPrice;
+  // PARTIAL CAPTURE FIX: Use currentTotalPrice (actual captured amount) if available
+  // For orders with line item removals before capture, currentTotalPrice < totalPrice
+  // Example: Auth $95.91, removed items, captured $31.28 → use $31.28
+  const orderTotal = order.currentTotalPrice || order.totalPrice;
 
   // Check if totals match (allow 1 cent rounding difference)
   const diff = totalPayments.minus(orderTotal).abs();

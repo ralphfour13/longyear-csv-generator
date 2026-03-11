@@ -35,14 +35,31 @@ import type { CogsCalculation } from '../types/cin7';
  */
 
 /**
- * Get the original tax amount for an order.
- * POINT-IN-TIME SNAPSHOT: Always returns original tax amount.
+ * Calculate the tax amount for an order, handling partial captures.
  *
- * Exports represent data as it appeared at 3-4 AM morning after close of business.
- * We ALWAYS use original totals, never current totals.
+ * PARTIAL CAPTURE LOGIC:
+ * - For partial captures (currentTotalPrice < totalPrice), calculate tax proportionally
+ * - Tax = (currentTotalPrice - currentSubtotalPrice) where available
+ * - Fallback: Use original totalTax if current amounts not available
+ *
+ * Example Partial Capture (Order #80211):
+ * - Original: $95.91 total, $89.54 subtotal, $6.37 tax
+ * - Removed items, captured: $31.28 total
+ * - Tax should be: $31.28 - (currentSubtotalPrice) = proportional tax amount
  */
-export function getOriginalTaxAmount(order: Order): Decimal {
-  return order.totalTax;
+export function calculateTaxAmount(order: Order): Decimal {
+  // If we have both current amounts, calculate tax from the difference
+  if (order.currentTotalPrice && order.currentSubtotalPrice) {
+    const currentTax = order.currentTotalPrice
+      .minus(order.currentSubtotalPrice)
+      .minus(order.totalShipping || new Decimal(0));
+
+    // Tax should never be negative
+    return currentTax.greaterThan(0) ? currentTax : new Decimal(0);
+  }
+
+  // Fallback: Use original tax amount
+  return order.totalTax || new Decimal(0);
 }
 
 /**
@@ -79,9 +96,10 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // POINT-IN-TIME SNAPSHOT: Always use original subtotal
-  // Exports represent data as it appeared at 3-4 AM morning after close of business
-  const netSales = order.subtotalPrice;
+  // PARTIAL CAPTURE FIX: Use currentSubtotalPrice for orders with line item removals
+  // For partial captures, currentSubtotalPrice reflects the actual captured amount
+  // Example: Order $95.91, items removed, captured $31.28 → use currentSubtotalPrice
+  const netSales = order.currentSubtotalPrice || order.subtotalPrice;
 
   // CREDIT: Sales Revenue (NET - post-discount amount)
   // Add discount info to memo for transparency
@@ -103,7 +121,8 @@ export async function createOrderJournalEntries(
   // NO DISCOUNT ENTRY - discounts are already reflected in NET sales amount
 
   // CREDIT: Sales Tax (only if > 0)
-  const taxAmount = getOriginalTaxAmount(order);
+  // PARTIAL CAPTURE FIX: Calculate tax proportionally for partial captures
+  const taxAmount = calculateTaxAmount(order);
   if (taxAmount && taxAmount.greaterThan(0)) {
     entries.push({
       date: targetDate,
