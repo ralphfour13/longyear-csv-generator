@@ -155,20 +155,66 @@ async function fetchOrdersByDate(
 
     const url: string = `${baseUrl}?${params.toString()}`;
 
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
-      });
+    // Retry loop for handling rate limits
+    let response: Response | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        response = await fetch(url, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (!response.ok) {
+        // Handle 429 rate limit errors with retry
+        if (response.status === 429) {
+          if (attempt < MAX_RETRIES) {
+            // Calculate exponential backoff delay: 500ms, 1000ms, 2000ms, 4000ms, 8000ms
+            const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+            console.log(
+              `Rate limit hit on orders endpoint. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+            );
+            await sleep(delay);
+            continue; // Retry the request
+          } else {
+            const errorText = await response.text();
+            throw new Error(
+              `Failed to fetch orders after ${MAX_RETRIES} retries: ${response.status} ${response.statusText} - ${errorText}`
+            );
+          }
+        }
+
+        // If request succeeded, break out of retry loop
+        if (response.ok) {
+          break;
+        }
+
+        // For other errors, throw immediately
         const errorText = await response.text();
         throw new Error(
           `Failed to fetch orders: ${response.status} ${response.statusText} - ${errorText}`
         );
+      } catch (error) {
+        // If this is the last attempt or not a retryable error, throw
+        if (attempt === MAX_RETRIES || !(error instanceof Error) || !error.message.includes('429')) {
+          console.error(`Error fetching orders by ${minParam}:`, error);
+          throw error;
+        }
+        // For 429 errors on early attempts, retry with backoff
+        const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+        console.log(
+          `Error fetching orders. Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+        );
+        await sleep(delay);
       }
+    }
+
+    // If we exhausted retries without success, throw error
+    if (!response || !response.ok) {
+      throw new Error('Failed to fetch orders after all retry attempts');
+    }
+
+    try {
 
       const data = await response.json();
 
@@ -203,6 +249,8 @@ async function fetchOrdersByDate(
           const match: RegExpMatchArray | null = linkHeader.match(/page_info=([^&>]+)/);
           if (match) {
             pageInfo = match[1];
+            // Add delay before fetching next page to stay under rate limits
+            await sleep(300);
           } else {
             hasNextPage = false;
           }
