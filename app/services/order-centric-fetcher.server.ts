@@ -42,7 +42,7 @@ const BASE_RETRY_DELAY = 500; // Start with 500ms delay
  * Fetch orders by capture date range using dual-query strategy
  *
  * Uses BOTH created_at and updated_at queries to ensure comprehensive coverage:
- * - Query 1 (created_at): Catches orders created near target date (uses full buffer)
+ * - Query 1 (created_at): Catches orders created up to a week before capture (uses -7/+1 buffer)
  * - Query 2 (updated_at): Catches orders with recent updates/edits/refunds (tighter window)
  * - Results are combined and deduplicated by order ID
  *
@@ -53,8 +53,8 @@ const BASE_RETRY_DELAY = 500; // Start with 500ms delay
  *
  * @param shop - Shop domain
  * @param accessToken - Shopify access token
- * @param startDate - Start date for created_at buffer (YYYY-MM-DD format, typically targetDate - 2 days)
- * @param endDate - End date for created_at buffer (YYYY-MM-DD format, typically targetDate + 2 days)
+ * @param startDate - Start date for created_at buffer (YYYY-MM-DD format, typically targetDate - 7 days)
+ * @param endDate - End date for created_at buffer (YYYY-MM-DD format, typically targetDate + 1 day)
  * @returns Array of orders that had captures in this date range
  */
 export async function fetchOrdersByCaptureDateRange(

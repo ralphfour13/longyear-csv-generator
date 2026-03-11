@@ -50,12 +50,13 @@ export async function reconcileOrdersByDate(
   const enrichedTransactions: EnrichedTransaction[] = [];
 
   try {
-    // Fetch orders with activity in the date range (±2 day buffer for created_at query)
+    // Fetch orders with activity in the date range (-7/+1 day buffer for created_at query)
     // The fetcher uses dual-query strategy:
-    // - created_at: Uses full ±2 day buffer to catch orders created near target date
-    // - updated_at: Uses ±1 day buffer to catch recently modified orders
-    const startDate = addDays(targetDate, -2);
-    const endDate = addDays(targetDate, 2);
+    // - created_at: Uses -7/+1 day buffer to catch orders created up to a week before capture
+    // - updated_at: Uses ±1 day buffer to catch recently modified orders (unchanged)
+    // Orders can't be created in the future, so +1 day is sufficient forward buffer
+    const startDate = addDays(targetDate, -7);
+    const endDate = addDays(targetDate, 1);
 
     const orders = await fetchOrdersByCaptureDateRange(
       shop,
