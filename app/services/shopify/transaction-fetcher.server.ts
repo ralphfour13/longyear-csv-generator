@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { Transaction, TransactionFee } from '../../types/journal-entry';
+import { retryShopifyAPI } from '../../utils/retry';
 
 /**
  * Fetch transactions for a specific order
@@ -18,31 +19,33 @@ export async function fetchOrderTransactions(
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}/transactions.json`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
+    return await retryShopifyAPI(async () => {
+      const response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return [];
+      if (!response.ok) {
+        if (response.status === 404) {
+          return [];
+        }
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch transactions: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch transactions: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.transactions && Array.isArray(data.transactions)) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return data.transactions.map((txn: any) => parseTransaction(txn));
-    }
+      if (data.transactions && Array.isArray(data.transactions)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return data.transactions.map((txn: any) => parseTransaction(txn));
+      }
 
-    return [];
+      return [];
+    });
   } catch (error) {
     console.error(`Error fetching transactions for order ${orderId}:`, error);
     throw error;
@@ -146,30 +149,32 @@ export async function fetchTransactionById(
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}/transactions/${transactionId}.json`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
+    return await retryShopifyAPI(async () => {
+      const response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch transaction: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch transaction: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.transaction) {
-      return parseTransaction(data.transaction);
-    }
+      if (data.transaction) {
+        return parseTransaction(data.transaction);
+      }
 
-    return null;
+      return null;
+    });
   } catch (error) {
     console.error(`Error fetching transaction ${transactionId}:`, error);
     throw error;

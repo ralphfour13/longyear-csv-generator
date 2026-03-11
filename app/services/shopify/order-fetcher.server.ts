@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { Order, OrderLineItem, Refund, RefundLineItem } from '../../types/journal-entry';
+import { retryShopifyAPI } from '../../utils/retry';
 
 /**
  * Fetch order details by order ID
@@ -17,30 +18,32 @@ export async function fetchOrderById(
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}.json`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
+    return await retryShopifyAPI(async () => {
+      const response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch order: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch order: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (data.order) {
-      return parseOrder(data.order);
-    }
+      if (data.order) {
+        return parseOrder(data.order);
+      }
 
-    return null;
+      return null;
+    });
   } catch (error) {
     console.error(`Error fetching order ${orderId}:`, error);
     throw error;
@@ -184,21 +187,28 @@ export async function fetchOrdersByDateRange(
     const url = `${baseUrl}?${params.toString()}`;
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
+      const result = await retryShopifyAPI(async () => {
+        const response = await fetch(url, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to fetch orders: ${response.status} ${response.statusText} - ${errorText}`
+          );
+        }
+
+        const data = await response.json();
+        const linkHeader = response.headers.get('Link');
+
+        return { data, linkHeader };
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to fetch orders: ${response.status} ${response.statusText} - ${errorText}`
-        );
-      }
-
-      const data = await response.json();
+      const { data, linkHeader } = result;
 
       if (data.orders && Array.isArray(data.orders)) {
         for (const orderData of data.orders) {
@@ -206,7 +216,6 @@ export async function fetchOrdersByDateRange(
         }
 
         // Check for Link header for pagination
-        const linkHeader = response.headers.get('Link');
         if (linkHeader && linkHeader.includes('rel="next"')) {
           // Extract page_info from Link header
           const match = linkHeader.match(/page_info=([^&>]+)/);

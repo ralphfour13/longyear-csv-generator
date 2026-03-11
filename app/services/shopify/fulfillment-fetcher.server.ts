@@ -1,4 +1,5 @@
 import type { OrderLineItem } from '../../types/journal-entry';
+import { retryShopifyAPI } from '../../utils/retry';
 
 /**
  * Fulfillment line item data from Shopify
@@ -56,69 +57,71 @@ export async function fetchFulfilledLineItems(
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}/fulfillments.json`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
+    return await retryShopifyAPI(async () => {
+      const response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        // Order exists but has no fulfillments yet
-        console.log(`Order ${orderId} has no fulfillments yet`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Order exists but has no fulfillments yet
+          console.log(`Order ${orderId} has no fulfillments yet`);
+          return [];
+        }
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch fulfillments for order ${orderId}: ${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const data: ShopifyFulfillmentsResponse = await response.json();
+
+      if (!data.fulfillments || data.fulfillments.length === 0) {
+        console.log(`Order ${orderId} has no fulfillments`);
         return [];
       }
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch fulfillments for order ${orderId}: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
 
-    const data: ShopifyFulfillmentsResponse = await response.json();
+      // Extract line items from all fulfillments and aggregate by line item ID
+      const fulfilledItemsMap = new Map<string, FulfilledLineItem>();
 
-    if (!data.fulfillments || data.fulfillments.length === 0) {
-      console.log(`Order ${orderId} has no fulfillments`);
-      return [];
-    }
+      for (const fulfillment of data.fulfillments) {
+        // Only include successful fulfillments
+        if (fulfillment.status === 'cancelled' || fulfillment.status === 'error') {
+          console.log(
+            `Skipping ${fulfillment.status} fulfillment ${fulfillment.id} for order ${orderId}`
+          );
+          continue;
+        }
 
-    // Extract line items from all fulfillments and aggregate by line item ID
-    const fulfilledItemsMap = new Map<string, FulfilledLineItem>();
+        for (const item of fulfillment.line_items) {
+          const lineItemId = item.id.toString();
+          const existingItem = fulfilledItemsMap.get(lineItemId);
 
-    for (const fulfillment of data.fulfillments) {
-      // Only include successful fulfillments
-      if (fulfillment.status === 'cancelled' || fulfillment.status === 'error') {
-        console.log(
-          `Skipping ${fulfillment.status} fulfillment ${fulfillment.id} for order ${orderId}`
-        );
-        continue;
-      }
-
-      for (const item of fulfillment.line_items) {
-        const lineItemId = item.id.toString();
-        const existingItem = fulfilledItemsMap.get(lineItemId);
-
-        if (existingItem) {
-          // Item was fulfilled in multiple shipments - sum quantities
-          existingItem.quantity += item.quantity;
-        } else {
-          fulfilledItemsMap.set(lineItemId, {
-            lineItemId,
-            sku: item.sku,
-            quantity: item.quantity,
-            productTitle: item.name,
-          });
+          if (existingItem) {
+            // Item was fulfilled in multiple shipments - sum quantities
+            existingItem.quantity += item.quantity;
+          } else {
+            fulfilledItemsMap.set(lineItemId, {
+              lineItemId,
+              sku: item.sku,
+              quantity: item.quantity,
+              productTitle: item.name,
+            });
+          }
         }
       }
-    }
 
-    const fulfilledItems = Array.from(fulfilledItemsMap.values());
+      const fulfilledItems = Array.from(fulfilledItemsMap.values());
 
-    console.log(
-      `📦 Order ${orderId}: Found ${fulfilledItems.length} fulfilled line items from ${data.fulfillments.length} fulfillment(s)`
-    );
+      console.log(
+        `📦 Order ${orderId}: Found ${fulfilledItems.length} fulfilled line items from ${data.fulfillments.length} fulfillment(s)`
+      );
 
-    return fulfilledItems;
+      return fulfilledItems;
+    });
   } catch (error) {
     console.error(`Error fetching fulfillments for order ${orderId}:`, error);
     throw error;

@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { BalanceTransaction, FeeBreakdown } from '../../types/journal-entry';
+import { retryShopifyAPI } from '../../utils/retry';
 
 /**
  * Fetch balance transactions for a specific payout
@@ -34,21 +35,23 @@ export async function fetchBalanceTransactions(
     const url = `${baseUrl}?${params.toString()}`;
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
+      const data = await retryShopifyAPI(async () => {
+        const response = await fetch(url, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to fetch balance transactions: ${response.status} ${response.statusText} - ${errorText}`
+          );
+        }
+
+        return await response.json();
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to fetch balance transactions: ${response.status} ${response.statusText} - ${errorText}`
-        );
-      }
-
-      const data = await response.json();
 
       if (data.transactions && Array.isArray(data.transactions)) {
         for (const txn of data.transactions) {
@@ -146,21 +149,23 @@ export async function fetchBalanceTransactionsByDate(
     const url = `${baseUrl}?${params.toString()}`;
 
     try {
-      const response = await fetch(url, {
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
+      const data = await retryShopifyAPI(async () => {
+        const response = await fetch(url, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to fetch balance transactions: ${response.status} ${response.statusText} - ${errorText}`
+          );
+        }
+
+        return await response.json();
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Failed to fetch balance transactions: ${response.status} ${response.statusText} - ${errorText}`
-        );
-      }
-
-      const data = await response.json();
 
       if (data.transactions && Array.isArray(data.transactions)) {
         for (const txn of data.transactions) {
