@@ -1,5 +1,14 @@
 import { Decimal } from 'decimal.js';
 
+// Retry configuration for rate limit handling
+const MAX_RETRIES = 5;
+const BASE_RETRY_DELAY = 500; // 500ms → 1000ms → 2000ms → 4000ms → 8000ms
+
+// Helper function for delays
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Enriched order data for Daily Sales Report
  * Contains additional fields beyond standard Order interface
@@ -67,32 +76,77 @@ async function fetchTransactionsForEnrichment(
 ): Promise<any[]> {
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}/transactions.json`;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
+  let response: Response | null = null;
 
-    if (!response.ok) {
+  // Retry loop for handling rate limits
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Handle 429 rate limit errors with retry
+      if (response.status === 429) {
+        if (attempt < MAX_RETRIES) {
+          const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+          console.log(
+            `Rate limit hit on transactions endpoint for order ${orderId}. ` +
+            `Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+          );
+          await sleep(delay);
+          continue; // Retry the request
+        } else {
+          const errorText = await response.text();
+          console.warn(
+            `Failed to fetch transactions for order ${orderId} after ${MAX_RETRIES} retries. ` +
+            `Returning empty array.`
+          );
+          return []; // Return empty array instead of throwing
+        }
+      }
+
+      // Handle 404 as valid case (order has no transactions)
       if (response.status === 404) {
         console.warn(`No transactions found for order ${orderId}`);
         return [];
       }
-      const errorText = await response.text();
-      throw new Error(
-        `Failed to fetch transactions for order ${orderId}: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
 
-    const data = await response.json();
-    return data.transactions || [];
-  } catch (error) {
-    console.error(`Error fetching transactions for order ${orderId}:`, error);
-    // Return empty array rather than throwing - we can still enrich other fields
-    return [];
+      // If request succeeded, break out of retry loop
+      if (response.ok) {
+        const data = await response.json();
+        return data.transactions || [];
+      }
+
+      // For other non-retriable errors, log and return empty array
+      const errorText = await response.text();
+      console.error(
+        `Failed to fetch transactions for order ${orderId}: ` +
+        `${response.status} ${response.statusText} - ${errorText}`
+      );
+      return []; // Return empty array rather than throwing
+
+    } catch (error) {
+      // If this is the last attempt, return empty array
+      if (attempt === MAX_RETRIES) {
+        console.error(`Error fetching transactions for order ${orderId}:`, error);
+        return [];
+      }
+
+      // For network errors or other exceptions, retry with backoff
+      const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+      console.log(
+        `Error fetching transactions for order ${orderId}. ` +
+        `Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+      );
+      await sleep(delay);
+    }
   }
+
+  // Fallback (should not reach here)
+  return [];
 }
 
 /**
@@ -119,93 +173,123 @@ export async function enrichOrderData(
 ): Promise<EnrichedOrderData | null> {
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}.json`;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      },
-    });
+  let response: Response | null = null;
+  let orderData: any = null;
 
-    if (!response.ok) {
+  // Retry loop for handling rate limits
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      response = await fetch(url, {
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Handle 429 rate limit errors with retry
+      if (response.status === 429) {
+        if (attempt < MAX_RETRIES) {
+          const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+          console.log(
+            `Rate limit hit on enrichment endpoint for order ${orderId}. ` +
+            `Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+          );
+          await sleep(delay);
+          continue; // Retry the request
+        } else {
+          const errorText = await response.text();
+          throw new Error(
+            `Failed to enrich order ${orderId} after ${MAX_RETRIES} retries: ` +
+            `${response.status} ${response.statusText} - ${errorText}`
+          );
+        }
+      }
+
+      // Handle 404 as valid case (order not found)
       if (response.status === 404) {
         console.warn(`Order ${orderId} not found for enrichment`);
         return null;
       }
+
+      // If request succeeded, break out of retry loop
+      if (response.ok) {
+        const data = await response.json();
+        if (!data.order) {
+          return null;
+        }
+        orderData = data.order;
+        break; // Success - exit retry loop
+      }
+
+      // For other non-retriable errors, throw immediately
       const errorText = await response.text();
       throw new Error(
-        `Failed to fetch order for enrichment: ${response.status} ${response.statusText} - ${errorText}`
+        `Failed to fetch order for enrichment: ` +
+        `${response.status} ${response.statusText} - ${errorText}`
       );
+
+    } catch (error) {
+      // If this is the last attempt or not a retryable error, throw
+      if (attempt === MAX_RETRIES ||
+          !(error instanceof Error) ||
+          !error.message.includes('429')) {
+        console.error(`Error enriching order ${orderId}:`, error);
+        throw error;
+      }
+
+      // For 429 errors on early attempts, retry with backoff
+      const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+      console.log(
+        `Error enriching order ${orderId}. ` +
+        `Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+      );
+      await sleep(delay);
     }
-
-    const data = await response.json();
-
-    if (!data.order) {
-      return null;
-    }
-
-    const orderData = data.order;
-
-    // Fetch transactions separately
-    // NOTE: The /orders/{id}.json endpoint does NOT include transactions!
-    // We must fetch them from /orders/{id}/transactions.json
-    const transactionData = await fetchTransactionsForEnrichment(shop, accessToken, orderId);
-
-    // Extract tags
-    const tags = orderData.tags || '';
-
-    // Parse tax lines (up to 3)
-    const taxLines = parseTaxBreakdown(orderData.tax_lines || []);
-
-    // Extract shipping address
-    const shippingAddress = parseShippingAddress(orderData.shipping_address);
-
-    // Parse transactions (from separate fetch, NOT from orderData)
-    const transactions = parseTransactions(transactionData);
-
-    // Calculate payment breakdown (now has actual transaction data!)
-    const paymentBreakdown = calculatePaymentBreakdown(transactions);
-
-    // Extract status fields
-    const fulfillmentStatus = orderData.fulfillment_status || 'unfulfilled';
-    const financialStatus = orderData.financial_status || 'pending';
-
-    // Extract shipping price
-    const totalShippingPrice = new Decimal(
-      orderData.total_shipping_price_set?.shop_money?.amount ||
-      orderData.total_shipping_price ||
-      0
-    );
-
-    // Extract current total price (after edits/refunds)
-    const currentTotalPrice = new Decimal(
-      orderData.current_total_price ||
-      orderData.total_price ||
-      0
-    );
-
-    // Calculate total refunded
-    const totalRefunded = new Decimal(
-      orderData.total_refunded ||
-      0
-    );
-
-    return {
-      tags,
-      taxLines,
-      shippingAddress,
-      transactions,
-      paymentBreakdown,
-      fulfillmentStatus,
-      financialStatus,
-      totalShippingPrice,
-      currentTotalPrice,
-      totalRefunded,
-    };
-  } catch (error) {
-    console.error(`Error enriching order ${orderId}:`, error);
-    throw error;
   }
+
+  // If we exhausted retries without success, throw error
+  if (!orderData) {
+    throw new Error(`Failed to enrich order ${orderId} after all retry attempts`);
+  }
+
+  // Fetch transactions separately (now with retry logic!)
+  const transactionData = await fetchTransactionsForEnrichment(shop, accessToken, orderId);
+
+  // Extract and parse order data (same as before)
+  const tags = orderData.tags || '';
+  const taxLines = parseTaxBreakdown(orderData.tax_lines || []);
+  const shippingAddress = parseShippingAddress(orderData.shipping_address);
+  const transactions = parseTransactions(transactionData);
+  const paymentBreakdown = calculatePaymentBreakdown(transactions);
+  const fulfillmentStatus = orderData.fulfillment_status || 'unfulfilled';
+  const financialStatus = orderData.financial_status || 'pending';
+  const totalShippingPrice = new Decimal(
+    orderData.total_shipping_price_set?.shop_money?.amount ||
+    orderData.total_shipping_price ||
+    0
+  );
+  const currentTotalPrice = new Decimal(
+    orderData.current_total_price ||
+    orderData.total_price ||
+    0
+  );
+  const totalRefunded = new Decimal(
+    orderData.total_refunded ||
+    0
+  );
+
+  return {
+    tags,
+    taxLines,
+    shippingAddress,
+    transactions,
+    paymentBreakdown,
+    fulfillmentStatus,
+    financialStatus,
+    totalShippingPrice,
+    currentTotalPrice,
+    totalRefunded,
+  };
 }
 
 /**

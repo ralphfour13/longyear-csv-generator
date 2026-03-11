@@ -26,6 +26,11 @@ import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { Cin7ProductService } from './cin7/cin7-product-service.server';
 
+// Helper function for rate limiting delays
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Reconcile orders by capture date
  *
@@ -394,6 +399,10 @@ async function processOrderCaptures(
     console.error(`Failed to enrich order ${order.name}:`, enrichError);
     warnings.push(`Failed to enrich order ${order.name} for export`);
   }
+
+  // Rate limiting delay: prevents rapid sequential enrichment calls
+  // when processing multiple orders
+  await sleep(300);
 }
 
 /**
@@ -458,6 +467,10 @@ async function processOrderRefunds(
     console.error(`Failed to enrich refund order ${order.name}:`, enrichError);
     warnings.push(`Failed to enrich refund order ${order.name} for export`);
   }
+
+  // Rate limiting delay: prevents rapid sequential enrichment calls
+  // when processing multiple orders
+  await sleep(300);
 }
 
 /**
