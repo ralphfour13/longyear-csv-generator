@@ -11,7 +11,7 @@
 
 import { Decimal } from 'decimal.js';
 import type { Order, JournalEntry } from '../types/journal-entry';
-import { getOriginalTaxAmount } from './order-centric-journal-generator.server';
+import { calculateTaxAmount } from './order-centric-journal-generator.server';
 
 /**
  * Consistency Check Result
@@ -306,7 +306,7 @@ export async function generateConsistencyReport(
     }
 
     // 3. Check tax amounts
-    const orderTax = getOriginalTaxAmount(order);
+    const orderTax = calculateTaxAmount(order);
     const journalTax = orderEntries
       .filter((e) => e.accountName?.toLowerCase().includes('tax'))
       .reduce((sum, e) => sum.plus(e.credit).minus(e.debit), new Decimal(0));
