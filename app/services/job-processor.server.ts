@@ -1,6 +1,5 @@
 import { getJobStatus, updateJobStatus, cleanupOldJobs, getShopJobs } from './background-jobs.server';
 import { processExport } from './batch-processor.server';
-import { format } from 'date-fns';
 
 // Track processing state per shop to prevent concurrent processing of the same shop's jobs
 // Key: shop domain, Value: true if currently processing
@@ -22,91 +21,31 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
       startedAt: new Date().toISOString(),
     });
 
-    console.log(`[Job ${jobId}] Starting export for ${shop}`);
+    console.log(`[Job ${jobId}] Starting export for ${shop} (${job.startDate})`);
 
-    // Check if date range or single date
-    const useRange = !!job.endDate;
+    // All jobs are now single-date exports (date ranges are split into separate jobs)
+    const result = await processExport(
+      shop,
+      accessToken,
+      job.startDate,
+      job.fileOptions
+    );
 
-    if (useRange && job.endDate) {
-      // Date range processing
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allFiles: any[] = [];
-      let totalEntries = 0;
-      let allBalanced = true;
-      const dates: string[] = [];
+    // Mark as completed
+    await updateJobStatus(jobId, {
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      result: {
+        success: true,
+        message: `Export completed for ${job.startDate}`,
+        filename: result.filename,
+        files: result.files,
+        entryCount: result.entryCount,
+        balanced: result.balanced,
+      },
+    });
 
-      const currentDate = new Date(job.startDate);
-      const endDate = new Date(job.endDate);
-
-      while (currentDate <= endDate) {
-        const dateStr = format(currentDate, 'yyyy-MM-dd');
-        dates.push(dateStr);
-
-        const result = await processExport(
-          shop,
-          accessToken,
-          dateStr,
-          job.fileOptions
-        );
-
-        // Append date to filenames for clarity
-        const dateLabel = format(currentDate, 'MMM-dd');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        result.files.forEach((file: any) => {
-          const nameParts = file.filename.split('.');
-          const ext = nameParts.pop();
-          const baseName = nameParts.join('.');
-          file.filename = `${baseName}_${dateLabel}.${ext}`;
-          file.date = dateStr;
-        });
-
-        allFiles.push(...result.files);
-        totalEntries += result.entryCount;
-        if (!result.balanced) allBalanced = false;
-
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      // Mark as completed
-      await updateJobStatus(jobId, {
-        status: 'completed',
-        completedAt: new Date().toISOString(),
-        result: {
-          success: true,
-          message: `Export completed for ${dates.length} days (${format(new Date(job.startDate), 'MMM d')} - ${format(endDate, 'MMM d, yyyy')})`,
-          files: allFiles,
-          entryCount: totalEntries,
-          balanced: allBalanced,
-          dateRange: { start: job.startDate, end: job.endDate, count: dates.length },
-        },
-      });
-
-      console.log(`[Job ${jobId}] Completed: ${dates.length} days, ${totalEntries} entries`);
-    } else {
-      // Single date processing
-      const result = await processExport(
-        shop,
-        accessToken,
-        job.startDate,
-        job.fileOptions
-      );
-
-      // Mark as completed
-      await updateJobStatus(jobId, {
-        status: 'completed',
-        completedAt: new Date().toISOString(),
-        result: {
-          success: true,
-          message: 'Export completed successfully',
-          filename: result.filename,
-          files: result.files,
-          entryCount: result.entryCount,
-          balanced: result.balanced,
-        },
-      });
-
-      console.log(`[Job ${jobId}] Completed: ${result.entryCount} entries`);
-    }
+    console.log(`[Job ${jobId}] Completed: ${result.entryCount} entries`);
   } catch (error) {
     console.error(`[Job ${jobId}] Failed:`, error);
 

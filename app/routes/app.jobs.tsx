@@ -137,25 +137,11 @@ export default function Jobs() {
     );
   };
 
-  // Format date range - parse YYYY-MM-DD strings without timezone conversion
-  const formatDateRange = (job: ExportJob) => {
-    // Helper to format YYYY-MM-DD string directly without timezone conversion
-    const formatDateString = (dateStr: string): string => {
-      const [, month, day] = dateStr.split('-').map(Number);
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${monthNames[month - 1]} ${day}`;
-    };
-
-    const formatDateStringFull = (dateStr: string): string => {
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${monthNames[month - 1]} ${day}, ${year}`;
-    };
-
-    if (job.endDate) {
-      return `${formatDateString(job.startDate)} - ${formatDateStringFull(job.endDate)}`;
-    }
-    return formatDateStringFull(job.startDate);
+  // Format date - parse YYYY-MM-DD strings without timezone conversion
+  const formatDateString = (dateStr: string): string => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[month - 1]} ${day}, ${year}`;
   };
 
   // Calculate duration
@@ -339,7 +325,7 @@ export default function Jobs() {
                     Status
                   </th>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '12px', color: '#6D7175', textTransform: 'uppercase' }}>
-                    Date Range
+                    Date
                   </th>
                   <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, fontSize: '12px', color: '#6D7175', textTransform: 'uppercase' }}>
                     Created
@@ -375,7 +361,7 @@ export default function Jobs() {
                       {getStatusBadge(job.status)}
                     </td>
                     <td style={{ padding: '12px', fontSize: '14px' }}>
-                      {formatDateRange(job)}
+                      {formatDateString(job.startDate)}
                     </td>
                     <td style={{ padding: '12px', fontSize: '14px' }}>
                       {format(new Date(job.createdAt), 'MMM d, h:mm a')}

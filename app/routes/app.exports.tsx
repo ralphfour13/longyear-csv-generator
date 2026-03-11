@@ -64,7 +64,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const { processPendingJobs } = await import('../services/job-processor.server');
 
       if (useRange) {
-        // Date range mode
+        // Date range mode - create separate job for each day
         const startDateParam = formData.get('startDate');
         const endDateParam = formData.get('endDate');
 
@@ -80,13 +80,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           return { success: false, error: 'Start date must be before end date', status: 400 };
         }
 
-        // Create background job
-        const jobId = await createExportJob(
-          shop,
-          startDateParam,
-          endDateParam,
-          fileOptions
-        );
+        // Create separate job for each day in the range
+        const jobIds: string[] = [];
+        const currentDate = new Date(startDate);
+
+        while (currentDate <= endDate) {
+          const dateStr = format(currentDate, 'yyyy-MM-dd');
+
+          const jobId = await createExportJob(
+            shop,
+            dateStr,
+            undefined, // No endDate - each job is for a single day
+            fileOptions
+          );
+
+          jobIds.push(jobId);
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
 
         // Start processing in background (don't await)
         const accessToken = session.accessToken || '';
@@ -94,13 +104,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           console.error('Background job processing error:', error);
         });
 
-        const dayCount = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const dayCount = jobIds.length;
 
         return {
           success: true,
           processing: true,
-          jobId,
-          message: `Export started for ${dayCount} days (${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}). Processing in background...`,
+          jobId: jobIds[0], // Return first job ID for compatibility
+          jobIds, // Return all job IDs
+          message: `Created ${dayCount} export jobs (${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}). Processing in background...`,
           dateRange: { start: startDateParam, end: endDateParam, count: dayCount },
         };
       } else {
