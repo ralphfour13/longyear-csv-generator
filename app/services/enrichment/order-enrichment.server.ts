@@ -99,7 +99,6 @@ async function fetchTransactionsForEnrichment(
           await sleep(delay);
           continue; // Retry the request
         } else {
-          const errorText = await response.text();
           console.warn(
             `Failed to fetch transactions for order ${orderId} after ${MAX_RETRIES} retries. ` +
             `Returning empty array.`
@@ -174,6 +173,7 @@ export async function enrichOrderData(
   const url = `https://${shop}/admin/api/2024-10/orders/${orderId}.json`;
 
   let response: Response | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let orderData: any = null;
 
   // Retry loop for handling rate limits

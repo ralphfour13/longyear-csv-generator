@@ -88,24 +88,37 @@ git push origin Production
 
 ---
 
-### 4. Manual Deployment (Fallback)
+### 4. Manual Deployment (Current Standard Process)
 
-If CI/CD is down or you need to bypass it:
+**Current deployment process** (run locally before deploying):
 
 ```bash
-# Deploy with default settings (uses last deployment config)
-caprover deploy --default
+# Install dependencies, run all checks, build, and deploy
+npm i && npm run typecheck && npm run lint && npm run build && caprover deploy --default
 ```
 
-**What happens**:
-1. CapRover tars the current directory
-2. Uploads to CapRover server
-3. Builds Docker image (uses `Dockerfile`)
-4. Deploys new container
-5. App restarts automatically
+**What this does**:
+1. `npm i` - Installs/updates dependencies (ensures clean state)
+2. `npm run typecheck` - Validates TypeScript types (catches type errors)
+3. `npm run lint` - Checks code style and quality (catches lint errors)
+4. `npm run build` - Builds production bundle (verifies build succeeds)
+5. `caprover deploy --default` - Deploys to CapRover server
+
+**Why this sequence**:
+- ✅ Catches errors locally before deployment
+- ✅ Ensures dependencies are up-to-date
+- ✅ Verifies build works before pushing to server
+- ✅ Faster feedback loop (fail fast locally)
+- ✅ Prevents broken deployments
+
+**Deployment time**: ~2-5 minutes (depending on changes)
 
 **Expected output**:
 ```
+added 1234 packages, and audited 1235 packages in 15s
+✓ Type checking passed
+✓ Linting passed
+✓ Build completed successfully
 Preparing deployment to CapRover...
 Deploying sage50-journal-entry-sync-prod to four13-cap...
 Build has finished successfully!
@@ -113,7 +126,18 @@ Deployed successfully sage50-journal-entry-sync-prod
 App is available at https://sage50-journal-entry-sync-prod.server.four13.dev
 ```
 
-**Deployment time**: ~1-3 minutes
+**Quick deployment** (skip checks if already validated):
+
+```bash
+# Deploy with default settings only (uses last deployment config)
+caprover deploy --default
+```
+
+**When to use**:
+- CI/CD is down or you need to bypass it
+- Already ran checks locally and verified
+- Hot fix deployment (already tested)
+- Deployment time: ~1-3 minutes
 
 ---
 
