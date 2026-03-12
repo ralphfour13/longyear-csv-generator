@@ -98,7 +98,7 @@ jobs:
       - name: Authenticate with CapRover
         run: |
           echo "Using API token authentication from 1Password"
-          caprover login --caproverPassword "$CAPROVER_API_TOKEN" --caproverUrl "${{ env.CAPROVER_URL }}"
+          caprover login --caproverPassword "$CAPROVER_API_TOKEN" --caproverUrl "${{ env.CAPROVER_URL }}" --caproverName "four13-cap"
 
       - name: Create deployment tarball
         run: |
