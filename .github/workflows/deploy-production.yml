@@ -90,15 +90,10 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          CAPROVER_API_TOKEN: "op://sage50-journal-entry-sync/CAPROVER/api-token"
+          CAPROVER_APP_TOKEN: "op://sage50-journal-entry-sync/CAPROVER/app-token"
 
       - name: Install CapRover CLI
         run: npm install -g caprover
-
-      - name: Authenticate with CapRover
-        run: |
-          echo "Using API token authentication from 1Password"
-          caprover login --caproverPassword "$CAPROVER_API_TOKEN" --caproverUrl "${{ env.CAPROVER_URL }}" --caproverName "four13-cap"
 
       - name: Create deployment tarball
         run: |
@@ -120,7 +115,8 @@ jobs:
           echo "Deploying to CapRover app: ${{ env.CAPROVER_APP }}"
           caprover deploy \
             --caproverUrl "${{ env.CAPROVER_URL }}" \
-            --caproverApp "${{ env.CAPROVER_APP }}" \
+            --appToken "$CAPROVER_APP_TOKEN" \
+            --appName "${{ env.CAPROVER_APP }}" \
             --tarFile deploy.tar 2>&1 | tee deploy.log
 
           echo "✓ Deployment completed"
