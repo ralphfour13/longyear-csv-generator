@@ -21,10 +21,14 @@ RUN npx prisma generate
 
 # Cache-busting: CapRover passes git commit SHA, forcing rebuild when code changes
 ARG CAPROVER_GIT_COMMIT_SHA
+ENV APP_VERSION=${CAPROVER_GIT_COMMIT_SHA:-dev}
 RUN echo "Building commit: ${CAPROVER_GIT_COMMIT_SHA:-dev}"
 
 # Copy application code (now rebuilds when commit SHA changes)
 COPY . .
+
+# Write version info to file for runtime access
+RUN echo "{\"commit\":\"${CAPROVER_GIT_COMMIT_SHA:-dev}\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /app/version.json
 
 # Build the app
 RUN npm run build
