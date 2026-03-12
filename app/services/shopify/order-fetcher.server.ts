@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import type { Order, OrderLineItem, Refund, RefundLineItem } from '../../types/journal-entry';
+import type { Order, OrderLineItem, OrderAdjustment, Refund, RefundLineItem } from '../../types/journal-entry';
 import { retryShopifyAPI } from '../../utils/retry';
 
 /**
@@ -268,6 +268,16 @@ function parseRefunds(refundsData: any[]): Refund[] {
       },
     }));
 
+    // Parse order adjustments (refund discrepancies, shipping refunds, etc.)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const order_adjustments: OrderAdjustment[] = (refund.order_adjustments || []).map((adj: any) => ({
+      id: adj.id?.toString() || '',
+      kind: adj.kind || 'other',
+      amount: adj.amount || '0',
+      reason: adj.reason || undefined,
+      tax_amount: adj.tax_amount || undefined,
+    }));
+
     return {
       id: refund.id.toString(),
       orderId: refund.order_id?.toString() || '',
@@ -275,6 +285,8 @@ function parseRefunds(refundsData: any[]): Refund[] {
       processedAt: refund.processed_at,
       transactions: [], // Will be populated from order.transactions separately
       refund_line_items,
+      order_adjustments: order_adjustments.length > 0 ? order_adjustments : undefined,
+      note: refund.note || undefined,
     };
   });
 }

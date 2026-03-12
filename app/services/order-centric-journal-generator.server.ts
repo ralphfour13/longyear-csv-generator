@@ -357,6 +357,37 @@ export async function createRefundJournalEntries(
       memo: `Refund ${accountName} - Order ${order.name}`,
     });
 
+    // Check if this is a refund discrepancy (manual price adjustment with no items returned)
+    // These are adjustments where money is refunded but no items are returned to inventory
+    // Example: Discount didn't apply correctly, merchant manually refunds the difference
+    const isRefundDiscrepancy = refund?.order_adjustments?.some(
+      adj => adj.kind === 'refund_discrepancy'
+    ) && (!refund?.refund_line_items || refund.refund_line_items.length === 0);
+
+    if (isRefundDiscrepancy) {
+      // Handle as price adjustment - money goes out but no sales reversal needed
+      // The RF- entry (payment out) was already created above
+      // Create a debit to Discounts/Allowances to balance the entry
+      const refundNote = refund?.note || 'Price Adjustment';
+
+      entries.push({
+        date: targetDate,
+        reference: `RF-${order.name}`,
+        account: accountMappings.discounts.accountCode,
+        accountName: accountMappings.discounts.accountName,
+        debit: refundAmount,
+        credit: new Decimal(0),
+        memo: `${refundNote} - Order ${order.name}`,
+      });
+
+      console.log(
+        `💰 Order ${order.name}: Refund discrepancy (price adjustment) - $${refundAmount.toFixed(2)} ` +
+        `(Note: "${refundNote}")`
+      );
+
+      continue; // Skip normal sales reversal processing
+    }
+
     // SO- REVERSAL ENTRIES: Use ACTUAL refund breakdown from refund_line_items
     let refundedSubtotal = new Decimal(0);
     let refundedTax = new Decimal(0);
