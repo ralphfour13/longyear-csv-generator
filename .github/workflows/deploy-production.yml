@@ -90,7 +90,7 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          CAPROVER_API_TOKEN: op://sage50-sync/caprover/api-token
+          CAPROVER_API_TOKEN: "op://sage50-journal-entry-sync/CAPROVER/api-token"
 
       - name: Install CapRover CLI
         run: npm install -g caprover
@@ -148,8 +148,8 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          SHOPIFY_CLI_TOKEN: op://sage50-sync/shopify/cli-token
-          SHOPIFY_API_SECRET: op://sage50-sync/shopify/api-secret
+          SHOPIFY_CLI_TOKEN: op://sage50-journal-entry-sync/SHOPIFY/cli-token
+          SHOPIFY_API_SECRET: op://sage50-journal-entry-sync/SHOPIFY/api-secret
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
