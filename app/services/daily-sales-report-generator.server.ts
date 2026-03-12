@@ -26,7 +26,7 @@ interface DailySalesReportRow {
   taxTotal: string;
   totalShipping: string;
   totalRefund: string;
-  currentTotal1: string; // First instance of current total (card payment)
+  currentTotal1: string; // Total payment from all methods (was: card only)
   cash: string;
   charge: string; // Travel Give Aways
   giftCard: string;
@@ -161,8 +161,14 @@ function transformToReportRow(
       }
     : enrichedData.paymentBreakdown;
 
-  // Current total (card payment goes to first instance)
-  const currentTotal1 = isRefund ? '' : paymentBreakdown.card.toFixed(2);
+  // Current total (sum of all payment methods)
+  const totalPayment = paymentBreakdown.card
+    .plus(paymentBreakdown.cash)
+    .plus(paymentBreakdown.giftCard)
+    .plus(paymentBreakdown.storeCredit)
+    .plus(paymentBreakdown.check)
+    .plus(paymentBreakdown.charge);
+  const currentTotal1 = isRefund ? '' : totalPayment.toFixed(2);
   const currentTotal2 = isRefund ? '' : order.currentTotalPrice.toFixed(2);
 
   // Refund amount (only for refund transactions)

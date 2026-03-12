@@ -182,6 +182,18 @@ export interface TransactionFee {
 }
 
 /**
+ * Order Adjustment
+ * Represents adjustments made during refunds (e.g., refund discrepancies)
+ */
+export interface OrderAdjustment {
+  id: string;
+  kind: 'refund_discrepancy' | 'shipping_refund' | 'other';
+  amount: string; // String amount (may be negative)
+  reason?: string;
+  tax_amount?: string;
+}
+
+/**
  * Refund
  * Contains refund transactions and line items for proper tax splitting
  */
@@ -192,6 +204,8 @@ export interface Refund {
   processedAt: string;
   transactions: Transaction[]; // Refund transactions
   refund_line_items: RefundLineItem[]; // Line items being refunded
+  order_adjustments?: OrderAdjustment[]; // Adjustments like refund discrepancies
+  note?: string; // Refund note/reason
 }
 
 /**
