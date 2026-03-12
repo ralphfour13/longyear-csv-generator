@@ -48,7 +48,15 @@ import type { CogsCalculation } from '../types/cin7';
  * - Tax should be: $31.28 - (currentSubtotalPrice) = proportional tax amount
  */
 export function calculateTaxAmount(order: Order): Decimal {
-  // If we have both current amounts, calculate tax from the difference
+  // REFUND FIX: For refunded orders, always use ORIGINAL tax amount
+  // The refund entries will properly reverse the tax
+  const isRefunded = order.financialStatus === 'refunded' || order.financialStatus === 'partially_refunded';
+  if (isRefunded) {
+    return order.totalTax || new Decimal(0);
+  }
+
+  // PARTIAL CAPTURE: If we have both current amounts and this is a true partial capture
+  // (items removed before payment), calculate tax from the difference
   if (order.currentTotalPrice && order.currentSubtotalPrice) {
     const currentTax = order.currentTotalPrice
       .minus(order.currentSubtotalPrice)
@@ -96,10 +104,25 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // PARTIAL CAPTURE FIX: Use currentSubtotalPrice for orders with line item removals
-  // For partial captures, currentSubtotalPrice reflects the actual captured amount
-  // Example: Order $95.91, items removed, captured $31.28 → use currentSubtotalPrice
-  const netSales = order.currentSubtotalPrice || order.subtotalPrice;
+  // PARTIAL CAPTURE vs SAME-DAY REFUND FIX:
+  // - For partial captures (items removed BEFORE payment): Use currentSubtotalPrice
+  //   Example: Order $95.91, items removed before capture, captured $31.28
+  // - For fully refunded orders: Use ORIGINAL subtotalPrice (the refund will reverse it)
+  //   Example: Order #80304 - sale $1.03, same-day refund $1.03
+  // - For partially refunded orders: Use ORIGINAL subtotalPrice (refund processed separately)
+  //   Example: Order #80284 - sale $1,129.92, later refund $183.97
+  //
+  // The key distinction: currentSubtotalPrice reflects post-refund state, but for journal
+  // entries we need the ORIGINAL sale amount. The refund entries handle the reversal.
+  const isRefunded = order.financialStatus === 'refunded' || order.financialStatus === 'partially_refunded';
+  const isPartialCapture = !isRefunded &&
+                           order.currentSubtotalPrice !== undefined &&
+                           order.currentSubtotalPrice.gt(0) &&
+                           order.currentSubtotalPrice.lt(order.subtotalPrice);
+
+  // Use currentSubtotalPrice ONLY for true partial captures (items removed before payment)
+  // For refunded orders, always use original amounts
+  const netSales: Decimal = isPartialCapture ? order.currentSubtotalPrice! : order.subtotalPrice;
 
   // CREDIT: Sales Revenue (NET - post-discount amount)
   // Add discount info to memo for transparency
