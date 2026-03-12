@@ -98,7 +98,7 @@ jobs:
       - name: Authenticate with CapRover
         run: |
           echo "Using API token authentication from 1Password"
-          caprover login --apiToken "$CAPROVER_API_TOKEN" --caproverUrl "${{ env.CAPROVER_URL }}"
+          caprover login --password "$CAPROVER_API_TOKEN" --caproverUrl "${{ env.CAPROVER_URL }}"
 
       - name: Create deployment tarball
         run: |
@@ -264,7 +264,7 @@ jobs:
           export-env: true
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          SLACK_WEBHOOK_URL: op://sage50-sync/slack/webhook-url
+          SLACK_WEBHOOK_URL: op://sage50-journal-entry-sync/SLACK/webhook-url
 
       - name: Determine deployment status
         id: status
