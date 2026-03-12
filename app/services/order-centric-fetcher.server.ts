@@ -450,6 +450,9 @@ function parseOrder(orderData: any): Order {
     currentTotalPrice: orderData.current_total_price
       ? new Decimal(orderData.current_total_price)
       : undefined,
+    currentTotalTax: orderData.current_total_tax
+      ? new Decimal(orderData.current_total_tax)
+      : undefined,
     totalTax: new Decimal(orderData.total_tax || 0),
     totalShipping,
     totalDiscounts: new Decimal(orderData.total_discounts || 0),

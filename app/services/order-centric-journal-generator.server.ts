@@ -37,15 +37,18 @@ import type { CogsCalculation } from '../types/cin7';
 /**
  * Calculate the tax amount for an order, handling partial captures.
  *
- * PARTIAL CAPTURE LOGIC:
- * - For partial captures (currentTotalPrice < totalPrice), calculate tax proportionally
- * - Tax = (currentTotalPrice - currentSubtotalPrice) where available
- * - Fallback: Use original totalTax if current amounts not available
+ * TAX SOURCE PRIORITY:
+ * 1. For refunded orders: Use original totalTax (refund entries handle reversal)
+ * 2. For partial captures: Use currentTotalTax from Shopify (actual tax after item removal)
+ * 3. For all other orders: Use totalTax from Shopify
  *
- * Example Partial Capture (Order #80211):
- * - Original: $95.91 total, $89.54 subtotal, $6.37 tax
- * - Removed items, captured: $31.28 total
- * - Tax should be: $31.28 - (currentSubtotalPrice) = proportional tax amount
+ * IMPORTANT: Always use Shopify's actual tax fields, NOT calculated from price differences.
+ * Previous approach of calculating tax as (currentTotalPrice - currentSubtotalPrice - shipping)
+ * produced incorrect results due to rounding and tax jurisdiction complexities.
+ *
+ * Example Order #80279:
+ * - Calculated method gave: $53.70 - $43.75 - $6.50 = $3.45 (WRONG)
+ * - Actual Shopify totalTax: $3.75 (CORRECT)
  */
 export function calculateTaxAmount(order: Order): Decimal {
   // REFUND FIX: For refunded orders, always use ORIGINAL tax amount
@@ -55,18 +58,16 @@ export function calculateTaxAmount(order: Order): Decimal {
     return order.totalTax || new Decimal(0);
   }
 
-  // PARTIAL CAPTURE: If we have both current amounts and this is a true partial capture
-  // (items removed before payment), calculate tax from the difference
-  if (order.currentTotalPrice && order.currentSubtotalPrice) {
-    const currentTax = order.currentTotalPrice
-      .minus(order.currentSubtotalPrice)
-      .minus(order.totalShipping || new Decimal(0));
+  // PARTIAL CAPTURE: If items were removed before payment, use currentTotalTax
+  // This reflects the actual tax on the captured items, not the original order tax
+  const isPartialCapture = order.currentTotalPrice !== undefined &&
+                           order.currentTotalPrice.lt(order.totalPrice);
 
-    // Tax should never be negative
-    return currentTax.greaterThan(0) ? currentTax : new Decimal(0);
+  if (isPartialCapture && order.currentTotalTax !== undefined) {
+    return order.currentTotalTax;
   }
 
-  // Fallback: Use original tax amount
+  // Default: Use original tax amount from Shopify
   return order.totalTax || new Decimal(0);
 }
 
