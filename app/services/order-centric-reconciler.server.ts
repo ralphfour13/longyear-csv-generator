@@ -32,6 +32,24 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Log order reconciliation values for debugging
+ * Shows original vs current values to help diagnose partial capture/refund issues
+ */
+function logOrderReconciliationValues(order: Order, usedValues: { sales: Decimal; tax: Decimal }): void {
+  const hasCurrentValues = order.currentSubtotalPrice !== undefined || order.currentTotalTax !== undefined;
+
+  console.log(`📊 Order ${order.name} Reconciliation Values:`);
+  console.log(`  Original: subtotal=$${order.subtotalPrice.toFixed(2)}, tax=$${(order.totalTax || new Decimal(0)).toFixed(2)}, total=$${order.totalPrice.toFixed(2)}`);
+
+  if (hasCurrentValues) {
+    console.log(`  Current:  subtotal=$${order.currentSubtotalPrice?.toFixed(2) ?? 'N/A'}, tax=$${order.currentTotalTax?.toFixed(2) ?? 'N/A'}, total=$${order.currentTotalPrice?.toFixed(2) ?? 'N/A'}`);
+  }
+
+  console.log(`  Used:     sales=$${usedValues.sales.toFixed(2)}, tax=$${usedValues.tax.toFixed(2)}`);
+  console.log(`  Financial Status: ${order.financialStatus}`);
+}
+
+/**
  * Reconcile orders by capture date
  *
  * This is the main entry point for order-centric reconciliation.
@@ -334,6 +352,15 @@ async function processOrderCaptures(
   if (paymentErrors.length > 0) {
     errors.push(...paymentErrors);
   }
+
+  // Log reconciliation values for debugging (helps diagnose partial capture/refund issues)
+  const usedSales = order.currentSubtotalPrice !== undefined && order.currentSubtotalPrice.gte(0)
+    ? order.currentSubtotalPrice
+    : order.subtotalPrice;
+  const usedTax = order.currentTotalTax !== undefined
+    ? order.currentTotalTax
+    : (order.totalTax || new Decimal(0));
+  logOrderReconciliationValues(order, { sales: usedSales, tax: usedTax });
 
   // Create journal entries
   const formattedDate = formatDate(targetDate);

@@ -102,16 +102,13 @@ function transformToReconciliationRow(
   const order = transactions[0].order;
   const enrichedData = transactions[0].enrichedData;
 
-  // Determine if this is a refunded order
-  const isRefunded =
-    order.financialStatus === 'refunded' ||
-    order.financialStatus === 'partially_refunded';
-
-  // Calculate sales (use original subtotal for refunded orders)
+  // Calculate sales - PREFER current values for ALL orders (reflects actual captured/remaining amount)
+  // currentSubtotalPrice reflects:
+  // - Partial captures: Items removed before payment (e.g., Order #80211: $88.90 → $29.00)
+  // - Refunds: Amount remaining after refund
+  // - Normal orders: Same as subtotalPrice
   let sales: Decimal;
-  if (isRefunded) {
-    sales = order.subtotalPrice;
-  } else if (order.currentSubtotalPrice) {
+  if (order.currentSubtotalPrice !== undefined && order.currentSubtotalPrice.gte(0)) {
     sales = order.currentSubtotalPrice;
   } else {
     sales = order.totalPrice
@@ -153,7 +150,7 @@ function transformToReconciliationRow(
       originalSubtotal: originalSubtotal.neg().toFixed(2),
       discount: discount.neg().toFixed(2),
       netSubtotal: netSubtotal.neg().toFixed(2), // Negative for refund
-      tax: (order.totalTax || new Decimal(0)).neg().toFixed(2),
+      tax: (order.currentTotalTax ?? order.totalTax ?? new Decimal(0)).neg().toFixed(2),
       shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.neg().toFixed(2) : '',
       area,
       notes: notes || '',
@@ -175,7 +172,7 @@ function transformToReconciliationRow(
       originalSubtotal: originalSubtotal.toFixed(2),
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
-      tax: (order.totalTax || new Decimal(0)).toFixed(2),
+      tax: (order.currentTotalTax ?? order.totalTax ?? new Decimal(0)).toFixed(2),
       shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',
@@ -191,13 +188,13 @@ function transformToReconciliationRow(
       giftCardUsed: giftCardInfo.used,
     });
   } else {
-    // Normal order
+    // Normal order - use current tax (reflects actual captured amount for partial captures)
     rows.push({
       orderNumber: order.name,
       originalSubtotal: originalSubtotal.toFixed(2),
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
-      tax: (order.totalTax || new Decimal(0)).toFixed(2),
+      tax: (order.currentTotalTax ?? order.totalTax ?? new Decimal(0)).toFixed(2),
       shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',

@@ -72,12 +72,13 @@ export function calculateGiftCardProductSales(order: Order): Decimal {
 }
 
 /**
- * Calculate the tax amount for an order, handling partial captures.
+ * Calculate the tax amount for an order, handling partial captures and refunds.
  *
  * TAX SOURCE PRIORITY:
- * 1. For refunded orders: Use original totalTax (refund entries handle reversal)
- * 2. For partial captures: Use currentTotalTax from Shopify (actual tax after item removal)
- * 3. For all other orders: Use totalTax from Shopify
+ * 1. PREFERRED: Use currentTotalTax when available (reflects final economic reality)
+ *    - Partial captures: Items removed before payment (e.g., Order #80211: $7.01 → $2.28)
+ *    - Partial refunds: Tax on remaining items
+ * 2. FALLBACK: Use totalTax from Shopify (original order tax)
  *
  * IMPORTANT: Always use Shopify's actual tax fields, NOT calculated from price differences.
  * Previous approach of calculating tax as (currentTotalPrice - currentSubtotalPrice - shipping)
@@ -86,25 +87,20 @@ export function calculateGiftCardProductSales(order: Order): Decimal {
  * Example Order #80279:
  * - Calculated method gave: $53.70 - $43.75 - $6.50 = $3.45 (WRONG)
  * - Actual Shopify totalTax: $3.75 (CORRECT)
+ *
+ * Example Order #80211 (partial capture):
+ * - Original totalTax: $7.01
+ * - currentTotalTax: $2.28 (reflects actual captured items)
+ * - We use: $2.28 (correct)
  */
 export function calculateTaxAmount(order: Order): Decimal {
-  // REFUND FIX: For refunded orders, always use ORIGINAL tax amount
-  // The refund entries will properly reverse the tax
-  const isRefunded = order.financialStatus === 'refunded' || order.financialStatus === 'partially_refunded';
-  if (isRefunded) {
-    return order.totalTax || new Decimal(0);
-  }
-
-  // PARTIAL CAPTURE: If items were removed before payment, use currentTotalTax
-  // This reflects the actual tax on the captured items, not the original order tax
-  const isPartialCapture = order.currentTotalPrice !== undefined &&
-                           order.currentTotalPrice.lt(order.totalPrice);
-
-  if (isPartialCapture && order.currentTotalTax !== undefined) {
+  // PREFERRED: Use current tax when available (reflects final economic reality)
+  // This handles partial captures, cancellations, and reflects current order state
+  if (order.currentTotalTax !== undefined) {
     return order.currentTotalTax;
   }
 
-  // Default: Use original tax amount from Shopify
+  // FALLBACK: Use original tax amount from Shopify
   return order.totalTax || new Decimal(0);
 }
 
@@ -142,25 +138,19 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // PARTIAL CAPTURE vs SAME-DAY REFUND FIX:
-  // - For partial captures (items removed BEFORE payment): Use currentSubtotalPrice
-  //   Example: Order $95.91, items removed before capture, captured $31.28
-  // - For fully refunded orders: Use ORIGINAL subtotalPrice (the refund will reverse it)
-  //   Example: Order #80304 - sale $1.03, same-day refund $1.03
-  // - For partially refunded orders: Use ORIGINAL subtotalPrice (refund processed separately)
-  //   Example: Order #80284 - sale $1,129.92, later refund $183.97
+  // SALES CALCULATION: Prefer current subtotal when available
+  // currentSubtotalPrice reflects the final economic reality:
+  // - Partial captures: Items removed before payment (e.g., Order #80211: $88.90 → $29.00)
+  // - Partial refunds: Remaining amount after refund
+  // - Normal orders: Same as subtotalPrice
   //
-  // The key distinction: currentSubtotalPrice reflects post-refund state, but for journal
-  // entries we need the ORIGINAL sale amount. The refund entries handle the reversal.
-  const isRefunded = order.financialStatus === 'refunded' || order.financialStatus === 'partially_refunded';
-  const isPartialCapture = !isRefunded &&
-                           order.currentSubtotalPrice !== undefined &&
-                           order.currentSubtotalPrice.gt(0) &&
-                           order.currentSubtotalPrice.lt(order.subtotalPrice);
-
-  // Use currentSubtotalPrice ONLY for true partial captures (items removed before payment)
-  // For refunded orders, always use original amounts
-  const netSales: Decimal = isPartialCapture ? order.currentSubtotalPrice! : order.subtotalPrice;
+  // NOTE: For refunds where sale and refund occur on DIFFERENT dates:
+  // - Day 1 (sale): Posts captured amount (using current values)
+  // - Day N (refund): Posts refund reversal (from refund_line_items)
+  // This maintains proper double-entry accounting.
+  const netSales: Decimal = order.currentSubtotalPrice !== undefined && order.currentSubtotalPrice.gte(0)
+    ? order.currentSubtotalPrice
+    : order.subtotalPrice;
 
   // GIFT CARD PRODUCT SALES: Separate gift card product revenue from regular sales
   // Gift card sales go to liability (2320), not revenue (3000)
