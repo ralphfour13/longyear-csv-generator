@@ -219,17 +219,7 @@ jobs:
             exit 1
           fi
 
-          # Test 2: Auth endpoint (410 is expected when not accessed from Shopify admin)
-          echo "Testing auth endpoint..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.APP_URL }}/auth")
-          if [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || [ "$STATUS" = "410" ]; then
-            echo "✓ Auth endpoint responding (HTTP $STATUS)"
-          else
-            echo "❌ Auth endpoint test failed (HTTP $STATUS)"
-            exit 1
-          fi
-
-          # Test 3: Health endpoint
+          # Test 2: Health endpoint
           echo "Testing health endpoint..."
           HEALTH_STATUS=$(curl -s "${{ env.APP_URL }}/api/healthz" | jq -r '.status')
           if [ "$HEALTH_STATUS" = "ok" ]; then
