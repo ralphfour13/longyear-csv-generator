@@ -17,10 +17,16 @@ import type { CogsCalculation } from '../types/cin7';
  *
  * Entry structure:
  * - Debit: One entry per payment method (e.g., Card, Gift Card, Cash)
- * - Credit: Sales Revenue (NET - post-discount amount)
+ * - Credit: Sales Revenue (NET - post-discount amount, excluding gift card product sales)
+ * - Credit: Gift Card Liability (for gift card product sales - deferred revenue)
  * - Credit: Sales Tax
  * - Credit: Shipping Revenue
  * - Debit/Credit: COGS entries (if Cin7 enabled)
+ *
+ * GIFT CARD PRODUCT SALES:
+ * When a customer purchases a gift card, the revenue is deferred (not earned yet).
+ * It goes to Gift Card Liability (2320) instead of Sales (3000).
+ * Revenue is only recognized when the gift card is redeemed.
  *
  * Example split payment (Card $7.03 + Gift Card $20.00 = $27.03 total):
  * SO-81302: Order #81302
@@ -33,6 +39,37 @@ import type { CogsCalculation } from '../types/cin7';
  *
  * Total: 0.00 ✓ Balanced
  */
+
+/**
+ * Calculate the total value of gift card products sold in an order.
+ *
+ * Gift cards are identified by:
+ * - Title containing "Gift Card" (case insensitive)
+ * - No productId (Shopify native gift cards have empty productId)
+ *
+ * @param order - Order with line items
+ * @returns Total value of gift card product sales
+ */
+export function calculateGiftCardProductSales(order: Order): Decimal {
+  if (!order.lineItems || order.lineItems.length === 0) {
+    return new Decimal(0);
+  }
+
+  return order.lineItems.reduce((total, item) => {
+    // Check if this is a gift card product
+    const isGiftCard = item.title?.toLowerCase().includes('gift card');
+
+    if (isGiftCard) {
+      // Calculate line item total: price * quantity - discount
+      const lineTotal = new Decimal(item.price)
+        .times(item.quantity)
+        .minus(item.totalDiscount || 0);
+      return total.plus(lineTotal);
+    }
+
+    return total;
+  }, new Decimal(0));
+}
 
 /**
  * Calculate the tax amount for an order, handling partial captures.
@@ -125,22 +162,44 @@ export async function createOrderJournalEntries(
   // For refunded orders, always use original amounts
   const netSales: Decimal = isPartialCapture ? order.currentSubtotalPrice! : order.subtotalPrice;
 
-  // CREDIT: Sales Revenue (NET - post-discount amount)
+  // GIFT CARD PRODUCT SALES: Separate gift card product revenue from regular sales
+  // Gift card sales go to liability (2320), not revenue (3000)
+  const giftCardProductSales = calculateGiftCardProductSales(order);
+  const regularSales = netSales.minus(giftCardProductSales);
+
+  // CREDIT: Sales Revenue (NET - post-discount amount, excluding gift card products)
   // Add discount info to memo for transparency
   const hasDiscount = order.totalDiscounts && order.totalDiscounts.gt(0);
   const discountInfo = hasDiscount
-    ? ` (Net: $${netSales.toFixed(2)}, Discount: $${order.totalDiscounts.toFixed(2)})`
+    ? ` (Net: $${regularSales.toFixed(2)}, Discount: $${order.totalDiscounts.toFixed(2)})`
     : '';
 
-  entries.push({
-    date: targetDate,
-    reference,
-    account: accountMappings.sales_revenue.accountCode,
-    accountName: accountMappings.sales_revenue.accountName,
-    debit: new Decimal(0),
-    credit: netSales,
-    memo: `Sales - Order ${order.name}${discountInfo}`,
-  });
+  // Only create sales entry if there are regular (non-gift-card) sales
+  if (regularSales.greaterThan(0)) {
+    entries.push({
+      date: targetDate,
+      reference,
+      account: accountMappings.sales_revenue.accountCode,
+      accountName: accountMappings.sales_revenue.accountName,
+      debit: new Decimal(0),
+      credit: regularSales,
+      memo: `Sales - Order ${order.name}${discountInfo}`,
+    });
+  }
+
+  // CREDIT: Gift Card Liability (for gift card product sales - deferred revenue)
+  // Gift card sales are NOT revenue until redeemed
+  if (giftCardProductSales.greaterThan(0)) {
+    entries.push({
+      date: targetDate,
+      reference,
+      account: accountMappings.gift_card_liability.accountCode,
+      accountName: accountMappings.gift_card_liability.accountName,
+      debit: new Decimal(0),
+      credit: giftCardProductSales,
+      memo: `Gift Card Sale - Order ${order.name}`,
+    });
+  }
 
   // NO DISCOUNT ENTRY - discounts are already reflected in NET sales amount
 
@@ -332,16 +391,44 @@ export async function createRefundJournalEntries(
           memo: `Cancellation AR Reversal - Order ${order.name}`,
         });
 
-        // Reverse sales revenue
-        if (refundedSubtotal.greaterThan(0)) {
+        // GIFT CARD CANCELLATION HANDLING: Check if cancelled items include gift cards
+        let giftCardCancelSubtotal = new Decimal(0);
+        let regularCancelSubtotal = refundedSubtotal;
+
+        if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
+          for (const refundItem of refund.refund_line_items) {
+            const isGiftCard = refundItem.line_item?.title?.toLowerCase().includes('gift card');
+            if (isGiftCard) {
+              const itemSubtotal = new Decimal(refundItem.subtotal);
+              giftCardCancelSubtotal = giftCardCancelSubtotal.plus(itemSubtotal);
+            }
+          }
+          regularCancelSubtotal = refundedSubtotal.minus(giftCardCancelSubtotal);
+        }
+
+        // Reverse sales revenue (regular products)
+        if (regularCancelSubtotal.greaterThan(0)) {
           entries.push({
             date: targetDate,
             reference: `SO-${order.name}`,
             account: accountMappings.sales_revenue.accountCode,
             accountName: accountMappings.sales_revenue.accountName,
-            debit: refundedSubtotal,
+            debit: regularCancelSubtotal,
             credit: new Decimal(0),
             memo: `Sales Cancellation - Order ${order.name}`,
+          });
+        }
+
+        // Reverse gift card liability (gift card products)
+        if (giftCardCancelSubtotal.greaterThan(0)) {
+          entries.push({
+            date: targetDate,
+            reference: `SO-${order.name}`,
+            account: accountMappings.gift_card_liability.accountCode,
+            accountName: accountMappings.gift_card_liability.accountName,
+            debit: giftCardCancelSubtotal,
+            credit: new Decimal(0),
+            memo: `Gift Card Sale Cancellation - Order ${order.name}`,
           });
         }
 
@@ -454,16 +541,47 @@ export async function createRefundJournalEntries(
       refundedTax = taxAmount.times(refundRatio);
     }
 
-    // DEBIT: Sales Revenue (reverse credit)
-    if (refundedSubtotal.greaterThan(0)) {
+    // GIFT CARD REFUND HANDLING: Check if refunded items include gift cards
+    // Gift card refunds reverse liability (2320), not sales revenue (3000)
+    let giftCardRefundSubtotal = new Decimal(0);
+    let regularRefundSubtotal = refundedSubtotal;
+
+    if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
+      // Check each refunded item to see if it's a gift card
+      for (const refundItem of refund.refund_line_items) {
+        const isGiftCard = refundItem.line_item?.title?.toLowerCase().includes('gift card');
+        if (isGiftCard) {
+          const itemSubtotal = new Decimal(refundItem.subtotal);
+          giftCardRefundSubtotal = giftCardRefundSubtotal.plus(itemSubtotal);
+        }
+      }
+      // Regular refunds = total refunded subtotal minus gift card refunds
+      regularRefundSubtotal = refundedSubtotal.minus(giftCardRefundSubtotal);
+    }
+
+    // DEBIT: Sales Revenue (reverse credit for regular products)
+    if (regularRefundSubtotal.greaterThan(0)) {
       entries.push({
         date: targetDate,
         reference: `RF-${order.name}`,
         account: accountMappings.sales_revenue.accountCode,
         accountName: accountMappings.sales_revenue.accountName,
-        debit: refundedSubtotal,
+        debit: regularRefundSubtotal,
         credit: new Decimal(0),
         memo: `Sales Refund - Order ${order.name}`,
+      });
+    }
+
+    // DEBIT: Gift Card Liability (reverse credit for gift card products)
+    if (giftCardRefundSubtotal.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference: `RF-${order.name}`,
+        account: accountMappings.gift_card_liability.accountCode,
+        accountName: accountMappings.gift_card_liability.accountName,
+        debit: giftCardRefundSubtotal,
+        credit: new Decimal(0),
+        memo: `Gift Card Sale Refund - Order ${order.name}`,
       });
     }
 
