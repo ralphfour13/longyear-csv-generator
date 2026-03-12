@@ -143,8 +143,9 @@ function transformToReportRow(
   const tax4 = enrichedData.taxLines[3] || { title: '', rate: '', price: new Decimal(0) };
   const tax5 = enrichedData.taxLines[4] || { title: '', rate: '', price: new Decimal(0) };
 
-  // Tax total
-  const taxTotal = enrichedData.taxLines.reduce(
+  // Tax total - use currentTotalTax for partial captures (items removed before payment)
+  // This matches the journal entry tax calculation and reflects actual captured amount
+  const taxTotal = order.currentTotalTax ?? order.totalTax ?? enrichedData.taxLines.reduce(
     (sum, tax) => sum.plus(tax.price),
     new Decimal(0)
   );
