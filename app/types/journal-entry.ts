@@ -127,6 +127,7 @@ export interface Order {
   currentSubtotalPrice?: Decimal; // Current subtotal (after edits/removals)
   currentTotalDiscounts?: Decimal; // Current discounts (after edits)
   currentTotalPrice?: Decimal; // Current total (after edits)
+  currentTotalTax?: Decimal; // Current tax (after edits/removals)
   totalTax: Decimal; // Total tax amount
   totalShipping: Decimal; // Shipping charges
   totalDiscounts: Decimal; // Discount amount
@@ -304,6 +305,7 @@ export interface EnrichedTransaction {
     subtotalPrice: Decimal; // Subtotal before tax/shipping
     currentTotalPrice: Decimal;
     currentSubtotalPrice?: Decimal; // Current subtotal (after edits)
+    currentTotalTax?: Decimal; // Current tax (after edits/removals)
     totalTax: Decimal;
     totalShipping: Decimal;
     totalDiscounts: Decimal;
