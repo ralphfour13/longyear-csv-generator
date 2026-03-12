@@ -111,7 +111,8 @@ jobs:
             --exclude='.github' \
             --exclude='*.log' \
             --exclude='.env' \
-            .
+            --exclude='deploy.tar' \
+            . || true
           ls -lh deploy.tar
 
       - name: Deploy to CapRover
