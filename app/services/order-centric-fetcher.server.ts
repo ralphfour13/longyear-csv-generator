@@ -21,6 +21,34 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Fetch with timeout using AbortController
+ * Prevents hanging requests from blocking forever
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = 60000 // 60 second default timeout
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms: ${url}`);
+    }
+    throw error;
+  }
+}
+
+/**
  * Add days to a date string (YYYY-MM-DD format)
  */
 function addDays(dateString: string, days: number): string {
@@ -159,12 +187,13 @@ async function fetchOrdersByDate(
     let response: Response | null = null;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        response = await fetch(url, {
+        console.log(`[API] Fetching orders from ${url} (attempt ${attempt + 1}/${MAX_RETRIES + 1}, timeout: 60s)`);
+        response = await fetchWithTimeout(url, {
           headers: {
             'X-Shopify-Access-Token': accessToken,
             'Content-Type': 'application/json',
           },
-        });
+        }, 60000);
 
         // Handle 429 rate limit errors with retry
         if (response.status === 429) {
@@ -373,12 +402,13 @@ async function fetchOrderTransactions(
   // Retry loop with exponential backoff
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(url, {
+      console.log(`[API] Fetching transactions for order ${orderId} (attempt ${attempt + 1}/${MAX_RETRIES + 1}, timeout: 60s)`);
+      const response = await fetchWithTimeout(url, {
         headers: {
           'X-Shopify-Access-Token': accessToken,
           'Content-Type': 'application/json',
         },
-      });
+      }, 60000);
 
       // Handle 429 rate limit errors with retry
       if (response.status === 429) {
