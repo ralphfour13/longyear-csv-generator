@@ -19,7 +19,11 @@ COPY prisma ./prisma/
 # Generate Prisma client
 RUN npx prisma generate
 
-# Copy application code
+# Cache-busting: CapRover passes git commit SHA, forcing rebuild when code changes
+ARG CAPROVER_GIT_COMMIT_SHA
+RUN echo "Building commit: ${CAPROVER_GIT_COMMIT_SHA:-dev}"
+
+# Copy application code (now rebuilds when commit SHA changes)
 COPY . .
 
 # Build the app

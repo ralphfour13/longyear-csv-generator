@@ -46,7 +46,8 @@ function sleep(ms: number): Promise<void> {
 export async function reconcileOrdersByDate(
   shop: string,
   accessToken: string,
-  targetDate: string
+  targetDate: string,
+  jobId?: string  // Optional job ID for progress tracking
 ): Promise<OrderCentricReconciliationResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -67,7 +68,8 @@ export async function reconcileOrdersByDate(
       shop,
       accessToken,
       startDate,
-      endDate
+      endDate,
+      jobId  // Pass jobId for progress tracking
     );
 
     let ordersProcessed = 0;

@@ -18,6 +18,30 @@ export interface ExportJob {
   error?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result?: any;
+
+  // Progress tracking
+  progress?: {
+    phase?: 'fetching' | 'reconciling' | 'cogs' | 'generating' | 'validating';
+    phaseLabel?: string;
+    overallPercentage?: number;
+
+    // Metrics
+    ordersFound?: number;
+    ordersProcessed?: number;
+    transactionsFetched?: number;
+    journalEntriesGenerated?: number;
+    filesGenerated?: number;
+    filesTotalCount?: number;
+
+    // Timing
+    startTime?: number;
+    lastUpdate?: number;
+    estimatedTotalSeconds?: number;
+    estimatedSecondsRemaining?: number;
+
+    // Current activity
+    currentActivity?: string;
+  };
 }
 
 /**
@@ -350,4 +374,182 @@ export async function deleteJob(jobId: string): Promise<boolean> {
     console.error(`Error deleting job ${jobId}:`, error);
     return false;
   }
+}
+
+/**
+ * Update job progress (throttled to avoid excessive writes)
+ *
+ * @param jobId - Job ID
+ * @param progressUpdate - Partial progress update
+ */
+export async function updateJobProgress(
+  jobId: string,
+  progressUpdate: Partial<ExportJob['progress']>
+): Promise<void> {
+  try {
+    const job = await getJobStatus(jobId);
+    if (!job) {
+      console.error(`[Progress] Job not found: ${jobId}`);
+      return;
+    }
+
+    const now = Date.now();
+    const currentProgress = job.progress || {};
+
+    // Throttle updates: Only write if >2 seconds since last update
+    // (unless it's a phase change or completion)
+    const timeSinceLastUpdate = currentProgress.lastUpdate
+      ? now - currentProgress.lastUpdate
+      : Infinity;
+
+    const isPhaseChange = progressUpdate?.phase && progressUpdate.phase !== currentProgress.phase;
+    const shouldUpdate = isPhaseChange || timeSinceLastUpdate > 2000;
+
+    if (!shouldUpdate) {
+      return;
+    }
+
+    // Merge progress updates
+    const updatedProgress = {
+      ...currentProgress,
+      ...progressUpdate,
+      lastUpdate: now,
+    };
+
+    // Calculate overall percentage based on phase
+    if (!progressUpdate?.overallPercentage) {
+      updatedProgress.overallPercentage = calculateOverallProgress(updatedProgress);
+    }
+
+    // Estimate remaining time
+    if (updatedProgress.startTime && updatedProgress.ordersFound) {
+      const elapsed = (now - updatedProgress.startTime) / 1000;
+      const processed = updatedProgress.ordersProcessed || updatedProgress.transactionsFetched || 0;
+
+      if (processed > 0 && processed < updatedProgress.ordersFound) {
+        const avgTimePerOrder = elapsed / processed;
+        const remaining = updatedProgress.ordersFound - processed;
+        updatedProgress.estimatedSecondsRemaining = Math.round(avgTimePerOrder * remaining);
+        updatedProgress.estimatedTotalSeconds = Math.round(avgTimePerOrder * updatedProgress.ordersFound);
+      }
+    }
+
+    await updateJobStatus(jobId, { progress: updatedProgress });
+
+    // Log progress for user watching logs
+    logProgress(jobId, updatedProgress);
+  } catch (error) {
+    console.error('[Progress] Failed to update job progress:', error);
+    console.error('[Progress] Job ID:', jobId);
+    console.error('[Progress] Update:', JSON.stringify(progressUpdate));
+  }
+}
+
+/**
+ * Calculate overall progress percentage based on phase and metrics
+ */
+function calculateOverallProgress(progress: ExportJob['progress']): number {
+  if (!progress) return 0;
+
+  // Phase weights (total = 100%)
+  const PHASE_WEIGHTS = {
+    fetching: 60,      // Biggest bottleneck
+    reconciling: 20,
+    cogs: 10,
+    generating: 8,
+    validating: 2,
+  };
+
+  let overallProgress = 0;
+
+  switch (progress.phase) {
+    case 'fetching':
+      if (progress.ordersFound && progress.transactionsFetched) {
+        const fetchProgress = (progress.transactionsFetched / progress.ordersFound) * 100;
+        overallProgress = (fetchProgress / 100) * PHASE_WEIGHTS.fetching;
+      }
+      break;
+
+    case 'reconciling':
+      overallProgress = PHASE_WEIGHTS.fetching; // Fetching complete
+      if (progress.ordersFound && progress.ordersProcessed) {
+        const reconProgress = (progress.ordersProcessed / progress.ordersFound) * 100;
+        overallProgress += (reconProgress / 100) * PHASE_WEIGHTS.reconciling;
+      }
+      break;
+
+    case 'cogs':
+      overallProgress = PHASE_WEIGHTS.fetching + PHASE_WEIGHTS.reconciling;
+      if (progress.ordersProcessed && progress.ordersFound) {
+        const cogsProgress = (progress.ordersProcessed / progress.ordersFound) * 100;
+        overallProgress += (cogsProgress / 100) * PHASE_WEIGHTS.cogs;
+      }
+      break;
+
+    case 'generating':
+      overallProgress = PHASE_WEIGHTS.fetching + PHASE_WEIGHTS.reconciling + PHASE_WEIGHTS.cogs;
+      if (progress.filesTotalCount && progress.filesGenerated) {
+        const fileProgress = (progress.filesGenerated / progress.filesTotalCount) * 100;
+        overallProgress += (fileProgress / 100) * PHASE_WEIGHTS.generating;
+      }
+      break;
+
+    case 'validating':
+      overallProgress = 98; // Almost done
+      break;
+  }
+
+  return Math.min(Math.round(overallProgress), 99); // Never show 100% until actually complete
+}
+
+/**
+ * Log progress in a format useful for watching logs
+ */
+function logProgress(jobId: string, progress: ExportJob['progress']): void {
+  if (!progress) return;
+
+  const elapsed = progress.startTime
+    ? formatDuration((Date.now() - progress.startTime) / 1000)
+    : '0s';
+
+  const remaining = progress.estimatedSecondsRemaining
+    ? formatDuration(progress.estimatedSecondsRemaining)
+    : 'calculating...';
+
+  let details = '';
+  switch (progress.phase) {
+    case 'fetching':
+      details = `Orders: ${progress.transactionsFetched || 0}/${progress.ordersFound || '?'}`;
+      break;
+    case 'reconciling':
+      details = `Matched: ${progress.ordersProcessed || 0} orders with captures`;
+      break;
+    case 'cogs':
+      details = `COGS: ${progress.ordersProcessed || 0}/${progress.ordersFound || '?'} orders`;
+      break;
+    case 'generating':
+      details = `Files: ${progress.filesGenerated || 0}/${progress.filesTotalCount || '?'}`;
+      break;
+    case 'validating':
+      details = 'Running quality checks...';
+      break;
+  }
+
+  console.log(
+    `[Job ${jobId.split('_')[2]}] ${progress.overallPercentage}% | ` +
+    `${progress.phaseLabel} | ${details} | ` +
+    `Elapsed: ${elapsed} | Est. remaining: ${remaining}`
+  );
+}
+
+/**
+ * Format seconds into human-readable duration (2m 30s)
+ */
+function formatDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${Math.round(seconds)}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return `${minutes}m ${secs}s`;
 }

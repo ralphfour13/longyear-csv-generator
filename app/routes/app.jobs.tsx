@@ -5,15 +5,24 @@ import { authenticate } from '../shopify.server';
 import { getShopJobs, clearCompletedJobs, cancelPendingJobs, cancelAllProcessingJobs, type ExportJob } from '../services/background-jobs.server';
 import { processPendingJobs } from '../services/job-processor.server';
 import { format } from 'date-fns';
+import { JobProgressBar } from '../components/JobProgressBar';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
   // Get all jobs for this shop
-  const jobs = await getShopJobs(shop);
+  const allJobs = await getShopJobs(shop);
 
-  return { shop, jobs };
+  // Separate active jobs (pending/processing) from completed/failed
+  const activeJobs = allJobs.filter(
+    job => job.status === 'pending' || job.status === 'processing'
+  );
+  const completedJobs = allJobs.filter(
+    job => job.status === 'completed' || job.status === 'failed'
+  );
+
+  return { shop, allJobs, activeJobs, completedJobs };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -75,38 +84,39 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Jobs() {
-  const { shop, jobs: initialJobs } = useLoaderData<typeof loader>();
+  const { shop, allJobs, activeJobs, completedJobs } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const revalidator = useRevalidator();
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Auto-refresh every 15 seconds if there are pending or processing jobs
-  useEffect(() => {
-    const hasActiveJobs = initialJobs.some(
-      (job: ExportJob) => job.status === 'pending' || job.status === 'processing'
-    );
+  // Debug logging
+  console.log('[Jobs Page] Active jobs:', activeJobs);
+  console.log('[Jobs Page] Active jobs count:', activeJobs.length);
 
-    if (hasActiveJobs) {
+  // Auto-refresh every 5 seconds if there are pending or processing jobs
+  // (Progress bars poll separately at 2 seconds)
+  useEffect(() => {
+    if (activeJobs.length > 0) {
       const interval = setInterval(() => {
         revalidator.revalidate();
-      }, 15000);
+      }, 5000);
 
       return () => clearInterval(interval);
     }
-  }, [initialJobs, revalidator]);
+  }, [activeJobs.length, revalidator]);
 
-  // Filter jobs based on status filter
+  // Filter completed jobs based on status filter
   const filteredJobs = statusFilter === 'all'
-    ? initialJobs
-    : initialJobs.filter((job: ExportJob) => job.status === statusFilter);
+    ? completedJobs
+    : completedJobs.filter((job: ExportJob) => job.status === statusFilter);
 
   // Count jobs by status
   const statusCounts = {
-    all: initialJobs.length,
-    pending: initialJobs.filter((j: ExportJob) => j.status === 'pending').length,
-    processing: initialJobs.filter((j: ExportJob) => j.status === 'processing').length,
-    completed: initialJobs.filter((j: ExportJob) => j.status === 'completed').length,
-    failed: initialJobs.filter((j: ExportJob) => j.status === 'failed').length,
+    all: allJobs.length,
+    pending: allJobs.filter((j: ExportJob) => j.status === 'pending').length,
+    processing: allJobs.filter((j: ExportJob) => j.status === 'processing').length,
+    completed: allJobs.filter((j: ExportJob) => j.status === 'completed').length,
+    failed: allJobs.filter((j: ExportJob) => j.status === 'failed').length,
   };
 
   // Get status badge styling
@@ -279,11 +289,46 @@ export default function Jobs() {
         </s-section>
       </div>
 
+      {/* Active Jobs Section */}
+      {activeJobs.length > 0 && (
+        <div style={{ marginBottom: '32px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#202223', margin: 0 }}>
+              Active Jobs
+            </h2>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {activeJobs.map((job: ExportJob) => (
+              <JobProgressBar
+                key={job.id}
+                jobId={job.id}
+                onComplete={() => {
+                  // Refresh job list when job completes
+                  revalidator.revalidate();
+                }}
+                onError={(error) => {
+                  console.error('Job error:', error);
+                  // Refresh job list when job fails
+                  revalidator.revalidate();
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Job History Section */}
+      <div style={{ marginBottom: '16px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#202223', margin: 0 }}>
+          Job History
+        </h2>
+      </div>
+
       {/* Status Filter Tabs */}
       <div style={{ marginBottom: '20px' }}>
         <s-section>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            {(['all', 'pending', 'processing', 'completed', 'failed'] as const).map((status) => (
+            {(['all', 'completed', 'failed'] as const).map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -412,10 +457,10 @@ export default function Jobs() {
       </s-section>
 
       {/* Auto-refresh indicator */}
-      {statusCounts.pending + statusCounts.processing > 0 && (
+      {activeJobs.length > 0 && (
         <div style={{ marginTop: '20px' }}>
           <s-banner tone="info">
-            🔄 Auto-refreshing every 15 seconds while jobs are active
+            🔄 Auto-refreshing every 5 seconds ({activeJobs.length} active {activeJobs.length === 1 ? 'job' : 'jobs'})
           </s-banner>
         </div>
       )}

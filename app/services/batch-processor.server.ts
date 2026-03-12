@@ -1,6 +1,7 @@
 import { Decimal } from 'decimal.js';
 import type { ExportHistoryEntry, JournalEntry, EnrichedTransaction, GeneratedFile, Order } from '../types/journal-entry';
 import { reconcileOrdersByDate, collectCogsData } from './order-centric-reconciler.server'; // NEW: Order-centric reconciler
+import { updateJobProgress } from './background-jobs.server';
 import { applyAccountMappings } from './account-mapper.server';
 import { generateCSV, validateEntries } from './csv-generator.server';
 import { getAccountMappings, getShopConfig, writeExport } from './storage.server';
@@ -51,7 +52,8 @@ export async function processExport(
   shop: string,
   accessToken: string,
   targetDate: string,
-  fileOptions?: FileGenerationOptions
+  fileOptions?: FileGenerationOptions,
+  jobId?: string  // Optional job ID for progress tracking
 ): Promise<ExportHistoryEntry> {
   // Default to generating all files if not specified
   const options: Required<FileGenerationOptions> = {
@@ -80,7 +82,16 @@ export async function processExport(
     // Step 1: Reconcile orders by capture date (order-centric approach)
     await logInfo(shop, 'Export', `Reconciling orders by capture date: ${targetDate}...`);
 
-    const result = await reconcileOrdersByDate(shop, accessToken, targetDate);
+    // Progress: Start reconciliation
+    if (jobId) {
+      await updateJobProgress(jobId, {
+        phase: 'reconciling',
+        phaseLabel: 'Matching Captures',
+        currentActivity: 'Reconciling orders by capture date...',
+      });
+    }
+
+    const result = await reconcileOrdersByDate(shop, accessToken, targetDate, jobId);
 
     const allJournalEntries: JournalEntry[] = result.journalEntries;
     const allEnrichedTransactions: EnrichedTransaction[] = result.enrichedTransactions;
@@ -91,6 +102,14 @@ export async function processExport(
     const cogsWarnings: string[] = result.cogsWarnings || [];
 
     await logInfo(shop, 'Export', `Reconciled ${result.orderCount} orders with ${result.captureCount} captures`)
+
+    // Progress: Reconciliation complete
+    if (jobId) {
+      await updateJobProgress(jobId, {
+        ordersProcessed: result.captureCount,
+        currentActivity: `Matched ${result.captureCount} captures from ${result.orderCount} orders`,
+      });
+    }
 
     // Step 1.25: Check for order changes (state tracking)
     await logInfo(shop, 'Export', 'Checking for order changes since last export...');
@@ -134,6 +153,15 @@ export async function processExport(
     let cogsOrders: Order[] = []; // Store orders for reuse in COGS details CSV
 
     if (cin7Enabled) {
+      // Progress: Start COGS collection
+      if (jobId) {
+        await updateJobProgress(jobId, {
+          phase: 'cogs',
+          phaseLabel: 'Collecting COGS',
+          currentActivity: 'Fetching cost data from Cin7...',
+        });
+      }
+
       await logInfo(shop, 'Export', 'Collecting COGS data from Cin7...');
       try {
         // CRITICAL FIX: Filter orders to only those that generated journal entries
@@ -145,6 +173,13 @@ export async function processExport(
         // NEW: Pass accessToken to enable fulfillment-based filtering
         cogsDataMap = await collectCogsData(shop, accessToken, cogsOrders);
         await logInfo(shop, 'Export', `Collected COGS data for ${cogsDataMap.size} orders`);
+
+        // Progress: COGS collection complete
+        if (jobId) {
+          await updateJobProgress(jobId, {
+            currentActivity: `Collected COGS for ${cogsDataMap.size} orders`,
+          });
+        }
       } catch (error) {
         const errorMsg = `COGS data collection failed: ${error instanceof Error ? error.message : String(error)}`;
         await logWarning(shop, 'Export', errorMsg);
@@ -174,6 +209,15 @@ export async function processExport(
     }
 
     // Step 4.5: Validate journal entry balance (Debits = Credits)
+    // Progress: Validation phase
+    if (jobId) {
+      await updateJobProgress(jobId, {
+        phase: 'validating',
+        phaseLabel: 'Validating',
+        currentActivity: 'Running quality checks and balance validation...',
+      });
+    }
+
     await logInfo(shop, 'Export', 'Validating journal entry balance...');
     const totalDebitsCheck = mappedEntries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
     const totalCreditsCheck = mappedEntries.reduce((sum, e) => sum.plus(e.credit), new Decimal(0));
@@ -238,7 +282,21 @@ export async function processExport(
 
     // Step 5: Generate files based on options with error isolation
     await logInfo(shop, 'Export', 'Generating export files...');
+
+    // Progress: Start file generation
+    const filesToGenerate = Object.values(options).filter(Boolean).length;
+    if (jobId) {
+      await updateJobProgress(jobId, {
+        phase: 'generating',
+        phaseLabel: 'Generating Files',
+        filesTotalCount: filesToGenerate,
+        filesGenerated: 0,
+        currentActivity: 'Generating export files...',
+      });
+    }
+
     const generatedFiles: GeneratedFile[] = [];
+    let filesGenerated = 0;
 
     // File #1: Detailed Sales Report
     if (options.generateDailySales) {
@@ -257,6 +315,12 @@ export async function processExport(
       });
 
       await logInfo(shop, 'Export', `Detailed Sales Report saved: ${detailedSalesFilename}`);
+
+      // Update progress
+      filesGenerated++;
+      if (jobId) {
+        await updateJobProgress(jobId, { filesGenerated });
+      }
     } catch (error) {
       const errorMsg = `Detailed Sales Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
       console.error('❌ Detailed Sales Report error:', error);
@@ -290,6 +354,12 @@ export async function processExport(
       });
 
       await logInfo(shop, 'Export', `Payouts with Orders saved: ${payoutsFilename}`);
+
+      // Update progress
+      filesGenerated++;
+      if (jobId) {
+        await updateJobProgress(jobId, { filesGenerated });
+      }
     } catch (error) {
       const errorMsg = `Payouts with Orders generation failed: ${error instanceof Error ? error.message : String(error)}`;
       console.error('❌ Payouts with Orders error:', error);
@@ -321,6 +391,12 @@ export async function processExport(
       });
 
       await logInfo(shop, 'Export', `Journal Entry Details saved: ${journalEntriesDetailsFilename}`);
+
+      // Update progress
+      filesGenerated++;
+      if (jobId) {
+        await updateJobProgress(jobId, { filesGenerated });
+      }
     } catch (error) {
       const errorMsg = `Journal Entry Details generation failed: ${error instanceof Error ? error.message : String(error)}`;
       console.error('❌ Journal Entry Details error:', error);
@@ -375,6 +451,12 @@ export async function processExport(
       });
 
       await logInfo(shop, 'Export', `Journal Entry Summary saved: ${journalEntrySummaryFilename} and ${journalEntrySummaryTxtFilename}`);
+
+      // Update progress (2 files generated: CSV and TXT)
+      filesGenerated += 2;
+      if (jobId) {
+        await updateJobProgress(jobId, { filesGenerated });
+      }
     } catch (error) {
       const errorMsg = `Journal Entry Summary generation failed: ${error instanceof Error ? error.message : String(error)}`;
       console.error('❌ Journal Entry Summary error:', error);
@@ -421,6 +503,12 @@ export async function processExport(
 
         await logInfo(shop, 'Export', `COGS Details saved: ${cogsDetailsFilename}`);
 
+        // Update progress
+        filesGenerated++;
+        if (jobId) {
+          await updateJobProgress(jobId, { filesGenerated });
+        }
+
         // NEW: Validate COGS consistency between JE and CSV
         await logInfo(shop, 'Export', 'Validating COGS consistency...');
         try {
@@ -465,6 +553,12 @@ export async function processExport(
         });
 
         await logInfo(shop, 'Export', `Daily Reconciliation Report saved: ${reconciliationFilename}`);
+
+        // Update progress
+        filesGenerated++;
+        if (jobId) {
+          await updateJobProgress(jobId, { filesGenerated });
+        }
       } catch (error) {
         const errorMsg = `Daily Reconciliation Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
         console.error('❌ Daily Reconciliation Report error:', error);
@@ -498,6 +592,12 @@ export async function processExport(
         });
 
         await logInfo(shop, 'Export', `Error Report saved: ${errorReportFilename} (${rowCount} issues found)`);
+
+        // Update progress
+        filesGenerated++;
+        if (jobId) {
+          await updateJobProgress(jobId, { filesGenerated });
+        }
       } catch (error) {
         const errorMsg = `Error Report generation failed: ${error instanceof Error ? error.message : String(error)}`;
         console.error('❌ Error Report error:', error);
@@ -526,6 +626,12 @@ export async function processExport(
 
         console.log(`✅ DEBUG: Order JSON saved successfully: ${orderJsonFilename} (${orderCount} orders)`);
         await logInfo(shop, 'Export', `Order JSON Data saved: ${orderJsonFilename} (${orderCount} orders)`);
+
+        // Update progress
+        filesGenerated++;
+        if (jobId) {
+          await updateJobProgress(jobId, { filesGenerated });
+        }
       } catch (error) {
         const errorMsg = `Order JSON Data generation failed: ${error instanceof Error ? error.message : String(error)}`;
         console.error('❌ Order JSON Data error:', error);
@@ -573,6 +679,12 @@ export async function processExport(
         });
 
         await logInfo(shop, 'Export', `Error Orders JSON saved: ${errorOrdersFilename} (${errorOrderCount} orders with errors/warnings)`);
+
+        // Update progress
+        filesGenerated++;
+        if (jobId) {
+          await updateJobProgress(jobId, { filesGenerated });
+        }
       } catch (error) {
         const errorMsg = `Error Orders JSON generation failed: ${error instanceof Error ? error.message : String(error)}`;
         console.error('❌ Error Orders JSON error:', error);

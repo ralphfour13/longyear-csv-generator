@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats } from '../services/storage.server';
 import { format } from 'date-fns';
+import { JobProgressBar } from '../components/JobProgressBar';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -194,6 +195,8 @@ export default function Exports() {
   const [generateReconciliation, setGenerateReconciliation] = useState(true);
   const [currentJob, setCurrentJob] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string>('');
+  const [showProgress, setShowProgress] = useState(false);
+  const [progressJobId, setProgressJobId] = useState<string | null>(null);
   const fetcher = useFetcher();
 
   const yesterday = new Date();
@@ -234,6 +237,14 @@ export default function Exports() {
       };
     }
   }, [actionData, fetcher]);
+
+  // Show progress bar when job is created
+  useEffect(() => {
+    if (actionData?.success && actionData?.jobId) {
+      setShowProgress(true);
+      setProgressJobId(actionData.jobId);
+    }
+  }, [actionData]);
 
   // Handle job status updates
   useEffect(() => {
@@ -315,6 +326,26 @@ export default function Exports() {
 
   return (
     <s-page heading="Export Center">
+      {/* Progress Bar for Active Job */}
+      {showProgress && progressJobId && (
+        <div style={{ marginBottom: '20px' }}>
+          <JobProgressBar
+            jobId={progressJobId}
+            onComplete={() => {
+              setShowProgress(false);
+              setProgressJobId(null);
+              // Refresh to show completed files
+              revalidator.revalidate();
+            }}
+            onError={(error) => {
+              console.error('Job error:', error);
+              setShowProgress(false);
+              setProgressJobId(null);
+            }}
+          />
+        </div>
+      )}
+
       {currentJob && (
         <s-banner tone="info">
           <s-stack direction="block" gap="base">

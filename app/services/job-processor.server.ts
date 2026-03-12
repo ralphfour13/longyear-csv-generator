@@ -33,13 +33,15 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
       shop,
       accessToken,
       job.startDate,
-      job.fileOptions
+      job.fileOptions,
+      jobId  // Pass jobId for progress tracking
     );
 
     // Mark as completed
     await updateJobStatus(jobId, {
       status: 'completed',
       completedAt: new Date().toISOString(),
+      progress: undefined,  // Clear progress on completion
       result: {
         success: true,
         message: `Export completed for ${job.startDate}`,
@@ -64,6 +66,7 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
     await updateJobStatus(jobId, {
       status: 'failed',
       completedAt: new Date().toISOString(),
+      progress: undefined,  // Clear progress on failure
       error: error instanceof Error ? error.message : String(error),
     });
   }

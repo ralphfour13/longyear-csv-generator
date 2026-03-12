@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { Order, Transaction, Refund, RefundLineItem } from '../types/journal-entry';
+import { updateJobProgress } from './background-jobs.server';
 
 /**
  * Order-Centric Fetcher Service
@@ -89,7 +90,8 @@ export async function fetchOrdersByCaptureDateRange(
   shop: string,
   accessToken: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  jobId?: string  // Optional job ID for progress tracking
 ): Promise<Order[]> {
   const orderMap = new Map<string, Order>(); // Deduplicate by order ID
   const baseUrl = `https://${shop}/admin/api/2024-10/orders.json`;
@@ -113,6 +115,20 @@ export async function fetchOrdersByCaptureDateRange(
 
   console.log(`Fetching orders with activity between ${startDate} and ${endDate}`);
 
+  // Initialize progress tracking
+  if (jobId) {
+    try {
+      await updateJobProgress(jobId, {
+        phase: 'fetching',
+        phaseLabel: 'Fetching Orders',
+        currentActivity: 'Querying Shopify orders API...',
+        startTime: Date.now(),
+      });
+    } catch (error) {
+      console.error('[Progress] Failed to update job progress:', error);
+    }
+  }
+
   // QUERY 1: Fetch by created_at (for orders created near target date)
   await fetchOrdersByDate(
     baseUrl,
@@ -122,7 +138,8 @@ export async function fetchOrdersByCaptureDateRange(
     'created_at_max',
     createdStartDateTime,
     createdEndDateTime,
-    orderMap
+    orderMap,
+    jobId  // Pass jobId for progress tracking
   );
 
   // QUERY 2: Fetch by updated_at (for orders updated near target date)
@@ -134,10 +151,25 @@ export async function fetchOrdersByCaptureDateRange(
     'updated_at_max',
     updatedStartDateTime,
     updatedEndDateTime,
-    orderMap
+    orderMap,
+    jobId  // Pass jobId for progress tracking
   );
 
   const orders = Array.from(orderMap.values());
+  const totalOrders = orders.length;
+
+  // Update with total order count
+  if (jobId) {
+    try {
+      await updateJobProgress(jobId, {
+        ordersFound: totalOrders,
+        currentActivity: `Fetched ${totalOrders} orders with activity in date range`,
+      });
+    } catch (error) {
+      console.error('[Progress] Failed to update job progress:', error);
+    }
+  }
+
   console.log(`Fetched ${orders.length} total orders with activity in date range`);
 
   return orders;
@@ -163,11 +195,14 @@ async function fetchOrdersByDate(
   maxParam: string,
   startDateTime: string,
   endDateTime: string,
-  orderMap: Map<string, Order>
+  orderMap: Map<string, Order>,
+  jobId?: string  // Optional job ID for progress tracking
 ): Promise<void> {
   let hasNextPage = true;
   let pageInfo: string | null = null;
   let fetchedCount = 0;
+  const seenPageInfos = new Set<string>(); // Track visited pages to detect loops
+  let consecutiveNonNewOrders = 0; // Track pages with no new orders
 
   while (hasNextPage) {
     // When using page_info for pagination, Shopify requires ONLY page_info parameter
@@ -248,6 +283,8 @@ async function fetchOrdersByDate(
       const data = await response.json();
 
       if (data.orders && Array.isArray(data.orders)) {
+        let newOrdersThisPage = 0;
+
         // Fetch transactions for each order and add to map (deduplicate)
         for (let i = 0; i < data.orders.length; i++) {
           const orderData = data.orders[i];
@@ -265,6 +302,18 @@ async function fetchOrdersByDate(
 
           orderMap.set(order.id, order);
           fetchedCount++;
+          newOrdersThisPage++;
+
+          // Update progress every 10 orders
+          if (jobId && fetchedCount % 10 === 0) {
+            try {
+              await updateJobProgress(jobId, {
+                transactionsFetched: orderMap.size,
+              });
+            } catch (error) {
+              console.error('[Progress] Failed to update job progress:', error);
+            }
+          }
 
           // Rate limiting: Wait 500ms between calls (2 calls/second to stay well under limit)
           if (i < data.orders.length - 1) {
@@ -272,19 +321,42 @@ async function fetchOrdersByDate(
           }
         }
 
-        // Check for pagination
-        const linkHeader: string | null = response.headers.get('Link');
-        if (linkHeader && linkHeader.includes('rel="next"')) {
-          const match: RegExpMatchArray | null = linkHeader.match(/page_info=([^&>]+)/);
-          if (match) {
-            pageInfo = match[1];
-            // Add delay before fetching next page to stay under rate limits
-            await sleep(500);
-          } else {
+        // Track consecutive pages with no new orders
+        if (newOrdersThisPage === 0) {
+          consecutiveNonNewOrders++;
+          // Stop if we've seen 3 consecutive pages with no new orders
+          if (consecutiveNonNewOrders >= 3) {
+            console.log(`  Stopping pagination for ${minParam.replace('_min', '')} query - ${consecutiveNonNewOrders} consecutive pages with no new orders`);
             hasNextPage = false;
           }
         } else {
-          hasNextPage = false;
+          consecutiveNonNewOrders = 0; // Reset counter when we find new orders
+        }
+
+        // Check for pagination
+        if (hasNextPage) {
+          const linkHeader: string | null = response.headers.get('Link');
+          if (linkHeader && linkHeader.includes('rel="next"')) {
+            const match: RegExpMatchArray | null = linkHeader.match(/page_info=([^&>]+)/);
+            if (match) {
+              const nextPageInfo = match[1];
+
+              // Detect pagination loops by checking if we've seen this page_info before
+              if (seenPageInfos.has(nextPageInfo)) {
+                console.log(`  Stopping pagination for ${minParam.replace('_min', '')} query - detected loop (page_info already visited)`);
+                hasNextPage = false;
+              } else {
+                seenPageInfos.add(nextPageInfo);
+                pageInfo = nextPageInfo;
+                // Add delay before fetching next page to stay under rate limits
+                await sleep(500);
+              }
+            } else {
+              hasNextPage = false;
+            }
+          } else {
+            hasNextPage = false;
+          }
         }
       } else {
         hasNextPage = false;
