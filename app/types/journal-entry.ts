@@ -311,6 +311,7 @@ export interface EnrichedTransaction {
     totalDiscounts: Decimal;
     financialStatus: string;
     lineItems: OrderLineItem[]; // Needed for Daily Reconciliation Report notes
+    hasActualRefunds?: boolean; // True if order has actual refunds (not just cancellations)
   };
 
   // Enriched data for Daily Sales Report

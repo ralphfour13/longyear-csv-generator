@@ -72,48 +72,87 @@ export function calculateGiftCardProductSales(order: Order): Decimal {
 }
 
 /**
+ * Check if an order has ACTUAL refunds (money returned after payment)
+ * vs cancellations (items removed before payment, no money returned)
+ *
+ * KEY DISTINCTION:
+ * - Cancel-type refunds: restock_type: 'cancel', NO transactions
+ *   Items removed BEFORE payment, no money was ever collected
+ * - Return-type refunds: restock_type: 'return' OR has transactions
+ *   Items returned AFTER payment, money WAS refunded
+ *
+ * @param order - Order to check
+ * @returns true if order has actual refunds (not just cancellations)
+ */
+export function hasActualRefunds(order: Order): boolean {
+  if (!order.refunds || order.refunds.length === 0) {
+    return false;
+  }
+
+  // Check if ANY refund has:
+  // 1. Transactions (money was actually refunded), OR
+  // 2. Return-type line items (items returned after payment)
+  return order.refunds.some(refund => {
+    const hasRefundTransactions = refund.transactions && refund.transactions.length > 0;
+    const hasReturnItems = refund.refund_line_items?.some(
+      item => item.restock_type === 'return'
+    );
+    return hasRefundTransactions || hasReturnItems;
+  });
+}
+
+/**
  * Calculate the tax amount for an order, handling partial captures and refunds.
  *
  * KEY DISTINCTION:
  * - PARTIAL CAPTURE: Items removed BEFORE payment → use currentTotalTax
  *   (Customer never paid for removed items, so tax was never collected)
- * - REFUND: Items returned AFTER payment → use totalTax (original)
+ * - ACTUAL REFUND: Items returned AFTER payment → use totalTax (original)
  *   (Customer DID pay tax, refund entry reverses it separately via refund_line_items)
+ * - CANCEL-TYPE REFUND: Items cancelled BEFORE payment → use currentTotalTax
+ *   (Same as partial capture - customer never paid for cancelled items)
  *
  * ACCRUAL ACCOUNTING PRINCIPLE:
- * For orders with refunds on a DIFFERENT day than the sale:
+ * For orders with actual refunds on a DIFFERENT day than the sale:
  * - Sale day: Record FULL original tax (totalTax)
  * - Refund day: Record tax reversal (handled by createRefundJournalEntries)
  *
- * Example Order #80284:
+ * Example Order #80284 (actual refund):
  * - Jan 8: Sale captured with tax $76.37
- * - Jan 12: Partial refund, tax portion $12.36
+ * - Jan 12: Partial refund (restock_type: 'return'), tax portion $12.36
  * - Jan 8 entry should use $76.37 (original), not $64.01 (current)
  * - Jan 12 entry handles the $12.36 reversal
  *
- * Example Order #80211 (partial capture, NOT a refund):
+ * Example Order #80291 (cancel-type, NOT an actual refund):
+ * - Original totalTax: $X
+ * - currentTotalTax: $Y (items cancelled before payment)
+ * - We use: $Y (customer only paid for remaining items)
+ *
+ * Example Order #80211 (partial capture, no refunds):
  * - Original totalTax: $7.01
  * - currentTotalTax: $2.28 (items removed before payment)
  * - We use: $2.28 (customer only paid for remaining items)
  */
 export function calculateTaxAmount(order: Order): Decimal {
-  // Check if this is a partial capture (items removed BEFORE payment)
-  // vs a refund (items returned AFTER payment)
-  const hasRefunds = order.refunds && order.refunds.length > 0;
+  // Check if this has ACTUAL refunds (money returned after payment)
+  // vs cancellations (items removed before payment, no money returned)
+  const orderHasActualRefunds = hasActualRefunds(order);
 
-  // Partial capture detection: currentTotalPrice < totalPrice WITHOUT refunds
+  // Partial capture detection:
+  // - No actual refunds (just cancellations or no refunds at all), AND
+  // - currentTotalPrice < totalPrice (items were removed/cancelled)
   // This means items were removed/cancelled before payment was captured
-  const isPartialCapture = !hasRefunds &&
+  const isPartialCapture = !orderHasActualRefunds &&
     order.currentTotalPrice !== undefined &&
     order.currentTotalPrice.lt(order.totalPrice);
 
   if (isPartialCapture && order.currentTotalTax !== undefined) {
-    // Partial capture: items removed before payment, use current tax
+    // Partial capture or cancel-type: items removed before payment, use current tax
     // Customer only paid tax on the remaining items
     return order.currentTotalTax;
   }
 
-  // Normal orders and refunded orders: use original tax
+  // Normal orders and ACTUAL refunded orders: use original tax
   // Refund tax reversal is handled separately by createRefundJournalEntries()
   return order.totalTax || new Decimal(0);
 }
@@ -152,32 +191,39 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // SALES CALCULATION: Use original subtotal for refunded orders, current for partial captures
+  // SALES CALCULATION: Use original subtotal for ACTUAL refunded orders, current for partial captures
   //
   // KEY DISTINCTION:
   // - PARTIAL CAPTURE: Items removed BEFORE payment → use currentSubtotalPrice
   //   (Customer never paid for removed items)
-  // - REFUND: Items returned AFTER payment → use subtotalPrice (original)
+  // - CANCEL-TYPE REFUND: Items cancelled BEFORE payment → use currentSubtotalPrice
+  //   (Same as partial capture - customer never paid for cancelled items)
+  // - ACTUAL REFUND: Items returned AFTER payment → use subtotalPrice (original)
   //   (Customer DID pay, refund entry reverses it separately via refund_line_items)
   //
   // ACCRUAL ACCOUNTING PRINCIPLE:
-  // For orders with refunds on a DIFFERENT day than the sale:
+  // For orders with ACTUAL refunds on a DIFFERENT day than the sale:
   // - Sale day: Record FULL original sales (subtotalPrice)
   // - Refund day: Record sales reversal (handled by createRefundJournalEntries)
   //
-  // Example Order #80284:
+  // Example Order #80284 (actual refund):
   // - Jan 8: Sale captured with subtotal $X
-  // - Jan 12: Partial refund, subtotal portion $Y
+  // - Jan 12: Partial refund (restock_type: 'return'), subtotal portion $Y
   // - Jan 8 entry should use original subtotal, not reduced current value
-  const hasRefunds = order.refunds && order.refunds.length > 0;
-  const isPartialCapture = !hasRefunds &&
+  //
+  // Example Order #80291 (cancel-type, NOT an actual refund):
+  // - Original subtotal: $2,546.47
+  // - Current subtotal: $174.97 (items cancelled before payment)
+  // - We use: $174.97 (customer only paid for remaining items)
+  const orderHasActualRefunds = hasActualRefunds(order);
+  const isPartialCapture = !orderHasActualRefunds &&
     order.currentSubtotalPrice !== undefined &&
     order.currentSubtotalPrice.lt(order.subtotalPrice);
 
   // TypeScript needs explicit check even though isPartialCapture guarantees currentSubtotalPrice is defined
   const netSales: Decimal = isPartialCapture && order.currentSubtotalPrice !== undefined
-    ? order.currentSubtotalPrice  // Partial capture: use current
-    : order.subtotalPrice;        // Normal/refunded: use original
+    ? order.currentSubtotalPrice  // Partial capture or cancel-type: use current
+    : order.subtotalPrice;        // Normal or ACTUAL refunded: use original
 
   // GIFT CARD PRODUCT SALES: Separate gift card product revenue from regular sales
   // Gift card sales go to liability (2320), not revenue (3000)

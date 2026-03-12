@@ -148,12 +148,17 @@ function transformToReportRow(
   //
   // For captures: Use ORIGINAL tax (totalTax) for consistency with journal entries
   // Refund tax reversal is shown separately on refund day
-  // Exception: Partial captures (items removed BEFORE payment) use currentTotalTax
+  // Exception: Partial captures and cancel-type refunds use currentTotalTax
   //
-  // Detect refunded orders via financialStatus (refunds array not available in EnrichedTransaction.order)
-  const orderHasRefunds = order.financialStatus === 'refunded' ||
-    order.financialStatus === 'partially_refunded';
-  const isPartialCapture = !orderHasRefunds &&
+  // KEY DISTINCTION:
+  // - PARTIAL CAPTURE / CANCEL-TYPE: Items removed BEFORE payment → use currentTotalTax
+  //   (Customer never paid for removed items)
+  // - ACTUAL REFUND: Items returned AFTER payment → use totalTax (original)
+  //   (Customer DID pay, refund entry reverses it separately)
+  //
+  // Use hasActualRefunds flag (calculated from refunds array with restock_type check)
+  const orderHasActualRefunds = order.hasActualRefunds ?? false;
+  const isPartialCapture = !orderHasActualRefunds &&
     order.currentTotalPrice !== undefined &&
     order.currentTotalPrice.lt(order.totalPrice);
 

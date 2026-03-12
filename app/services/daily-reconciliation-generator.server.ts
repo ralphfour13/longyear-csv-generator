@@ -102,19 +102,20 @@ function transformToReconciliationRow(
   const order = transactions[0].order;
   const enrichedData = transactions[0].enrichedData;
 
-  // Calculate sales - Use ORIGINAL values for refunded orders, CURRENT for partial captures
+  // Calculate sales - Use ORIGINAL values for ACTUAL refunded orders, CURRENT for partial captures
   //
   // KEY DISTINCTION:
   // - PARTIAL CAPTURE: Items removed BEFORE payment → use currentSubtotalPrice
   //   (Customer never paid for removed items)
-  // - REFUND: Items returned AFTER payment → use subtotalPrice (original)
+  // - CANCEL-TYPE REFUND: Items cancelled BEFORE payment → use currentSubtotalPrice
+  //   (Same as partial capture - customer never paid for cancelled items)
+  // - ACTUAL REFUND: Items returned AFTER payment → use subtotalPrice (original)
   //   (Customer DID pay, refund entry reverses it separately)
   //
   // This matches the journal entry logic for consistency
-  // Detect refunded orders via financialStatus (refunds array not available in EnrichedTransaction.order)
-  const orderHasRefunds = order.financialStatus === 'refunded' ||
-    order.financialStatus === 'partially_refunded';
-  const isPartialCapture = !orderHasRefunds &&
+  // Use hasActualRefunds flag (calculated from refunds array with restock_type check)
+  const orderHasActualRefunds = order.hasActualRefunds ?? false;
+  const isPartialCapture = !orderHasActualRefunds &&
     order.currentSubtotalPrice !== undefined &&
     order.currentSubtotalPrice.lt(order.subtotalPrice);
 
@@ -152,8 +153,14 @@ function transformToReconciliationRow(
     new Decimal(0)
   );
 
-  // Calculate tax - use original for refunded orders, current for partial captures
+  // Calculate tax - use original for ACTUAL refunded orders, current for partial captures
   // This matches the journal entry logic for consistency
+  //
+  // KEY DISTINCTION:
+  // - PARTIAL CAPTURE / CANCEL-TYPE: Items removed BEFORE payment → use currentTotalTax
+  //   (Customer never paid for removed items)
+  // - ACTUAL REFUND: Items returned AFTER payment → use totalTax (original)
+  //   (Customer DID pay, refund entry reverses it separately)
   const taxAmount = isPartialCapture
     ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
     : (order.totalTax ?? new Decimal(0));

@@ -20,6 +20,7 @@ import {
   createRefundJournalEntries,
   createFeeEntries,
   validateOrderEntries,
+  hasActualRefunds,
 } from './order-centric-journal-generator.server';
 import { enrichOrderData } from './enrichment/order-enrichment.server';
 import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
@@ -417,6 +418,7 @@ async function processOrderCaptures(
         totalDiscounts: order.totalDiscounts,
         financialStatus: order.financialStatus,
         lineItems: order.lineItems,
+        hasActualRefunds: hasActualRefunds(order),
       },
       enrichedData: enrichedData || undefined,
       payout: {
@@ -486,6 +488,7 @@ async function processOrderRefunds(
         totalDiscounts: order.totalDiscounts,
         financialStatus: order.financialStatus,
         lineItems: order.lineItems,
+        hasActualRefunds: hasActualRefunds(order),
       },
       enrichedData: enrichedData || undefined,
       payout: {
