@@ -145,13 +145,26 @@ function transformToReportRow(
 
   // Tax total - for refunds, set to 0 to avoid double-counting in TOTALS row
   // (refund amount already includes tax, and we show it in totalRefund column)
-  // For captures, use currentTotalTax for partial captures (items removed before payment)
+  //
+  // For captures: Use ORIGINAL tax (totalTax) for consistency with journal entries
+  // Refund tax reversal is shown separately on refund day
+  // Exception: Partial captures (items removed BEFORE payment) use currentTotalTax
+  //
+  // Detect refunded orders via financialStatus (refunds array not available in EnrichedTransaction.order)
+  const orderHasRefunds = order.financialStatus === 'refunded' ||
+    order.financialStatus === 'partially_refunded';
+  const isPartialCapture = !orderHasRefunds &&
+    order.currentTotalPrice !== undefined &&
+    order.currentTotalPrice.lt(order.totalPrice);
+
   const taxTotal = isRefund
     ? new Decimal(0)
-    : (order.currentTotalTax ?? order.totalTax ?? enrichedData.taxLines.reduce(
-        (sum, tax) => sum.plus(tax.price),
-        new Decimal(0)
-      ));
+    : isPartialCapture
+      ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
+      : (order.totalTax ?? enrichedData.taxLines.reduce(
+          (sum, tax) => sum.plus(tax.price),
+          new Decimal(0)
+        ));
 
   // Payment breakdown (only for charge transactions, not refunds)
   const paymentBreakdown = isRefund

@@ -102,18 +102,27 @@ function transformToReconciliationRow(
   const order = transactions[0].order;
   const enrichedData = transactions[0].enrichedData;
 
-  // Calculate sales - PREFER current values for ALL orders (reflects actual captured/remaining amount)
-  // currentSubtotalPrice reflects:
-  // - Partial captures: Items removed before payment (e.g., Order #80211: $88.90 → $29.00)
-  // - Refunds: Amount remaining after refund
-  // - Normal orders: Same as subtotalPrice
+  // Calculate sales - Use ORIGINAL values for refunded orders, CURRENT for partial captures
+  //
+  // KEY DISTINCTION:
+  // - PARTIAL CAPTURE: Items removed BEFORE payment → use currentSubtotalPrice
+  //   (Customer never paid for removed items)
+  // - REFUND: Items returned AFTER payment → use subtotalPrice (original)
+  //   (Customer DID pay, refund entry reverses it separately)
+  //
+  // This matches the journal entry logic for consistency
+  // Detect refunded orders via financialStatus (refunds array not available in EnrichedTransaction.order)
+  const orderHasRefunds = order.financialStatus === 'refunded' ||
+    order.financialStatus === 'partially_refunded';
+  const isPartialCapture = !orderHasRefunds &&
+    order.currentSubtotalPrice !== undefined &&
+    order.currentSubtotalPrice.lt(order.subtotalPrice);
+
   let sales: Decimal;
-  if (order.currentSubtotalPrice !== undefined && order.currentSubtotalPrice.gte(0)) {
+  if (isPartialCapture && order.currentSubtotalPrice !== undefined) {
     sales = order.currentSubtotalPrice;
   } else {
-    sales = order.totalPrice
-      .minus(order.totalTax || new Decimal(0))
-      .minus(order.totalShipping || new Decimal(0));
+    sales = order.subtotalPrice;
   }
 
   // For fully refunded orders, create two rows: original sale and refund
@@ -143,6 +152,12 @@ function transformToReconciliationRow(
     new Decimal(0)
   );
 
+  // Calculate tax - use original for refunded orders, current for partial captures
+  // This matches the journal entry logic for consistency
+  const taxAmount = isPartialCapture
+    ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
+    : (order.totalTax ?? new Decimal(0));
+
   // If refunded, create original sale row
   if (order.financialStatus === 'refunded') {
     rows.push({
@@ -150,7 +165,7 @@ function transformToReconciliationRow(
       originalSubtotal: originalSubtotal.neg().toFixed(2),
       discount: discount.neg().toFixed(2),
       netSubtotal: netSubtotal.neg().toFixed(2), // Negative for refund
-      tax: (order.currentTotalTax ?? order.totalTax ?? new Decimal(0)).neg().toFixed(2),
+      tax: taxAmount.neg().toFixed(2),
       shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.neg().toFixed(2) : '',
       area,
       notes: notes || '',
@@ -172,7 +187,7 @@ function transformToReconciliationRow(
       originalSubtotal: originalSubtotal.toFixed(2),
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
-      tax: (order.currentTotalTax ?? order.totalTax ?? new Decimal(0)).toFixed(2),
+      tax: taxAmount.toFixed(2),
       shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',
@@ -188,13 +203,13 @@ function transformToReconciliationRow(
       giftCardUsed: giftCardInfo.used,
     });
   } else {
-    // Normal order - use current tax (reflects actual captured amount for partial captures)
+    // Normal order or partial capture
     rows.push({
       orderNumber: order.name,
       originalSubtotal: originalSubtotal.toFixed(2),
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
-      tax: (order.currentTotalTax ?? order.totalTax ?? new Decimal(0)).toFixed(2),
+      tax: taxAmount.toFixed(2),
       shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
       area,
       notes: notes || '',
