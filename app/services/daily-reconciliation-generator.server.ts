@@ -148,10 +148,9 @@ function transformToReconciliationRow(
 
   // Calculate payment breakdown
   const paymentBreakdown = enrichedData.paymentBreakdown;
-  const paymentTotal = Object.values(paymentBreakdown).reduce(
-    (sum, amount) => sum.plus(amount),
-    new Decimal(0)
-  );
+  // FIX: Use order.currentTotalPrice instead of summing paymentBreakdown
+  // The paymentBreakdown sum can be wrong due to duplicate transactions in enrichment
+  const paymentTotal = order.currentTotalPrice;
 
   // Calculate tax - use original for ACTUAL refunded orders, current for partial captures
   // This matches the journal entry logic for consistency
