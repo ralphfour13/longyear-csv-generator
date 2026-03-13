@@ -176,14 +176,10 @@ function transformToReportRow(
   // Payment breakdown from the capture transaction
   const paymentBreakdown = enrichedData.paymentBreakdown;
 
-  // Current total (sum of all payment methods)
-  const totalPayment = paymentBreakdown.card
-    .plus(paymentBreakdown.cash)
-    .plus(paymentBreakdown.giftCard)
-    .plus(paymentBreakdown.storeCredit)
-    .plus(paymentBreakdown.check)
-    .plus(paymentBreakdown.charge);
-  const currentTotal1 = totalPayment.toFixed(2);
+  // Current total - use order.currentTotalPrice for accuracy
+  // The paymentBreakdown sum can be wrong due to duplicate transactions in enrichment
+  // FIX: Both currentTotal1 and currentTotal2 should show the actual captured amount
+  const currentTotal1 = order.currentTotalPrice.toFixed(2);
   const currentTotal2 = order.currentTotalPrice.toFixed(2);
 
   // Calculate total refund by summing all refund transactions for this order
