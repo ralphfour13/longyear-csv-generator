@@ -154,19 +154,13 @@ function transformToReportRow(
   const tax5 = enrichedData.taxLines[4] || { title: '', rate: '', price: new Decimal(0) };
 
   // Tax total calculation
-  // KEY DISTINCTION:
-  // - PARTIAL CAPTURE / CANCEL-TYPE: Items removed BEFORE payment → use currentTotalTax
-  //   (Customer never paid for removed items)
-  // - ACTUAL REFUND: Items returned AFTER payment → use totalTax (original)
-  //   (Customer DID pay, refund entry reverses it separately)
-  //
-  // Use hasActualRefunds flag (calculated from refunds array with restock_type check)
-  const orderHasActualRefunds = order.hasActualRefunds ?? false;
-  const isPartialCapture = !orderHasActualRefunds &&
-    order.currentTotalPrice !== undefined &&
+  // FIX: Always use currentTotalTax when currentTotalPrice < totalPrice
+  // This ensures tax is consistent with the current total being reported
+  // Whether the reduction was due to cancellation OR refund, the current tax is what matters
+  const hasReducedTotal = order.currentTotalPrice !== undefined &&
     order.currentTotalPrice.lt(order.totalPrice);
 
-  const taxTotal = isPartialCapture
+  const taxTotal = hasReducedTotal
     ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
     : (order.totalTax ?? enrichedData.taxLines.reduce(
         (sum, tax) => sum.plus(tax.price),

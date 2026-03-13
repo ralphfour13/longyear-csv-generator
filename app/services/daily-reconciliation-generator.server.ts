@@ -102,29 +102,15 @@ function transformToReconciliationRow(
   const order = transactions[0].order;
   const enrichedData = transactions[0].enrichedData;
 
-  // Calculate sales - Use ORIGINAL values for ACTUAL refunded orders, CURRENT for partial captures
-  //
-  // KEY DISTINCTION:
-  // - PARTIAL CAPTURE: Items removed BEFORE payment → use currentSubtotalPrice
-  //   (Customer never paid for removed items)
-  // - CANCEL-TYPE REFUND: Items cancelled BEFORE payment → use currentSubtotalPrice
-  //   (Same as partial capture - customer never paid for cancelled items)
-  // - ACTUAL REFUND: Items returned AFTER payment → use subtotalPrice (original)
-  //   (Customer DID pay, refund entry reverses it separately)
-  //
-  // This matches the journal entry logic for consistency
-  // Use hasActualRefunds flag (calculated from refunds array with restock_type check)
-  const orderHasActualRefunds = order.hasActualRefunds ?? false;
-  const isPartialCapture = !orderHasActualRefunds &&
-    order.currentSubtotalPrice !== undefined &&
+  // Calculate sales - use currentSubtotalPrice when available and less than original
+  // FIX: Use current values whenever the subtotal is reduced, regardless of reason
+  // This ensures sales are consistent with the current total being reported
+  const hasReducedSubtotal = order.currentSubtotalPrice !== undefined &&
     order.currentSubtotalPrice.lt(order.subtotalPrice);
 
-  let sales: Decimal;
-  if (isPartialCapture && order.currentSubtotalPrice !== undefined) {
-    sales = order.currentSubtotalPrice;
-  } else {
-    sales = order.subtotalPrice;
-  }
+  const sales = hasReducedSubtotal && order.currentSubtotalPrice !== undefined
+    ? order.currentSubtotalPrice
+    : order.subtotalPrice;
 
   // For fully refunded orders, create two rows: original sale and refund
   const rows: DailyReconciliationRow[] = [];
@@ -152,15 +138,13 @@ function transformToReconciliationRow(
   // The paymentBreakdown sum can be wrong due to duplicate transactions in enrichment
   const paymentTotal = order.currentTotalPrice;
 
-  // Calculate tax - use original for ACTUAL refunded orders, current for partial captures
-  // This matches the journal entry logic for consistency
-  //
-  // KEY DISTINCTION:
-  // - PARTIAL CAPTURE / CANCEL-TYPE: Items removed BEFORE payment → use currentTotalTax
-  //   (Customer never paid for removed items)
-  // - ACTUAL REFUND: Items returned AFTER payment → use totalTax (original)
-  //   (Customer DID pay, refund entry reverses it separately)
-  const taxAmount = isPartialCapture
+  // Calculate tax - use currentTotalTax when currentTotalPrice < totalPrice
+  // FIX: Use currentTotalTax whenever the total is reduced, regardless of reason
+  // This ensures tax is consistent with the current total being reported
+  const hasReducedTotal = order.currentTotalPrice !== undefined &&
+    order.currentTotalPrice.lt(order.totalPrice);
+
+  const taxAmount = hasReducedTotal
     ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
     : (order.totalTax ?? new Decimal(0));
 
