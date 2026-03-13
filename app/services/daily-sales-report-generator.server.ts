@@ -50,16 +50,17 @@ interface DailySalesReportRow {
 /**
  * Generate Daily Sales Report CSV
  *
- * File #1: Transaction-level detail with raw Shopify data
+ * File #1: Order-level detail with raw Shopify data
  *
  * Format:
- * - One row per transaction (captures and refunds are separate rows)
+ * - ONE row per order (aggregates captures and refunds)
  * - Date assignment: Based on latest capture/sale date across all transactions
  * - Split payments: Entire order reports on the latest capture date
+ * - Refunds: Aggregated into totalRefund column (not separate rows)
+ * - Partial captures: Uses currentTotalPrice (what was actually captured)
  * - Totals row at bottom
  *
  * @param enrichedTransactions - Array of enriched transactions from reconciliation
- * @param targetDate - Target date for filtering (YYYY-MM-DD)
  * @returns CSV string
  */
 export function generateDailySalesReport(
@@ -73,10 +74,17 @@ export function generateDailySalesReport(
   // Process all orders that were already filtered by the reconciler
   // The reconciler has already filtered transactions by the target date,
   // so we don't need to filter again here
+  //
+  // FIX: Create ONE row per order by using only the FIRST transaction (the capture)
+  // Previously, this created rows for BOTH captures AND refunds, causing 2-3x duplication
+  // Refunds are shown in the totalRefund column, not as separate rows
   for (const [, transactions] of orderGroups.entries()) {
-    // For each transaction in the order, create a separate row
-    for (const enrichedTxn of transactions) {
-      const row = transformToReportRow(enrichedTxn);
+    // Find the capture transaction (charge type) for this order
+    const captureTransaction = transactions.find(txn => txn.balanceTransaction.type === 'charge');
+
+    // Only create a row if there's a capture (skip refund-only orders)
+    if (captureTransaction) {
+      const row = transformToReportRow(captureTransaction, transactions);
       if (row) {
         rows.push(row);
       }
@@ -115,13 +123,18 @@ function groupByOrder(
  * Transform EnrichedTransaction to Daily Sales Report row
  *
  * Handles:
- * - Multiple transactions per order (separate rows)
+ * - ONE row per order (aggregates all transactions)
  * - Payment method mapping
- * - Tax breakdown (up to 3 lines)
+ * - Tax breakdown (up to 5 lines)
  * - Shipping address fields
+ * - Refund totals (from all refund transactions for this order)
+ *
+ * @param enrichedTxn - The primary capture transaction for this order
+ * @param allOrderTransactions - All transactions for this order (captures + refunds)
  */
 function transformToReportRow(
   enrichedTxn: EnrichedTransaction,
+  allOrderTransactions?: EnrichedTransaction[],
 ): DailySalesReportRow | null {
   if (!enrichedTxn.order || !enrichedTxn.enrichedData) {
     return null;
@@ -129,12 +142,9 @@ function transformToReportRow(
 
   const order = enrichedTxn.order;
   const enrichedData = enrichedTxn.enrichedData;
-  const balanceTxn = enrichedTxn.balanceTransaction;
 
-  // Get the specific transaction for this row
-  // For charge transactions, we show all payment methods on the same row
-  // For refund transactions, we show a separate row with the refund amount
-  const isRefund = balanceTxn.type === 'refund';
+  // This function now only handles capture transactions (one row per order)
+  // Refunds are aggregated into the totalRefund column
 
   // Tax lines (up to 5)
   const tax1 = enrichedData.taxLines[0] || { title: '', rate: '', price: new Decimal(0) };
@@ -143,13 +153,7 @@ function transformToReportRow(
   const tax4 = enrichedData.taxLines[3] || { title: '', rate: '', price: new Decimal(0) };
   const tax5 = enrichedData.taxLines[4] || { title: '', rate: '', price: new Decimal(0) };
 
-  // Tax total - for refunds, set to 0 to avoid double-counting in TOTALS row
-  // (refund amount already includes tax, and we show it in totalRefund column)
-  //
-  // For captures: Use ORIGINAL tax (totalTax) for consistency with journal entries
-  // Refund tax reversal is shown separately on refund day
-  // Exception: Partial captures and cancel-type refunds use currentTotalTax
-  //
+  // Tax total calculation
   // KEY DISTINCTION:
   // - PARTIAL CAPTURE / CANCEL-TYPE: Items removed BEFORE payment → use currentTotalTax
   //   (Customer never paid for removed items)
@@ -162,26 +166,15 @@ function transformToReportRow(
     order.currentTotalPrice !== undefined &&
     order.currentTotalPrice.lt(order.totalPrice);
 
-  const taxTotal = isRefund
-    ? new Decimal(0)
-    : isPartialCapture
-      ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
-      : (order.totalTax ?? enrichedData.taxLines.reduce(
-          (sum, tax) => sum.plus(tax.price),
-          new Decimal(0)
-        ));
+  const taxTotal = isPartialCapture
+    ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
+    : (order.totalTax ?? enrichedData.taxLines.reduce(
+        (sum, tax) => sum.plus(tax.price),
+        new Decimal(0)
+      ));
 
-  // Payment breakdown (only for charge transactions, not refunds)
-  const paymentBreakdown = isRefund
-    ? {
-        cash: new Decimal(0),
-        charge: new Decimal(0),
-        giftCard: new Decimal(0),
-        storeCredit: new Decimal(0),
-        check: new Decimal(0),
-        card: new Decimal(0),
-      }
-    : enrichedData.paymentBreakdown;
+  // Payment breakdown from the capture transaction
+  const paymentBreakdown = enrichedData.paymentBreakdown;
 
   // Current total (sum of all payment methods)
   const totalPayment = paymentBreakdown.card
@@ -190,15 +183,24 @@ function transformToReportRow(
     .plus(paymentBreakdown.storeCredit)
     .plus(paymentBreakdown.check)
     .plus(paymentBreakdown.charge);
-  const currentTotal1 = isRefund ? '' : totalPayment.toFixed(2);
-  const currentTotal2 = isRefund ? '' : order.currentTotalPrice.toFixed(2);
+  const currentTotal1 = totalPayment.toFixed(2);
+  const currentTotal2 = order.currentTotalPrice.toFixed(2);
 
-  // Refund amount (only for refund transactions)
-  const totalRefund = isRefund ? balanceTxn.gross.abs().toFixed(2) : '';
+  // Calculate total refund by summing all refund transactions for this order
+  // FIX: Aggregate refunds from all transactions, don't create separate rows
+  let totalRefundAmount = new Decimal(0);
+  if (allOrderTransactions) {
+    for (const txn of allOrderTransactions) {
+      if (txn.balanceTransaction.type === 'refund') {
+        totalRefundAmount = totalRefundAmount.plus(txn.balanceTransaction.gross.abs());
+      }
+    }
+  }
+  const totalRefund = totalRefundAmount.greaterThan(0) ? totalRefundAmount.toFixed(2) : '';
 
-  // Get the specific transaction details for this row
+  // Get the capture/sale transaction details for this row
   const transaction = enrichedData.transactions.find(
-    (txn) => txn.kind === (isRefund ? 'refund' : 'capture') || txn.kind === 'sale'
+    (txn) => txn.kind === 'capture' || txn.kind === 'sale'
   );
 
   return {
