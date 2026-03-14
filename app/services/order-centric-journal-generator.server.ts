@@ -539,16 +539,17 @@ export async function createRefundJournalEntries(
     ) && (!refund?.refund_line_items || refund.refund_line_items.length === 0);
 
     if (isRefundDiscrepancy) {
-      // Handle as price adjustment - money goes out but no sales reversal needed
+      // Handle as price adjustment - refund reverses sales
       // The RF- entry (payment out) was already created above
-      // Create a debit to Discounts/Allowances to balance the entry
+      // Create a debit to Sales Revenue to balance the entry (not Discounts)
+      // Refunds reverse sales; discounts reduce the selling price
       const refundNote = refund?.note || 'Price Adjustment';
 
       entries.push({
         date: targetDate,
         reference: `RF-${order.name}`,
-        account: accountMappings.discounts.accountCode,
-        accountName: accountMappings.discounts.accountName,
+        account: accountMappings.sales_revenue.accountCode,
+        accountName: accountMappings.sales_revenue.accountName,
         debit: refundAmount,
         credit: new Decimal(0),
         memo: `${refundNote} - Order ${order.name}`,

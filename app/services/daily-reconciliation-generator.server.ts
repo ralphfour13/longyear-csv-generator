@@ -102,13 +102,21 @@ function transformToReconciliationRow(
   const order = transactions[0].order;
   const enrichedData = transactions[0].enrichedData;
 
-  // Calculate sales - use currentSubtotalPrice when available and less than original
-  // FIX: Use current values whenever the subtotal is reduced, regardless of reason
-  // This ensures sales are consistent with the current total being reported
+  // Determine if this order has actual refunds (money returned AFTER payment)
+  // vs partial capture (items removed BEFORE payment)
+  // This flag is already set in the reconciler
+  const orderHasActualRefunds = order.hasActualRefunds || false;
+
+  // Check if totals are reduced
   const hasReducedSubtotal = order.currentSubtotalPrice !== undefined &&
     order.currentSubtotalPrice.lt(order.subtotalPrice);
+  const hasReducedTotal = order.currentTotalPrice !== undefined &&
+    order.currentTotalPrice.lt(order.totalPrice);
 
-  const sales = hasReducedSubtotal && order.currentSubtotalPrice !== undefined
+  // Calculate sales - use original subtotalPrice for orders with actual refunds
+  // Only use currentSubtotalPrice for partial captures (items removed BEFORE payment)
+  // This ensures reports show historical state, not future-modified state
+  const sales = (hasReducedSubtotal && !orderHasActualRefunds && order.currentSubtotalPrice !== undefined)
     ? order.currentSubtotalPrice
     : order.subtotalPrice;
 
@@ -134,17 +142,16 @@ function transformToReconciliationRow(
 
   // Calculate payment breakdown
   const paymentBreakdown = enrichedData.paymentBreakdown;
-  // FIX: Use order.currentTotalPrice instead of summing paymentBreakdown
-  // The paymentBreakdown sum can be wrong due to duplicate transactions in enrichment
-  const paymentTotal = order.currentTotalPrice;
+  // Use original totalPrice for orders with actual refunds to show historical state
+  // Only use currentTotalPrice for partial captures
+  const paymentTotal = (hasReducedTotal && !orderHasActualRefunds)
+    ? order.currentTotalPrice
+    : order.totalPrice;
 
-  // Calculate tax - use currentTotalTax when currentTotalPrice < totalPrice
-  // FIX: Use currentTotalTax whenever the total is reduced, regardless of reason
-  // This ensures tax is consistent with the current total being reported
-  const hasReducedTotal = order.currentTotalPrice !== undefined &&
-    order.currentTotalPrice.lt(order.totalPrice);
-
-  const taxAmount = hasReducedTotal
+  // Calculate tax - use original totalTax for orders with actual refunds
+  // Only use currentTotalTax for partial captures (items removed BEFORE payment)
+  // This ensures reports show historical state, not future-modified state
+  const taxAmount = (hasReducedTotal && !orderHasActualRefunds)
     ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
     : (order.totalTax ?? new Decimal(0));
 

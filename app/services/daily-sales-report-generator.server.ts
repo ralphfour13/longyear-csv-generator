@@ -153,19 +153,18 @@ function transformToReportRow(
   const tax4 = enrichedData.taxLines[3] || { title: '', rate: '', price: new Decimal(0) };
   const tax5 = enrichedData.taxLines[4] || { title: '', rate: '', price: new Decimal(0) };
 
-  // Tax total calculation
-  // FIX: Always use currentTotalTax when currentTotalPrice < totalPrice
-  // This ensures tax is consistent with the current total being reported
-  // Whether the reduction was due to cancellation OR refund, the current tax is what matters
+  // Tax total calculation - use original totalTax for orders with actual refunds
+  // Only use currentTotalTax for partial captures (items removed BEFORE payment)
+  // This ensures reports show historical state, not future-modified state
   const hasReducedTotal = order.currentTotalPrice !== undefined &&
     order.currentTotalPrice.lt(order.totalPrice);
 
-  const taxTotal = hasReducedTotal
+  // Flag is already set in the reconciler
+  const orderHasActualRefunds = order.hasActualRefunds || false;
+
+  const taxTotal = (hasReducedTotal && !orderHasActualRefunds)
     ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
-    : (order.totalTax ?? enrichedData.taxLines.reduce(
-        (sum, tax) => sum.plus(tax.price),
-        new Decimal(0)
-      ));
+    : (order.totalTax ?? new Decimal(0));
 
   // Payment breakdown from the capture transaction
   const paymentBreakdown = enrichedData.paymentBreakdown;
