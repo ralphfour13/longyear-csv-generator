@@ -412,6 +412,10 @@ export async function createRefundJournalEntries(
   const entries: JournalEntry[] = [];
   const accountMappings = await getAccountMappings(shop);
 
+  // Track refunds that have already had sales/tax reversal entries created
+  // This prevents duplicate sales reversals when a refund has multiple payment transactions
+  const processedRefunds = new Set<string>();
+
   for (const refundTxn of refundTransactions) {
     const refundAmount = refundTxn.amount.abs();
 
@@ -564,102 +568,118 @@ export async function createRefundJournalEntries(
     }
 
     // SO- REVERSAL ENTRIES: Use ACTUAL refund breakdown from refund_line_items
-    let refundedSubtotal = new Decimal(0);
-    let refundedTax = new Decimal(0);
+    // Only create these entries ONCE per refund (not once per transaction)
+    // This prevents duplicate sales reversals when a refund has multiple payment methods
+    const refundId = refund?.id?.toString() || refundTxn.id.toString();
+    const shouldProcessSalesReversal = !processedRefunds.has(refundId);
 
-    if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
-      // PREFERRED METHOD: Calculate actual subtotal and tax from refund line items
-      refundedSubtotal = refund.refund_line_items.reduce(
-        (sum, item) => sum.plus(item.subtotal), new Decimal(0)
-      );
-      refundedTax = refund.refund_line_items.reduce(
-        (sum, item) => sum.plus(item.total_tax), new Decimal(0)
-      );
+    if (shouldProcessSalesReversal) {
+      let refundedSubtotal = new Decimal(0);
+      let refundedTax = new Decimal(0);
 
-      // Validate that subtotal + tax = refund amount
-      const calculatedTotal = refundedSubtotal.plus(refundedTax);
-      const diff = calculatedTotal.minus(refundAmount).abs();
+      // Calculate total refund amount for this refund object (sum of all its transactions)
+      const totalRefundAmount = refund?.transactions.reduce(
+        (sum, txn) => sum.plus(new Decimal(txn.amount).abs()),
+        new Decimal(0)
+      ) || refundAmount;
 
-      if (diff.greaterThan(new Decimal('0.02'))) {
-        console.warn(
-          `⚠️ Refund amount mismatch for ${order.name}: ` +
-          `Calculated ${calculatedTotal.toFixed(2)} != Transaction ${refundAmount.toFixed(2)} ` +
-          `(Diff: $${diff.toFixed(2)})`
+      if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
+        // PREFERRED METHOD: Calculate actual subtotal and tax from refund line items
+        refundedSubtotal = refund.refund_line_items.reduce(
+          (sum, item) => sum.plus(item.subtotal), new Decimal(0)
         );
-      }
+        refundedTax = refund.refund_line_items.reduce(
+          (sum, item) => sum.plus(item.total_tax), new Decimal(0)
+        );
 
-      console.log(
-        `Refund ${order.name}: $${refundAmount.toFixed(2)} = ` +
-        `Subtotal: $${refundedSubtotal.toFixed(2)} + Tax: $${refundedTax.toFixed(2)}`
-      );
-    } else {
-      // FALLBACK: Use proportional method if refund_line_items not available
-      console.warn(`⚠️ No refund_line_items for ${order.name}, using proportional calculation`);
+        // Validate that subtotal + tax = total refund amount
+        const calculatedTotal = refundedSubtotal.plus(refundedTax);
+        const diff = calculatedTotal.minus(totalRefundAmount).abs();
 
-      const netSales = calculateNetSalesForRefund(order);
-      const taxAmount = order.totalTax || new Decimal(0);
-      const orderTotal = order.totalPrice;
-      const refundRatio = refundAmount.dividedBy(orderTotal);
-
-      refundedSubtotal = netSales.times(refundRatio);
-      refundedTax = taxAmount.times(refundRatio);
-    }
-
-    // GIFT CARD REFUND HANDLING: Check if refunded items include gift cards
-    // Gift card refunds reverse liability (2320), not sales revenue (3000)
-    let giftCardRefundSubtotal = new Decimal(0);
-    let regularRefundSubtotal = refundedSubtotal;
-
-    if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
-      // Check each refunded item to see if it's a gift card
-      for (const refundItem of refund.refund_line_items) {
-        const isGiftCard = refundItem.line_item?.title?.toLowerCase().includes('gift card');
-        if (isGiftCard) {
-          const itemSubtotal = new Decimal(refundItem.subtotal);
-          giftCardRefundSubtotal = giftCardRefundSubtotal.plus(itemSubtotal);
+        if (diff.greaterThan(new Decimal('0.02'))) {
+          console.warn(
+            `⚠️ Refund amount mismatch for ${order.name}: ` +
+            `Calculated ${calculatedTotal.toFixed(2)} != Transaction ${totalRefundAmount.toFixed(2)} ` +
+            `(Diff: $${diff.toFixed(2)})`
+          );
         }
+
+        console.log(
+          `Refund ${order.name}: $${totalRefundAmount.toFixed(2)} = ` +
+          `Subtotal: $${refundedSubtotal.toFixed(2)} + Tax: $${refundedTax.toFixed(2)}`
+        );
+      } else {
+        // FALLBACK: Use proportional method if refund_line_items not available
+        console.warn(`⚠️ No refund_line_items for ${order.name}, using proportional calculation`);
+
+        const netSales = calculateNetSalesForRefund(order);
+        const taxAmount = order.totalTax || new Decimal(0);
+        const orderTotal = order.totalPrice;
+        const refundRatio = totalRefundAmount.dividedBy(orderTotal);
+
+        refundedSubtotal = netSales.times(refundRatio);
+        refundedTax = taxAmount.times(refundRatio);
       }
-      // Regular refunds = total refunded subtotal minus gift card refunds
-      regularRefundSubtotal = refundedSubtotal.minus(giftCardRefundSubtotal);
-    }
 
-    // DEBIT: Sales Revenue (reverse credit for regular products)
-    if (regularRefundSubtotal.greaterThan(0)) {
-      entries.push({
-        date: targetDate,
-        reference: `RF-${order.name}`,
-        account: accountMappings.sales_revenue.accountCode,
-        accountName: accountMappings.sales_revenue.accountName,
-        debit: regularRefundSubtotal,
-        credit: new Decimal(0),
-        memo: `Sales Refund - Order ${order.name}`,
-      });
-    }
+      // GIFT CARD REFUND HANDLING: Check if refunded items include gift cards
+      // Gift card refunds reverse liability (2320), not sales revenue (3000)
+      let giftCardRefundSubtotal = new Decimal(0);
+      let regularRefundSubtotal = refundedSubtotal;
 
-    // DEBIT: Gift Card Liability (reverse credit for gift card products)
-    if (giftCardRefundSubtotal.greaterThan(0)) {
-      entries.push({
-        date: targetDate,
-        reference: `RF-${order.name}`,
-        account: accountMappings.gift_card_liability.accountCode,
-        accountName: accountMappings.gift_card_liability.accountName,
-        debit: giftCardRefundSubtotal,
-        credit: new Decimal(0),
-        memo: `Gift Card Sale Refund - Order ${order.name}`,
-      });
-    }
+      if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
+        // Check each refunded item to see if it's a gift card
+        for (const refundItem of refund.refund_line_items) {
+          const isGiftCard = refundItem.line_item?.title?.toLowerCase().includes('gift card');
+          if (isGiftCard) {
+            const itemSubtotal = new Decimal(refundItem.subtotal);
+            giftCardRefundSubtotal = giftCardRefundSubtotal.plus(itemSubtotal);
+          }
+        }
+        // Regular refunds = total refunded subtotal minus gift card refunds
+        regularRefundSubtotal = refundedSubtotal.minus(giftCardRefundSubtotal);
+      }
 
-    // DEBIT: Sales Tax (reverse credit)
-    if (refundedTax.greaterThan(0)) {
-      entries.push({
-        date: targetDate,
-        reference: `RF-${order.name}`,
-        account: accountMappings.sales_tax.accountCode,
-        accountName: accountMappings.sales_tax.accountName,
-        debit: refundedTax,
-        credit: new Decimal(0),
-        memo: `Sales Tax Refund - Order ${order.name}`,
-      });
+      // DEBIT: Sales Revenue (reverse credit for regular products)
+      if (regularRefundSubtotal.greaterThan(0)) {
+        entries.push({
+          date: targetDate,
+          reference: `RF-${order.name}`,
+          account: accountMappings.sales_revenue.accountCode,
+          accountName: accountMappings.sales_revenue.accountName,
+          debit: regularRefundSubtotal,
+          credit: new Decimal(0),
+          memo: `Sales Refund - Order ${order.name}`,
+        });
+      }
+
+      // DEBIT: Gift Card Liability (reverse credit for gift card products)
+      if (giftCardRefundSubtotal.greaterThan(0)) {
+        entries.push({
+          date: targetDate,
+          reference: `RF-${order.name}`,
+          account: accountMappings.gift_card_liability.accountCode,
+          accountName: accountMappings.gift_card_liability.accountName,
+          debit: giftCardRefundSubtotal,
+          credit: new Decimal(0),
+          memo: `Gift Card Sale Refund - Order ${order.name}`,
+        });
+      }
+
+      // DEBIT: Sales Tax (reverse credit)
+      if (refundedTax.greaterThan(0)) {
+        entries.push({
+          date: targetDate,
+          reference: `RF-${order.name}`,
+          account: accountMappings.sales_tax.accountCode,
+          accountName: accountMappings.sales_tax.accountName,
+          debit: refundedTax,
+          credit: new Decimal(0),
+          memo: `Sales Tax Refund - Order ${order.name}`,
+        });
+      }
+
+      // Mark this refund as processed to prevent duplicate sales reversals
+      processedRefunds.add(refundId);
     }
 
     // NOTE: Shipping refunds are included in refund_line_items.subtotal
