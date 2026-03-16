@@ -110,10 +110,10 @@ function mapGatewayToAccount(
       };
 
     case 'charge':
-      // Manual charges go to COGS/Expense (e.g., travel giveaways)
+      // Manual charges go to Accounts Receivable (e.g., travel giveaways)
       return {
-        account: accountMappings.cogs_inventory_writeoff.accountCode,
-        accountName: accountMappings.cogs_inventory_writeoff.accountName,
+        account: accountMappings.accounts_receivable.accountCode,
+        accountName: accountMappings.accounts_receivable.accountName,
       };
 
     case 'check':
