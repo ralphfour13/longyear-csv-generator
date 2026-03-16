@@ -135,9 +135,30 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
+        // Check for refunds on target date BEFORE deciding to skip order
+        // This ensures refunds that occur on different dates than captures are still processed
+        const refundTransactions = filterRefundTransactions(order, targetDate);
+
         if (lastCaptureDate !== targetDate) {
-          // This order's last capture is on a different date, skip for now
-          // It will be processed when we run reconciliation for that date
+          // This order's last capture is on a different date
+          // BUT check if there are refunds on target date before skipping
+          if (refundTransactions.length > 0) {
+            // Process refunds for this order even though capture was on different date
+            await processOrderRefunds(
+              shop,
+              accessToken,
+              order,
+              refundTransactions,
+              targetDate,
+              journalEntries,
+              enrichedTransactions,
+              warnings
+            );
+
+            processedOrderIds.add(order.id);
+            ordersProcessed++;
+          }
+          // Skip capture processing (will be processed when we run reconciliation for that date)
           continue;
         }
 
@@ -163,8 +184,7 @@ export async function reconcileOrdersByDate(
           errors
         );
 
-        // Process refunds (if any on target date)
-        const refundTransactions = filterRefundTransactions(order, targetDate);
+        // Process refunds (if any on target date - already filtered above)
         if (refundTransactions.length > 0) {
           await processOrderRefunds(
             shop,
