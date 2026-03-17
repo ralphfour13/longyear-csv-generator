@@ -657,24 +657,54 @@ export function filterOrderTransactionsByDate(
 /**
  * Get the capture date for an order (latest capture/sale transaction date)
  *
+ * POINT-IN-TIME PROCESSING:
+ * When maxDate is provided, this function implements "point-in-time" transaction filtering.
+ * This prevents "future" transactions from affecting historical date processing.
+ *
+ * Example: Order #80386
+ * - Jan 10: Gift card payments $17.02 + $53.89
+ * - Jan 30: Manual payment $5.05 (added later to close outstanding balance)
+ * - When processing Jan 10 exports, we should only see Jan 10 captures
+ * - Without maxDate filtering, the Jan 30 payment would make lastCaptureDate = Jan 30
+ * - This would incorrectly skip the order on Jan 10 processing
+ *
  * @param order - Order with transactions
+ * @param maxDate - Optional cutoff date (YYYY-MM-DD). Only consider transactions on or before this date.
  * @returns Latest capture date (YYYY-MM-DD format) or null if no captures
  */
-export function getOrderCaptureDate(order: Order): string | null {
+export function getOrderCaptureDate(order: Order, maxDate?: string): string | null {
   if (!order.transactions || order.transactions.length === 0) {
     return null;
   }
 
   // Find all successful capture/sale transactions
-  const captureTransactions = order.transactions.filter(
+  let captureTransactions = order.transactions.filter(
     (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
   );
+
+  // POINT-IN-TIME FILTERING: Only consider transactions up to maxDate
+  // This prevents "future" transactions from affecting historical date processing
+  if (maxDate) {
+    const beforeFiltering = captureTransactions.length;
+    captureTransactions = captureTransactions.filter((txn) => {
+      const txnDate = formatDateOnly(txn.processedAt);
+      return txnDate <= maxDate;
+    });
+    const afterFiltering = captureTransactions.length;
+
+    if (beforeFiltering !== afterFiltering) {
+      console.log(
+        `📅 Point-in-time filtering for order ${order.name}: ` +
+          `${beforeFiltering} captures → ${afterFiltering} captures (maxDate: ${maxDate})`
+      );
+    }
+  }
 
   if (captureTransactions.length === 0) {
     return null;
   }
 
-  // Get the latest capture date
+  // Get the latest capture date (from filtered transactions)
   const latestCapture = captureTransactions.reduce((latest, txn) => {
     const txnDate = new Date(txn.processedAt);
     const latestDate = new Date(latest.processedAt);
