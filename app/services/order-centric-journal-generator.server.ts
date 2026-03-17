@@ -783,9 +783,10 @@ async function getRefundAccount(
       };
 
     case 'charge':
+      // Charge refunds should credit Accounts Receivable (same as charge payments)
       return {
-        account: accountMappings.cogs_inventory_writeoff.accountCode,
-        accountName: accountMappings.cogs_inventory_writeoff.accountName,
+        account: accountMappings.accounts_receivable.accountCode,
+        accountName: accountMappings.accounts_receivable.accountName,
       };
 
     case 'check':
