@@ -128,7 +128,8 @@ export async function reconcileOrdersByDate(
 
         // LAST-CAPTURE-DATE RULE: Order posts on the date of its LAST captured payment
         // This ensures split-payment orders post as a complete unit (all legs balance)
-        const lastCaptureDate = getOrderCaptureDate(order);
+        // POINT-IN-TIME: Only consider captures up to target date (no future knowledge)
+        const lastCaptureDate = getOrderCaptureDate(order, targetDate);
 
         if (!lastCaptureDate) {
           // Should not happen since we checked for captures above, but safety check
@@ -162,21 +163,31 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
-        // Use ALL capture transactions (already filtered above)
-        // This ensures we include all payment legs when the order posts
-        const captureTransactions = allCaptureTransactions;
+        // POINT-IN-TIME FILTERING: Only use captures on or before target date
+        // This ensures we don't process future transactions when generating historical journal entries
+        // Example: Order #80386 has manual payment on Jan 30 that shouldn't be included in Jan 10 export
+        const pointInTimeCaptureTransactions = allCaptureTransactions.filter((txn) => {
+          const txnDate = formatDateOnly(txn.processedAt);
+          return txnDate <= targetDate;
+        });
+
+        if (pointInTimeCaptureTransactions.length === 0) {
+          // No captures on or before target date, skip this order
+          console.log(`⏭️  Order ${order.name}: No captures on or before ${targetDate}`);
+          continue;
+        }
 
         // Check if we've already processed this order
         if (processedOrderIds.has(order.id)) {
           continue;
         }
 
-        // Process captures
+        // Process captures (using point-in-time filtered transactions)
         await processOrderCaptures(
           shop,
           accessToken,
           order,
-          captureTransactions,
+          pointInTimeCaptureTransactions,
           targetDate,
           journalEntries,
           enrichedTransactions,
@@ -201,7 +212,7 @@ export async function reconcileOrdersByDate(
         // Mark order as processed
         processedOrderIds.add(order.id);
         ordersProcessed++;
-        capturesProcessed += captureTransactions.length;
+        capturesProcessed += pointInTimeCaptureTransactions.length;
       } catch (error) {
         errors.push(
           `Failed to process order ${order.name}: ${
