@@ -147,43 +147,38 @@ export async function processExport(
       await logInfo(shop, 'State Tracking', 'No order changes detected');
     }
 
-    // Step 1.5: Collect COGS data (if Cin7 enabled)
+    // Step 1.5: Reuse COGS data from reconciliation (calculated once, used everywhere)
     const cin7Enabled = await isCin7Enabled(shop);
-    let cogsDataMap = new Map();
+    let cogsDataMap = result.cogsDataMap || new Map();
     let cogsOrders: Order[] = []; // Store orders for reuse in COGS details CSV
 
     if (cin7Enabled) {
-      // Progress: Start COGS collection
-      if (jobId) {
-        await updateJobProgress(jobId, {
-          phase: 'cogs',
-          phaseLabel: 'Collecting COGS',
-          currentActivity: 'Fetching cost data from Cin7...',
-        });
-      }
+      // COGS data was pre-collected during reconciliation to ensure consistency
+      // between journal entries and COGS detail CSV
+      cogsOrders = orders.filter(order => processedOrderIds.has(order.id));
 
-      await logInfo(shop, 'Export', 'Collecting COGS data from Cin7...');
-      try {
-        // CRITICAL FIX: Filter orders to only those that generated journal entries
-        // This ensures COGS details file matches journal entry details file
-        cogsOrders = orders.filter(order => processedOrderIds.has(order.id));
-
-        console.log(`📊 COGS: ${cogsOrders.length} orders (filtered from ${orders.length} fetched)`);
-
-        // NEW: Pass accessToken to enable fulfillment-based filtering
-        cogsDataMap = await collectCogsData(shop, accessToken, cogsOrders);
-        await logInfo(shop, 'Export', `Collected COGS data for ${cogsDataMap.size} orders`);
-
-        // Progress: COGS collection complete
+      if (cogsDataMap.size > 0) {
+        await logInfo(shop, 'Export', `Using pre-collected COGS data for ${cogsDataMap.size} orders`);
+      } else {
+        // Fallback: collect COGS data if reconciliation didn't provide it
         if (jobId) {
           await updateJobProgress(jobId, {
-            currentActivity: `Collected COGS for ${cogsDataMap.size} orders`,
+            phase: 'cogs',
+            phaseLabel: 'Collecting COGS',
+            currentActivity: 'Fetching cost data from Cin7...',
           });
         }
-      } catch (error) {
-        const errorMsg = `COGS data collection failed: ${error instanceof Error ? error.message : String(error)}`;
-        await logWarning(shop, 'Export', errorMsg);
-        allWarnings.push(errorMsg);
+
+        await logInfo(shop, 'Export', 'Collecting COGS data from Cin7 (fallback)...');
+        try {
+          console.log(`📊 COGS: ${cogsOrders.length} orders (filtered from ${orders.length} fetched)`);
+          cogsDataMap = await collectCogsData(shop, accessToken, cogsOrders);
+          await logInfo(shop, 'Export', `Collected COGS data for ${cogsDataMap.size} orders`);
+        } catch (error) {
+          const errorMsg = `COGS data collection failed: ${error instanceof Error ? error.message : String(error)}`;
+          await logWarning(shop, 'Export', errorMsg);
+          allWarnings.push(errorMsg);
+        }
       }
     }
 

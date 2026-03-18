@@ -1,4 +1,5 @@
 import { Decimal } from 'decimal.js';
+import type { CogsCalculation } from './cin7';
 
 /**
  * Sage 50 Journal Entry
@@ -385,6 +386,7 @@ export interface OrderCentricReconciliationResult {
   errors: string[];
   warnings: string[];
   cogsWarnings?: string[]; // COGS-specific warnings
+  cogsDataMap?: Map<string, CogsCalculation>; // Pre-calculated COGS data (shared with COGS detail CSV)
   orderCount: number;
   captureCount: number;
 }
