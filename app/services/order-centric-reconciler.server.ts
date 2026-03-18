@@ -66,7 +66,8 @@ export async function reconcileOrdersByDate(
   shop: string,
   accessToken: string,
   targetDate: string,
-  jobId?: string  // Optional job ID for progress tracking
+  jobId?: string,  // Optional job ID for progress tracking
+  cogsDataMap?: Map<string, CogsCalculation>  // Pre-calculated COGS data for consistency
 ): Promise<OrderCentricReconciliationResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -94,6 +95,23 @@ export async function reconcileOrdersByDate(
     let ordersProcessed = 0;
     let capturesProcessed = 0;
     const processedOrderIds = new Set<string>();
+
+    // PRE-COLLECT COGS DATA: Calculate COGS once before journal generation
+    // This ensures both journal entries and COGS detail CSV use identical cost data
+    let preCollectedCogsDataMap: Map<string, CogsCalculation> | undefined;
+    if (!cogsDataMap) {
+      const cin7Enabled = await isCin7Enabled(shop);
+      if (cin7Enabled) {
+        try {
+          preCollectedCogsDataMap = await collectCogsData(shop, accessToken, orders);
+          console.log(`📊 Pre-collected COGS for ${preCollectedCogsDataMap.size} orders`);
+        } catch (error) {
+          console.error('Failed to pre-collect COGS data:', error);
+          cogsWarnings.push(`COGS pre-collection failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    }
+    const effectiveCogsDataMap = cogsDataMap || preCollectedCogsDataMap;
 
     // Process each order
     for (const order of orders) {
@@ -192,7 +210,8 @@ export async function reconcileOrdersByDate(
           journalEntries,
           enrichedTransactions,
           warnings,
-          errors
+          errors,
+          effectiveCogsDataMap
         );
 
         // Process refunds (if any on target date - already filtered above)
@@ -272,6 +291,7 @@ export async function reconcileOrdersByDate(
       errors,
       warnings,
       cogsWarnings,
+      cogsDataMap: effectiveCogsDataMap, // Return pre-calculated COGS for reuse in COGS detail CSV
       orderCount: ordersProcessed,
       captureCount: capturesProcessed,
     };
@@ -370,7 +390,8 @@ async function processOrderCaptures(
   journalEntries: JournalEntry[],
   enrichedTransactions: EnrichedTransaction[],
   warnings: string[],
-  errors: string[]
+  errors: string[],
+  cogsDataMap?: Map<string, CogsCalculation>
 ): Promise<void> {
   // Analyze payment methods
   const paymentBreakdowns = await analyzeOrderPayments(
@@ -396,12 +417,14 @@ async function processOrderCaptures(
 
   // Create journal entries
   const formattedDate = formatDate(targetDate);
+  const preCalculatedCogs = cogsDataMap?.get(order.id);
   const entries = await createOrderJournalEntries(
     shop,
     order,
     paymentBreakdowns,
     formattedDate,
-    accessToken // NEW: Pass accessToken for COGS fulfillment filtering
+    accessToken,
+    preCalculatedCogs
   );
 
   journalEntries.push(...entries);

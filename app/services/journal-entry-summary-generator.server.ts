@@ -41,12 +41,14 @@ export function generateJournalEntrySummary(
     const existing = accountGroups.get(entry.account);
 
     if (existing) {
-      existing.totalDebit = existing.totalDebit.plus(entry.debit);
-      existing.totalCredit = existing.totalCredit.plus(entry.credit);
+      // Round each entry to 2 decimal places BEFORE aggregating
+      // This matches the CSV detail file which rounds per-entry via toFixed(2)
+      existing.totalDebit = existing.totalDebit.plus(entry.debit.toDecimalPlaces(2));
+      existing.totalCredit = existing.totalCredit.plus(entry.credit.toDecimalPlaces(2));
     } else {
       accountGroups.set(entry.account, {
-        totalDebit: entry.debit,
-        totalCredit: entry.credit,
+        totalDebit: entry.debit.toDecimalPlaces(2),
+        totalCredit: entry.credit.toDecimalPlaces(2),
       });
     }
   }

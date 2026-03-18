@@ -172,7 +172,8 @@ export async function createOrderJournalEntries(
   order: Order,
   paymentBreakdowns: PaymentMethodBreakdown[],
   targetDate: string,
-  accessToken?: string
+  accessToken?: string,
+  preCalculatedCogs?: CogsCalculation
 ): Promise<JournalEntry[]> {
   const entries: JournalEntry[] = [];
   const reference = `SO-${order.name}`;
@@ -299,8 +300,9 @@ export async function createOrderJournalEntries(
   try {
     const cin7Enabled = await isCin7Enabled(shop);
     if (cin7Enabled && order.lineItems.length > 0) {
-      // NEW: Pass accessToken to enable fulfillment-based filtering
-      const cogsCalculation = await calculateOrderCogs(shop, order, accessToken, true);
+      // Use pre-calculated COGS if provided (ensures consistency with COGS detail CSV),
+      // otherwise calculate independently
+      const cogsCalculation = preCalculatedCogs ?? await calculateOrderCogs(shop, order, accessToken, true);
 
       // VALIDATION: Check COGS calculation quality before adding entries
       const validation = validateCogsCalculation(order, cogsCalculation);
@@ -592,8 +594,19 @@ export async function createRefundJournalEntries(
           (sum, item) => sum.plus(item.total_tax), new Decimal(0)
         );
 
-        // Validate that subtotal + tax = total refund amount
-        const calculatedTotal = refundedSubtotal.plus(refundedTax);
+        // Validate that subtotal + tax + shipping adjustments = total refund amount
+        let shippingAdjustmentTotal = new Decimal(0);
+        if (refund?.order_adjustments) {
+          for (const adj of refund.order_adjustments) {
+            if (adj.kind === 'shipping_refund') {
+              shippingAdjustmentTotal = shippingAdjustmentTotal.plus(new Decimal(adj.amount).abs());
+              if (adj.tax_amount) {
+                shippingAdjustmentTotal = shippingAdjustmentTotal.plus(new Decimal(adj.tax_amount).abs());
+              }
+            }
+          }
+        }
+        const calculatedTotal = refundedSubtotal.plus(refundedTax).plus(shippingAdjustmentTotal);
         const diff = calculatedTotal.minus(totalRefundAmount).abs();
 
         if (diff.greaterThan(new Decimal('0.02'))) {
@@ -682,8 +695,43 @@ export async function createRefundJournalEntries(
       processedRefunds.add(refundId);
     }
 
-    // NOTE: Shipping refunds are included in refund_line_items.subtotal
-    // No separate shipping entry needed
+    // SHIPPING REFUND: Check for shipping refund adjustments
+    // Shopify tracks shipping refunds separately via order_adjustments (kind: 'shipping_refund'),
+    // NOT through refund_line_items.subtotal
+    if (refund?.order_adjustments) {
+      for (const adj of refund.order_adjustments) {
+        if (adj.kind === 'shipping_refund') {
+          const shippingRefundAmount = new Decimal(adj.amount).abs();
+          if (shippingRefundAmount.greaterThan(0)) {
+            entries.push({
+              date: targetDate,
+              reference: `RF-${order.name}`,
+              account: accountMappings.shipping_revenue.accountCode,
+              accountName: accountMappings.shipping_revenue.accountName,
+              debit: shippingRefundAmount,
+              credit: new Decimal(0),
+              memo: `Shipping Refund - Order ${order.name}`,
+            });
+
+            // Also handle shipping refund tax if present
+            if (adj.tax_amount) {
+              const shippingRefundTax = new Decimal(adj.tax_amount).abs();
+              if (shippingRefundTax.greaterThan(0)) {
+                entries.push({
+                  date: targetDate,
+                  reference: `RF-${order.name}`,
+                  account: accountMappings.sales_tax.accountCode,
+                  accountName: accountMappings.sales_tax.accountName,
+                  debit: shippingRefundTax,
+                  credit: new Decimal(0),
+                  memo: `Shipping Tax Refund - Order ${order.name}`,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   // COGS REVERSAL: Only for items returned to inventory

@@ -259,6 +259,13 @@ export async function generateConsistencyReport(
 
     const orderEntries = entries.filter((e) => e.reference.includes(order.name));
 
+    // Skip orders with no journal entries for this date
+    // These orders were fetched because they're in the payout window but their
+    // captures/refunds were processed on different dates
+    if (orderEntries.length === 0) {
+      continue;
+    }
+
     // 1. Check journal balance
     const references = new Set(orderEntries.map((e) => e.reference));
     for (const ref of references) {
