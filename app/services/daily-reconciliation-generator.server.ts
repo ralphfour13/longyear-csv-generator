@@ -95,17 +95,37 @@ function groupByOrder(
 function transformToReconciliationRow(
   transactions: EnrichedTransaction[]
 ): DailyReconciliationRow[] {
-  if (transactions.length === 0 || !transactions[0].order || !transactions[0].enrichedData) {
+  if (transactions.length === 0 || !transactions[0].order) {
     return [];
   }
 
   const order = transactions[0].order;
   const enrichedData = transactions[0].enrichedData;
 
+  // Handle missing enrichedData (enrichment failure resilience)
+  // Derive defaults from order data so the order still appears in reports
+  const effectiveEnrichedData = enrichedData || {
+    tags: '',
+    shippingAddress: { country: '' },
+    paymentBreakdown: {
+      cash: new Decimal(0),
+      card: new Decimal(0),
+      giftCard: new Decimal(0),
+      storeCredit: new Decimal(0),
+      check: new Decimal(0),
+      charge: new Decimal(0),
+    },
+  };
+
   // Determine if this order has actual refunds (money returned AFTER payment)
   // vs partial capture (items removed BEFORE payment)
   // This flag is already set in the reconciler
   const orderHasActualRefunds = order.hasActualRefunds || false;
+
+  // Detect same-day refund pattern: both charge and refund transactions on same day
+  // For same-day refunds, use current (net) amounts instead of original
+  const hasSameDayRefund = transactions.some(t => t.balanceTransaction.type === 'charge') &&
+    transactions.some(t => t.balanceTransaction.type === 'refund');
 
   // Check if totals are reduced
   const hasReducedSubtotal = order.currentSubtotalPrice !== undefined &&
@@ -115,8 +135,9 @@ function transformToReconciliationRow(
 
   // Calculate sales - use original subtotalPrice for orders with actual refunds
   // Only use currentSubtotalPrice for partial captures (items removed BEFORE payment)
-  // This ensures reports show historical state, not future-modified state
-  const sales = (hasReducedSubtotal && !orderHasActualRefunds && order.currentSubtotalPrice !== undefined)
+  // OR for same-day refunds where we want to show the net amount
+  const useCurrentAmounts = (hasReducedSubtotal && !orderHasActualRefunds) || hasSameDayRefund;
+  const sales = (useCurrentAmounts && order.currentSubtotalPrice !== undefined)
     ? order.currentSubtotalPrice
     : order.subtotalPrice;
 
@@ -124,16 +145,16 @@ function transformToReconciliationRow(
   const rows: DailyReconciliationRow[] = [];
 
   // Determine area (POS vs Canadian Catalog)
-  const area = determineArea(order, enrichedData);
+  const area = determineArea(order, effectiveEnrichedData);
 
   // Determine tender (payment method)
-  const tender = determineTender(enrichedData.paymentBreakdown);
+  const tender = determineTender(effectiveEnrichedData.paymentBreakdown);
 
   // Analyze notes (fishing licenses, discounts, split tender)
-  const notes = generateNotes(order, enrichedData);
+  const notes = generateNotes(order, effectiveEnrichedData);
 
   // Check for gift cards
-  const giftCardInfo = analyzeGiftCards(order, enrichedData.paymentBreakdown);
+  const giftCardInfo = analyzeGiftCards(order, effectiveEnrichedData.paymentBreakdown);
 
   // Calculate discount information for transparency
   const originalSubtotal = order.subtotalPrice;
@@ -141,17 +162,17 @@ function transformToReconciliationRow(
   const netSubtotal = sales; // Already calculated as NET above
 
   // Calculate payment breakdown
-  const paymentBreakdown = enrichedData.paymentBreakdown;
+  const paymentBreakdown = effectiveEnrichedData.paymentBreakdown;
   // Use original totalPrice for orders with actual refunds to show historical state
-  // Only use currentTotalPrice for partial captures
-  const paymentTotal = (hasReducedTotal && !orderHasActualRefunds)
+  // Use currentTotalPrice for partial captures OR same-day refunds (net amount)
+  const useCurrentTotal = (hasReducedTotal && !orderHasActualRefunds) || hasSameDayRefund;
+  const paymentTotal = (useCurrentTotal && order.currentTotalPrice)
     ? order.currentTotalPrice
     : order.totalPrice;
 
   // Calculate tax - use original totalTax for orders with actual refunds
-  // Only use currentTotalTax for partial captures (items removed BEFORE payment)
-  // This ensures reports show historical state, not future-modified state
-  const taxAmount = (hasReducedTotal && !orderHasActualRefunds)
+  // Use currentTotalTax for partial captures OR same-day refunds (net amount)
+  const taxAmount = (useCurrentTotal)
     ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
     : (order.totalTax ?? new Decimal(0));
 

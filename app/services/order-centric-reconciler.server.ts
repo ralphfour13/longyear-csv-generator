@@ -76,12 +76,12 @@ export async function reconcileOrdersByDate(
   const enrichedTransactions: EnrichedTransaction[] = [];
 
   try {
-    // Fetch orders with activity in the date range (-7/+1 day buffer for created_at query)
+    // Fetch orders with activity in the date range (-30/+1 day buffer for created_at query)
     // The fetcher uses dual-query strategy:
-    // - created_at: Uses -7/+1 day buffer to catch orders created up to a week before capture
-    // - updated_at: Uses ±1 day buffer to catch recently modified orders (unchanged)
+    // - created_at: Uses -30/+1 day buffer to catch orders with long auth-to-capture windows
+    // - updated_at: Uses ±1 day from targetDate to catch recently modified orders
     // Orders can't be created in the future, so +1 day is sufficient forward buffer
-    const startDate = addDays(targetDate, -7);
+    const startDate = addDays(targetDate, -30);
     const endDate = addDays(targetDate, 1);
 
     const orders = await fetchOrdersByCaptureDateRange(
@@ -89,7 +89,8 @@ export async function reconcileOrdersByDate(
       accessToken,
       startDate,
       endDate,
-      jobId  // Pass jobId for progress tracking
+      jobId,  // Pass jobId for progress tracking
+      targetDate  // Pass explicit targetDate so Query 2 uses correct ±1 day window
     );
 
     let ordersProcessed = 0;
@@ -200,12 +201,47 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
-        // Process captures (using point-in-time filtered transactions)
+        // SAME-DAY REFUND ADJUSTMENT: When a discount is applied as a post-capture refund
+        // (e.g., capture $54.50 then immediately refund $4.00), the capture amount exceeds
+        // the order total. Subtract same-day refunds from capture to keep journal balanced.
+        let effectiveCaptureTransactions = pointInTimeCaptureTransactions;
+        let sameDayRefundsHandled = false;
+
+        if (refundTransactions.length > 0) {
+          const refundTotal = refundTransactions.reduce(
+            (sum, txn) => sum.plus(txn.amount), new Decimal(0)
+          );
+
+          // Check if refunds are same-day as last capture (discount-as-refund pattern)
+          const lastCaptureIdx = pointInTimeCaptureTransactions.length - 1;
+          const lastCaptureDate = formatDateOnly(pointInTimeCaptureTransactions[lastCaptureIdx].processedAt);
+          const refundsAreSameDay = refundTransactions.every(
+            txn => formatDateOnly(txn.processedAt) === lastCaptureDate
+          );
+
+          if (refundsAreSameDay) {
+            // Adjust last capture amount by subtracting same-day refund total
+            effectiveCaptureTransactions = pointInTimeCaptureTransactions.map((txn, i) =>
+              i === lastCaptureIdx
+                ? { ...txn, amount: txn.amount.minus(refundTotal) }
+                : txn
+            );
+            sameDayRefundsHandled = true;
+            console.log(
+              `🔄 Order ${order.name}: Same-day refund adjustment - ` +
+              `capture ${pointInTimeCaptureTransactions[lastCaptureIdx].amount.toFixed(2)} → ` +
+              `${effectiveCaptureTransactions[lastCaptureIdx].amount.toFixed(2)} ` +
+              `(refund: ${refundTotal.toFixed(2)})`
+            );
+          }
+        }
+
+        // Process captures (using point-in-time filtered transactions, adjusted for same-day refunds)
         await processOrderCaptures(
           shop,
           accessToken,
           order,
-          pointInTimeCaptureTransactions,
+          effectiveCaptureTransactions,
           targetDate,
           journalEntries,
           enrichedTransactions,
@@ -214,8 +250,8 @@ export async function reconcileOrdersByDate(
           effectiveCogsDataMap
         );
 
-        // Process refunds (if any on target date - already filtered above)
-        if (refundTransactions.length > 0) {
+        // Process refunds (if any on target date - skip if already handled as same-day adjustment)
+        if (refundTransactions.length > 0 && !sameDayRefundsHandled) {
           await processOrderRefunds(
             shop,
             accessToken,
@@ -484,6 +520,42 @@ async function processOrderCaptures(
   } catch (enrichError) {
     console.error(`Failed to enrich order ${order.name}:`, enrichError);
     warnings.push(`Failed to enrich order ${order.name} for export`);
+
+    // Still push to enrichedTransactions with undefined enrichedData
+    // so the order appears in ALL report CSVs (not silently dropped)
+    enrichedTransactions.push({
+      balanceTransaction: {
+        id: captureTransactions[0].id,
+        type: 'charge',
+        sourceOrderId: order.id,
+        processedAt: captureTransactions[0].processedAt,
+        net: captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+        fee: new Decimal(0),
+        gross: captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+      },
+      order: {
+        id: order.id,
+        name: order.name,
+        createdAt: order.createdAt,
+        totalPrice: order.totalPrice,
+        subtotalPrice: order.subtotalPrice,
+        currentTotalPrice: order.currentTotalPrice || order.totalPrice,
+        currentSubtotalPrice: order.currentSubtotalPrice,
+        currentTotalTax: order.currentTotalTax,
+        totalTax: order.totalTax,
+        totalShipping: order.totalShipping,
+        totalDiscounts: order.totalDiscounts,
+        financialStatus: order.financialStatus,
+        lineItems: order.lineItems,
+        hasActualRefunds: hasActualRefunds(order),
+      },
+      enrichedData: undefined,
+      payout: {
+        id: 'Direct Payment',
+        date: targetDate,
+        amount: new Decimal(0),
+      },
+    });
   }
 
   // Rate limiting delay: prevents rapid sequential enrichment calls
@@ -554,6 +626,42 @@ async function processOrderRefunds(
   } catch (enrichError) {
     console.error(`Failed to enrich refund order ${order.name}:`, enrichError);
     warnings.push(`Failed to enrich refund order ${order.name} for export`);
+
+    // Still push to enrichedTransactions with undefined enrichedData
+    // so the refund appears in ALL report CSVs (not silently dropped)
+    enrichedTransactions.push({
+      balanceTransaction: {
+        id: refundTransactions[0].id,
+        type: 'refund',
+        sourceOrderId: order.id,
+        processedAt: refundTransactions[0].processedAt,
+        net: refundTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+        fee: new Decimal(0),
+        gross: refundTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+      },
+      order: {
+        id: order.id,
+        name: order.name,
+        createdAt: order.createdAt,
+        totalPrice: order.totalPrice,
+        subtotalPrice: order.subtotalPrice,
+        currentTotalPrice: order.currentTotalPrice || order.totalPrice,
+        currentSubtotalPrice: order.currentSubtotalPrice,
+        currentTotalTax: order.currentTotalTax,
+        totalTax: order.totalTax,
+        totalShipping: order.totalShipping,
+        totalDiscounts: order.totalDiscounts,
+        financialStatus: order.financialStatus,
+        lineItems: order.lineItems,
+        hasActualRefunds: hasActualRefunds(order),
+      },
+      enrichedData: undefined,
+      payout: {
+        id: 'Direct Payment',
+        date: targetDate,
+        amount: new Decimal(0),
+      },
+    });
   }
 
   // Rate limiting delay: prevents rapid sequential enrichment calls

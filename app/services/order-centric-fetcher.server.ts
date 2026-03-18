@@ -91,17 +91,20 @@ export async function fetchOrdersByCaptureDateRange(
   accessToken: string,
   startDate: string,
   endDate: string,
-  jobId?: string  // Optional job ID for progress tracking
+  jobId?: string,  // Optional job ID for progress tracking
+  targetDate?: string  // Explicit target date for Query 2 (updated_at ±1 day)
 ): Promise<Order[]> {
   const orderMap = new Map<string, Order>(); // Deduplicate by order ID
   const baseUrl = `https://${shop}/admin/api/2024-10/orders.json`;
 
-  // Calculate the midpoint (target date) from the provided range
-  const startTime = new Date(startDate).getTime();
-  const endTime = new Date(endDate).getTime();
-  const midpointTime = (startTime + endTime) / 2;
-  const midpointDate = new Date(midpointTime);
-  const targetDateStr = midpointDate.toISOString().split('T')[0];
+  // Use explicit targetDate if provided, otherwise fall back to midpoint calculation
+  const targetDateStr = targetDate || (() => {
+    const startTime = new Date(startDate).getTime();
+    const endTime = new Date(endDate).getTime();
+    const midpointTime = (startTime + endTime) / 2;
+    const midpointDate = new Date(midpointTime);
+    return midpointDate.toISOString().split('T')[0];
+  })();
 
   // Query 1: created_at with full buffer (use provided range)
   const createdStartDateTime = `${startDate}T00:00:00Z`;
