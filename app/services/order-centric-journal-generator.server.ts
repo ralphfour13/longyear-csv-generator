@@ -78,7 +78,7 @@ export function calculateGiftCardProductSales(order: Order): Decimal {
  * KEY DISTINCTION:
  * - Cancel-type refunds: restock_type: 'cancel', NO transactions
  *   Items removed BEFORE payment, no money was ever collected
- * - Return-type refunds: restock_type: 'return' OR has transactions
+ * - Return-type refunds: has transactions (money was actually refunded)
  *   Items returned AFTER payment, money WAS refunded
  *
  * @param order - Order to check
@@ -89,15 +89,11 @@ export function hasActualRefunds(order: Order): boolean {
     return false;
   }
 
-  // Check if ANY refund has:
-  // 1. Transactions (money was actually refunded), OR
-  // 2. Return-type line items (items returned after payment)
+  // An "actual refund" requires money to be returned (transactions exist).
+  // Exchanges have restock_type: 'return' but transactions: [] — no money refunded.
+  // These should use current amounts (post-exchange), not original.
   return order.refunds.some(refund => {
-    const hasRefundTransactions = refund.transactions && refund.transactions.length > 0;
-    const hasReturnItems = refund.refund_line_items?.some(
-      item => item.restock_type === 'return'
-    );
-    return hasRefundTransactions || hasReturnItems;
+    return refund.transactions && refund.transactions.length > 0;
   });
 }
 
