@@ -348,8 +348,8 @@ async function fetchOrdersByDate(
         // Track consecutive pages with no new orders
         if (newOrdersThisPage === 0) {
           consecutiveNonNewOrders++;
-          // Stop if we've seen 3 consecutive pages with no new orders
-          if (consecutiveNonNewOrders >= 3) {
+          // Stop if we've seen 10 consecutive pages with no new orders
+          if (consecutiveNonNewOrders >= 10) {
             console.log(`  Stopping pagination for ${minParam.replace('_min', '')} query - ${consecutiveNonNewOrders} consecutive pages with no new orders`);
             hasNextPage = false;
           }
