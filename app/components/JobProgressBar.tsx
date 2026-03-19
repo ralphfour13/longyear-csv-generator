@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface JobProgress {
   phase?: 'fetching' | 'reconciling' | 'cogs' | 'generating' | 'validating';
@@ -41,6 +41,12 @@ export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarPro
   const [isPolling, setIsPolling] = useState(true);
   const [elapsed, setElapsed] = useState('');
 
+  // Use refs for callbacks to avoid re-creating the polling effect on every render
+  const onCompleteRef = useRef(onComplete);
+  const onErrorRef = useRef(onError);
+  onCompleteRef.current = onComplete;
+  onErrorRef.current = onError;
+
   // Live duration timer for processing jobs (ticks every second)
   const jobStartedAt = job?.startedAt;
   const jobStatus = job?.status;
@@ -82,16 +88,16 @@ export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarPro
             clearInterval(pollInterval);
           }
 
-          if (data.status === 'completed' && onComplete) {
-            onComplete(data);
-          } else if (data.status === 'failed' && onError) {
-            onError(data.error || 'Job failed');
+          if (data.status === 'completed' && onCompleteRef.current) {
+            onCompleteRef.current(data);
+          } else if (data.status === 'failed' && onErrorRef.current) {
+            onErrorRef.current(data.error || 'Job failed');
           }
         }
       } catch (error) {
         console.error('Error fetching job progress:', error);
-        if (onError) {
-          onError(error instanceof Error ? error.message : String(error));
+        if (onErrorRef.current) {
+          onErrorRef.current(error instanceof Error ? error.message : String(error));
         }
         setIsPolling(false);
         if (pollInterval) {
@@ -113,7 +119,7 @@ export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarPro
         clearInterval(pollInterval);
       }
     };
-  }, [jobId, isPolling, onComplete, onError]);
+  }, [jobId, isPolling]);
 
   if (!job) {
     return (

@@ -227,6 +227,32 @@ export async function clearCompletedJobs(shop: string): Promise<number> {
   }
 }
 
+export async function clearFailedJobs(shop: string): Promise<number> {
+  try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
+    let deletedCount = 0;
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (job.shop === shop && job.status === 'failed') {
+          await fs.unlink(filePath);
+          deletedCount++;
+        }
+      }
+    }
+
+    return deletedCount;
+  } catch (error) {
+    console.error('Error clearing failed jobs:', error);
+    return 0;
+  }
+}
+
 /**
  * Cancel all pending jobs for a shop
  */
