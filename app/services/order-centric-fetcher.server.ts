@@ -110,13 +110,16 @@ export async function fetchOrdersByCaptureDateRange(
   const createdStartDateTime = `${startDate}T00:00:00Z`;
   const createdEndDateTime = `${endDate}T23:59:59Z`;
 
-  // Query 2: updated_at with ±1 day from target (tighter window)
-  const updatedStartDate = addDays(targetDateStr, -1);
-  const updatedEndDate = addDays(targetDateStr, 1);
+  // Query 2: updated_at with ±7 day from target (wider window to catch late-updated orders)
+  // Previously ±1 day, but missed orders like #80228 (captured Jan 7, updated Jan 22)
+  const updatedStartDate = addDays(targetDateStr, -7);
+  const updatedEndDate = addDays(targetDateStr, 7);
   const updatedStartDateTime = `${updatedStartDate}T00:00:00Z`;
   const updatedEndDateTime = `${updatedEndDate}T23:59:59Z`;
 
   console.log(`Fetching orders with activity between ${startDate} and ${endDate}`);
+  console.log(`  Query 1 (created_at): ${startDate} to ${endDate}`);
+  console.log(`  Query 2 (updated_at): ${updatedStartDate} to ${updatedEndDate}`);
 
   // Initialize progress tracking
   if (jobId) {
@@ -133,6 +136,7 @@ export async function fetchOrdersByCaptureDateRange(
   }
 
   // QUERY 1: Fetch by created_at (for orders created near target date)
+  const countBeforeQ1 = orderMap.size;
   await fetchOrdersByDate(
     baseUrl,
     shop,
@@ -144,8 +148,10 @@ export async function fetchOrdersByCaptureDateRange(
     orderMap,
     jobId  // Pass jobId for progress tracking
   );
+  const q1Count = orderMap.size - countBeforeQ1;
 
   // QUERY 2: Fetch by updated_at (for orders updated near target date)
+  const countBeforeQ2 = orderMap.size;
   await fetchOrdersByDate(
     baseUrl,
     shop,
@@ -157,9 +163,16 @@ export async function fetchOrdersByCaptureDateRange(
     orderMap,
     jobId  // Pass jobId for progress tracking
   );
+  const q2Count = orderMap.size - countBeforeQ2;
 
   const orders = Array.from(orderMap.values());
   const totalOrders = orders.length;
+
+  // Diagnostic logging for fetch coverage
+  console.log(`📊 Fetch diagnostics:`);
+  console.log(`  Query 1 (created_at ${startDate} to ${endDate}): ${q1Count} new orders`);
+  console.log(`  Query 2 (updated_at ${updatedStartDate} to ${updatedEndDate}): ${q2Count} new orders`);
+  console.log(`  Total unique orders: ${totalOrders}`);
 
   // Update with total order count
   if (jobId) {
