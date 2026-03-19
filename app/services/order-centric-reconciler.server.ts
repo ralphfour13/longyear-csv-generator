@@ -73,10 +73,11 @@ export async function reconcileOrdersByDate(
   try {
     // Fetch orders with activity in the date range (-30/+1 day buffer for created_at query)
     // The fetcher uses dual-query strategy:
-    // - created_at: Uses -7/+1 day buffer (matches Shopify's ~7-day auth-to-capture window)
+    // - created_at: Uses -8/+1 day buffer (extra day covers boundary edge cases where
+    //   orders created exactly 7 days before target date were missed)
     // - updated_at: Uses -7/+1 day from targetDate to catch recently modified orders
     // +1 day forward buffer covers timezone edge cases; no need to look further ahead
-    const startDate = addDays(targetDate, -7);
+    const startDate = addDays(targetDate, -8);
     const endDate = addDays(targetDate, 1);
 
     const orders = await fetchOrdersByCaptureDateRange(
@@ -126,6 +127,50 @@ export async function reconcileOrdersByDate(
             `⚠️ Order ${order.name} has 0 transactions - this order will be skipped. ` +
             `Check if transaction fetch failed silently.`
           );
+        }
+
+        // PENDING CC AUTH CHECK: Skip orders where a CC authorization exists but
+        // no CC capture has occurred on or before targetDate. The order will post
+        // on the date the CC capture happens instead.
+        // Example: Gift card + CC auth on Jan 12, CC capture on Jan 14 → skip on Jan 12, post on Jan 14
+        const hasPendingCCAuth = (() => {
+          if (!order.transactions || order.transactions.length === 0) return false;
+
+          // Find CC (shopify_payments) authorization transactions
+          const ccAuths = order.transactions.filter(
+            (txn) => txn.kind === 'authorization' && txn.status === 'success' && isCardGateway(txn.gateway)
+          );
+          if (ccAuths.length === 0) return false;
+
+          // Find CC capture transactions on or before targetDate
+          const ccCaptures = order.transactions.filter((txn) => {
+            if ((txn.kind !== 'capture' && txn.kind !== 'sale') || txn.status !== 'success') return false;
+            if (!isCardGateway(txn.gateway)) return false;
+            const txnDate = formatDateOnly(txn.processedAt);
+            return txnDate <= targetDate;
+          });
+
+          // CC auth exists but no CC capture by targetDate → pending
+          return ccCaptures.length === 0;
+        })();
+
+        if (hasPendingCCAuth) {
+          // Still check for refunds on targetDate before skipping entirely
+          const refundTxns = filterRefundTransactions(order, targetDate);
+          if (refundTxns.length > 0) {
+            await processOrderRefunds(
+              shop, accessToken, order, refundTxns, targetDate,
+              journalEntries, enrichedTransactions, warnings, enrichmentCache
+            );
+            processedOrderIds.add(order.id);
+            ordersProcessed++;
+          } else {
+            console.log(
+              `⏭️  Order ${order.name}: Skipped - CC authorized but not captured by ${targetDate}. ` +
+              `Will post when CC capture occurs.`
+            );
+          }
+          continue;
         }
 
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
