@@ -110,10 +110,10 @@ export async function fetchOrdersByCaptureDateRange(
   const createdStartDateTime = `${startDate}T00:00:00Z`;
   const createdEndDateTime = `${endDate}T23:59:59Z`;
 
-  // Query 2: updated_at with ±7 day from target (wider window to catch late-updated orders)
-  // Previously ±1 day, but missed orders like #80228 (captured Jan 7, updated Jan 22)
+  // Query 2: updated_at with -7/+1 day from target (catches orders updated via refunds/edits in prior week)
+  // +1 day forward is sufficient — point-in-time processing doesn't need to look into the future
   const updatedStartDate = addDays(targetDateStr, -7);
-  const updatedEndDate = addDays(targetDateStr, 7);
+  const updatedEndDate = addDays(targetDateStr, 1);
   const updatedStartDateTime = `${updatedStartDate}T00:00:00Z`;
   const updatedEndDateTime = `${updatedEndDate}T23:59:59Z`;
 
@@ -315,6 +315,14 @@ async function fetchOrdersByDate(
             accessToken,
             orderData
           );
+
+          // DIAGNOSTIC: Warn if transaction fetch returned empty for a non-pending order
+          if ((!order.transactions || order.transactions.length === 0) && order.financialStatus !== 'pending' && order.financialStatus !== 'voided') {
+            console.warn(
+              `⚠️ Order ${order.name} (${order.id}): 0 transactions fetched but financialStatus=${order.financialStatus}. ` +
+              `This order may be silently dropped during reconciliation.`
+            );
+          }
 
           orderMap.set(order.id, order);
           fetchedCount++;

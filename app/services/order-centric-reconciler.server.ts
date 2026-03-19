@@ -78,10 +78,10 @@ export async function reconcileOrdersByDate(
   try {
     // Fetch orders with activity in the date range (-30/+1 day buffer for created_at query)
     // The fetcher uses dual-query strategy:
-    // - created_at: Uses -30/+1 day buffer to catch orders with long auth-to-capture windows
-    // - updated_at: Uses ±1 day from targetDate to catch recently modified orders
-    // Orders can't be created in the future, so +1 day is sufficient forward buffer
-    const startDate = addDays(targetDate, -30);
+    // - created_at: Uses -7/+1 day buffer (matches Shopify's ~7-day auth-to-capture window)
+    // - updated_at: Uses -7/+1 day from targetDate to catch recently modified orders
+    // +1 day forward buffer covers timezone edge cases; no need to look further ahead
+    const startDate = addDays(targetDate, -7);
     const endDate = addDays(targetDate, 1);
 
     const orders = await fetchOrdersByCaptureDateRange(
@@ -90,7 +90,7 @@ export async function reconcileOrdersByDate(
       startDate,
       endDate,
       jobId,  // Pass jobId for progress tracking
-      targetDate  // Pass explicit targetDate so Query 2 uses correct ±1 day window
+      targetDate  // Pass explicit targetDate so Query 2 uses correct -7/+1 day window
     );
 
     let ordersProcessed = 0;
@@ -117,6 +117,18 @@ export async function reconcileOrdersByDate(
     // Process each order
     for (const order of orders) {
       try {
+        // DIAGNOSTIC: Warn if order has no transactions at all (likely a fetch failure)
+        if (!order.transactions || order.transactions.length === 0) {
+          warnings.push(
+            `⚠️ Order ${order.name} (${order.id}) has NO transactions - possible fetch failure. ` +
+            `Financial status: ${order.financialStatus}, Total: $${order.totalPrice.toFixed(2)}`
+          );
+          console.warn(
+            `⚠️ Order ${order.name} has 0 transactions - this order will be skipped. ` +
+            `Check if transaction fetch failed silently.`
+          );
+        }
+
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
         // Check this BEFORE capture logic to catch refund-only transactions
         const allCaptureTransactions = order.transactions?.filter(
@@ -142,6 +154,14 @@ export async function reconcileOrdersByDate(
             ordersProcessed++;
           }
           // Skip to next order (either processed refunds or nothing to do)
+          // DIAGNOSTIC: Log orders dropped with no captures and no refunds on target date
+          if (refundTransactions.length === 0) {
+            console.log(
+              `⏭️  Order ${order.name}: Skipped - no captures and no refunds on ${targetDate}. ` +
+              `Total transactions: ${order.transactions?.length || 0}, ` +
+              `Financial status: ${order.financialStatus}, Total: $${order.totalPrice.toFixed(2)}`
+            );
+          }
           continue;
         }
 

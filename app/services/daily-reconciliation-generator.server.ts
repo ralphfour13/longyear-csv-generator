@@ -117,6 +117,46 @@ function transformToReconciliationRow(
     },
   };
 
+  // REFUND-ONLY CHECK: If all transactions are refunds (no charges posted on this date),
+  // show only the refund amounts, not the full original order.
+  // This handles orders like #80504, #80549 where the original sale was on a prior date
+  // and only a refund posted on the target date.
+  const hasChargeOnDate = transactions.some(t => t.balanceTransaction.type === 'charge');
+  const hasRefundOnDate = transactions.some(t => t.balanceTransaction.type === 'refund');
+  const isRefundOnlyOnDate = !hasChargeOnDate && hasRefundOnDate;
+
+  if (isRefundOnlyOnDate) {
+    // Calculate refund total from enriched transactions
+    const refundTotal = transactions
+      .filter(t => t.balanceTransaction.type === 'refund')
+      .reduce((sum, t) => sum.plus(t.balanceTransaction.net), new Decimal(0));
+
+    const area = determineArea(order, effectiveEnrichedData);
+    const tender = determineTender(effectiveEnrichedData.paymentBreakdown);
+
+    // Show refund as negative row with actual refund amount
+    return [{
+      orderNumber: order.name,
+      originalSubtotal: '',
+      discount: '',
+      netSubtotal: refundTotal.neg().toFixed(2),
+      tax: '',
+      shipping: '',
+      area,
+      notes: 'refund only',
+      tender,
+      paymentCash: new Decimal(0).toFixed(2),
+      paymentCard: new Decimal(0).toFixed(2),
+      paymentGiftCard: new Decimal(0).toFixed(2),
+      paymentStoreCredit: new Decimal(0).toFixed(2),
+      paymentCheck: new Decimal(0).toFixed(2),
+      paymentOther: new Decimal(0).toFixed(2),
+      paymentTotal: refundTotal.neg().toFixed(2),
+      giftCardSold: '',
+      giftCardUsed: '',
+    }];
+  }
+
   // Determine if this order has actual refunds (money returned AFTER payment)
   // vs partial capture (items removed BEFORE payment)
   // This flag is already set in the reconciler
@@ -124,8 +164,7 @@ function transformToReconciliationRow(
 
   // Detect same-day refund pattern: both charge and refund transactions on same day
   // For same-day refunds, use current (net) amounts instead of original
-  const hasSameDayRefund = transactions.some(t => t.balanceTransaction.type === 'charge') &&
-    transactions.some(t => t.balanceTransaction.type === 'refund');
+  const hasSameDayRefund = hasChargeOnDate && hasRefundOnDate;
 
   // Check if totals are reduced
   const hasReducedSubtotal = order.currentSubtotalPrice !== undefined &&

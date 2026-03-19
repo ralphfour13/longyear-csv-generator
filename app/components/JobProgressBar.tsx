@@ -39,6 +39,27 @@ interface JobProgressBarProps {
 export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarProps) {
   const [job, setJob] = useState<Job | null>(null);
   const [isPolling, setIsPolling] = useState(true);
+  const [elapsed, setElapsed] = useState('');
+
+  // Live duration timer for processing jobs (ticks every second)
+  const jobStartedAt = job?.startedAt;
+  const jobStatus = job?.status;
+  useEffect(() => {
+    if (jobStatus !== 'processing' || !jobStartedAt) {
+      setElapsed('');
+      return;
+    }
+
+    function updateElapsed() {
+      const start = new Date(jobStartedAt!).getTime();
+      const durationMs = Date.now() - start;
+      setElapsed(formatDuration(Math.floor(durationMs / 1000)));
+    }
+
+    updateElapsed();
+    const timer = setInterval(updateElapsed, 1000);
+    return () => clearInterval(timer);
+  }, [jobStatus, jobStartedAt]);
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null;
@@ -225,17 +246,24 @@ export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarPro
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <strong style={{ fontSize: '16px' }}>Export for {job.startDate}</strong>
-          <span style={{
-            padding: '4px 12px',
-            borderRadius: '12px',
-            backgroundColor: '#E3F2FD',
-            color: '#0D5EAF',
-            fontSize: '12px',
-            fontWeight: 600,
-            textTransform: 'uppercase',
-          }}>
-            Processing
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {elapsed && (
+              <span style={{ fontSize: '13px', color: '#6D7175', fontVariantNumeric: 'tabular-nums' }}>
+                {elapsed}
+              </span>
+            )}
+            <span style={{
+              padding: '4px 12px',
+              borderRadius: '12px',
+              backgroundColor: '#E3F2FD',
+              color: '#0D5EAF',
+              fontSize: '12px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+            }}>
+              Processing
+            </span>
+          </div>
         </div>
 
         {/* Progress bar */}

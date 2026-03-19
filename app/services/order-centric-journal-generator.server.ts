@@ -880,6 +880,43 @@ export async function createRefundJournalEntries(
         });
       }
 
+      // SHIPPING REFUND FALLBACK: When refund total exceeds line items + tax,
+      // the difference is likely a shipping refund not tracked via order_adjustments.
+      // This handles cases where Shopify doesn't create a separate shipping_refund adjustment
+      // but the refund amount includes shipping (e.g., #80561: $11.50 = $5.00 sales + $6.50 shipping)
+      const shippingFromAdjustments = refund?.order_adjustments?.reduce((sum, adj) => {
+        if (adj.kind === 'shipping_refund') {
+          let adjTotal = new Decimal(adj.amount).abs();
+          if (adj.tax_amount) {
+            adjTotal = adjTotal.plus(new Decimal(adj.tax_amount).abs());
+          }
+          return sum.plus(adjTotal);
+        }
+        return sum;
+      }, new Decimal(0)) || new Decimal(0);
+
+      const lineItemsPlusTaxPlusShipping = refundedSubtotal.plus(refundedTax).plus(shippingFromAdjustments);
+      const refundGap = totalRefundAmount.minus(lineItemsPlusTaxPlusShipping);
+
+      if (refundGap.greaterThan(new Decimal('0.01')) && order.totalShipping.greaterThan(0)) {
+        // Gap exists and order has shipping - attribute gap to shipping refund
+        entries.push({
+          date: targetDate,
+          reference: `RF-${order.name}`,
+          account: accountMappings.shipping_revenue.accountCode,
+          accountName: accountMappings.shipping_revenue.accountName,
+          debit: refundGap,
+          credit: new Decimal(0),
+          memo: `Shipping Refund - Order ${order.name}`,
+        });
+
+        console.log(
+          `📦 Order ${order.name}: Shipping refund fallback - $${refundGap.toFixed(2)} gap ` +
+          `(refund $${totalRefundAmount.toFixed(2)} - items $${refundedSubtotal.toFixed(2)} ` +
+          `- tax $${refundedTax.toFixed(2)} - adj $${shippingFromAdjustments.toFixed(2)})`
+        );
+      }
+
       // Mark this refund as processed to prevent duplicate sales reversals
       processedRefunds.add(refundId);
     }
@@ -887,7 +924,8 @@ export async function createRefundJournalEntries(
     // SHIPPING REFUND: Check for shipping refund adjustments
     // Shopify tracks shipping refunds separately via order_adjustments (kind: 'shipping_refund'),
     // NOT through refund_line_items.subtotal
-    if (refund?.order_adjustments) {
+    // Guard with shouldProcessSalesReversal to prevent duplicates for multi-transaction refunds
+    if (shouldProcessSalesReversal && refund?.order_adjustments) {
       for (const adj of refund.order_adjustments) {
         if (adj.kind === 'shipping_refund') {
           const shippingRefundAmount = new Decimal(adj.amount).abs();
