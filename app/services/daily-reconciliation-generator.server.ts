@@ -476,7 +476,31 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
     new Decimal(0)
   );
 
+  // Calculate fishing license total from notes column
+  let fishingLicenseTotal = new Decimal(0);
+  for (const row of rows) {
+    if (row.notes) {
+      const fishingMatch = row.notes.match(/([\d.]+)\s*fishing licenses/);
+      if (fishingMatch) {
+        fishingLicenseTotal = fishingLicenseTotal.plus(new Decimal(fishingMatch[1]));
+      }
+    }
+  }
+
+  // Calculate payment method totals
+  const totalPaymentCash = rows.reduce((sum, row) => sum.plus(new Decimal(row.paymentCash || 0)), new Decimal(0));
+  const totalPaymentCard = rows.reduce((sum, row) => sum.plus(new Decimal(row.paymentCard || 0)), new Decimal(0));
+  const totalPaymentGiftCard = rows.reduce((sum, row) => sum.plus(new Decimal(row.paymentGiftCard || 0)), new Decimal(0));
+  const totalPaymentStoreCredit = rows.reduce((sum, row) => sum.plus(new Decimal(row.paymentStoreCredit || 0)), new Decimal(0));
+  const totalPaymentCheck = rows.reduce((sum, row) => sum.plus(new Decimal(row.paymentCheck || 0)), new Decimal(0));
+  const totalPaymentOther = rows.reduce((sum, row) => sum.plus(new Decimal(row.paymentOther || 0)), new Decimal(0));
+  const totalPaymentTotal = rows.reduce((sum, row) => sum.plus(new Decimal(row.paymentTotal || 0)), new Decimal(0));
+
   // Add summary row
+  const fishingNote = fishingLicenseTotal.greaterThan(0)
+    ? `FISHING LICENSES SOLD: $${fishingLicenseTotal.toFixed(2)}`
+    : '';
+
   const summaryFields = [
     `SUMMARY (${rows.length} orders)`,
     totalOriginalSubtotal.toFixed(2),
@@ -485,8 +509,15 @@ function generateCSV(rows: DailyReconciliationRow[]): string {
     totalTax.toFixed(2),
     totalShipping.toFixed(2),
     '', // area
-    '', // notes
+    fishingNote, // notes - fishing license summary
     '', // tender
+    totalPaymentCash.toFixed(2),
+    totalPaymentCard.toFixed(2),
+    totalPaymentGiftCard.toFixed(2),
+    totalPaymentStoreCredit.toFixed(2),
+    totalPaymentCheck.toFixed(2),
+    totalPaymentOther.toFixed(2),
+    totalPaymentTotal.toFixed(2),
     '', // gift card sold
     '', // gift card used
   ];

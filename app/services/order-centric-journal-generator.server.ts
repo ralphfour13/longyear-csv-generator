@@ -90,10 +90,17 @@ export function calculateGiftCardProductSales(order: Order): Decimal {
  * - Return-type refunds: has transactions (money was actually refunded)
  *   Items returned AFTER payment, money WAS refunded
  *
+ * POINT-IN-TIME AWARENESS:
+ * When maxDate is provided, only considers refunds created on or before that date.
+ * This prevents future refunds from affecting historical journal entries.
+ * Example: Order captured Jan 12, refunded Feb 8 — when generating Jan 12 entry,
+ * we should NOT see the Feb 8 refund.
+ *
  * @param order - Order to check
+ * @param maxDate - Optional cutoff date (YYYY-MM-DD). Only consider refunds on or before this date.
  * @returns true if order has actual refunds (not just cancellations)
  */
-export function hasActualRefunds(order: Order): boolean {
+export function hasActualRefunds(order: Order, maxDate?: string): boolean {
   if (!order.refunds || order.refunds.length === 0) {
     return false;
   }
@@ -102,8 +109,60 @@ export function hasActualRefunds(order: Order): boolean {
   // Exchanges have restock_type: 'return' but transactions: [] — no money refunded.
   // These should use current amounts (post-exchange), not original.
   return order.refunds.some(refund => {
+    // Point-in-time filtering: skip refunds created after maxDate
+    if (maxDate && refund.createdAt) {
+      const refundDate = formatDateOnly(refund.createdAt);
+      if (refundDate > maxDate) return false;
+    }
     return refund.transactions && refund.transactions.length > 0;
   });
+}
+
+/**
+ * Extract date-only portion from ISO timestamp (YYYY-MM-DD)
+ * Converts UTC timestamp to store's local timezone (Pacific).
+ */
+function formatDateOnly(isoTimestamp: string): string {
+  const date = new Date(isoTimestamp);
+  const pacificDateString = date.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const [month, day, year] = pacificDateString.split('/');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get point-in-time amounts for an order by adding back future refund amounts.
+ *
+ * Shopify's currentSubtotalPrice/currentTotalTax reflect ALL refunds (including future ones).
+ * When generating a historical journal entry, we need to "undo" refunds that haven't happened yet.
+ *
+ * @param order - Order with refunds
+ * @param maxDate - Cutoff date (YYYY-MM-DD). Refunds after this date are added back.
+ * @returns Adjusted subtotal and tax as of maxDate
+ */
+function getPointInTimeAmounts(order: Order, maxDate: string): { subtotal: Decimal; tax: Decimal } {
+  let adjustedSubtotal = order.currentSubtotalPrice ?? order.subtotalPrice;
+  let adjustedTax = order.currentTotalTax ?? order.totalTax ?? new Decimal(0);
+
+  // Find refunds AFTER maxDate and add their amounts back
+  const futureRefunds = order.refunds?.filter(r => {
+    if (!r.createdAt) return false;
+    const refundDate = formatDateOnly(r.createdAt);
+    return refundDate > maxDate;
+  }) || [];
+
+  for (const refund of futureRefunds) {
+    for (const item of refund.refund_line_items || []) {
+      adjustedSubtotal = adjustedSubtotal.plus(item.subtotal);
+      adjustedTax = adjustedTax.plus(item.total_tax);
+    }
+  }
+
+  return { subtotal: adjustedSubtotal, tax: adjustedTax };
 }
 
 /**
@@ -138,10 +197,11 @@ export function hasActualRefunds(order: Order): boolean {
  * - currentTotalTax: $2.28 (items removed before payment)
  * - We use: $2.28 (customer only paid for remaining items)
  */
-export function calculateTaxAmount(order: Order): Decimal {
+export function calculateTaxAmount(order: Order, targetDate?: string): Decimal {
   // Check if this has ACTUAL refunds (money returned after payment)
   // vs cancellations (items removed before payment, no money returned)
-  const orderHasActualRefunds = hasActualRefunds(order);
+  // Use point-in-time awareness when targetDate is provided
+  const orderHasActualRefunds = hasActualRefunds(order, targetDate);
 
   // Partial capture detection:
   // - No actual refunds (just cancellations or no refunds at all), AND
@@ -151,10 +211,16 @@ export function calculateTaxAmount(order: Order): Decimal {
     order.currentTotalPrice !== undefined &&
     order.currentTotalPrice.lt(order.totalPrice);
 
-  if (isPartialCapture && order.currentTotalTax !== undefined) {
+  if (isPartialCapture) {
     // Partial capture or cancel-type: items removed before payment, use current tax
-    // Customer only paid tax on the remaining items
-    return order.currentTotalTax;
+    // But if there are future refunds, we need point-in-time adjusted values
+    if (targetDate) {
+      const { tax } = getPointInTimeAmounts(order, targetDate);
+      return tax;
+    }
+    if (order.currentTotalTax !== undefined) {
+      return order.currentTotalTax;
+    }
   }
 
   // Normal orders and ACTUAL refunded orders: use original tax
@@ -179,7 +245,8 @@ export async function createOrderJournalEntries(
   targetDate: string,
   accessToken?: string,
   preCalculatedCogs?: CogsCalculation,
-  captureRatio?: Decimal
+  captureRatio?: Decimal,
+  isoTargetDate?: string  // YYYY-MM-DD format for point-in-time filtering
 ): Promise<JournalEntry[]> {
   const entries: JournalEntry[] = [];
   const reference = `SO-${order.name}`;
@@ -205,7 +272,7 @@ export async function createOrderJournalEntries(
     const totalDebit = paymentBreakdowns.reduce((sum, b) => sum.plus(b.amount), new Decimal(0));
 
     // Proportional tax
-    const fullTax = calculateTaxAmount(order);
+    const fullTax = calculateTaxAmount(order, isoTargetDate);
     const scaledTax = applyRatio(fullTax, captureRatio);
 
     // Proportional shipping
@@ -272,52 +339,88 @@ export async function createOrderJournalEntries(
     }
   } else {
   // SALES CALCULATION: Use original subtotal for ACTUAL refunded orders, current for partial captures
-  //
-  // KEY DISTINCTION:
-  // - PARTIAL CAPTURE: Items removed BEFORE payment → use currentSubtotalPrice
-  //   (Customer never paid for removed items)
-  // - CANCEL-TYPE REFUND: Items cancelled BEFORE payment → use currentSubtotalPrice
-  //   (Same as partial capture - customer never paid for cancelled items)
-  // - ACTUAL REFUND: Items returned AFTER payment → use subtotalPrice (original)
-  //   (Customer DID pay, refund entry reverses it separately via refund_line_items)
-  //
-  // ACCRUAL ACCOUNTING PRINCIPLE:
-  // For orders with ACTUAL refunds on a DIFFERENT day than the sale:
-  // - Sale day: Record FULL original sales (subtotalPrice)
-  // - Refund day: Record sales reversal (handled by createRefundJournalEntries)
-  //
-  // Example Order #80284 (actual refund):
-  // - Jan 8: Sale captured with subtotal $X
-  // - Jan 12: Partial refund (restock_type: 'return'), subtotal portion $Y
-  // - Jan 8 entry should use original subtotal, not reduced current value
-  //
-  // Example Order #80291 (cancel-type, NOT an actual refund):
-  // - Original subtotal: $2,546.47
-  // - Current subtotal: $174.97 (items cancelled before payment)
-  // - We use: $174.97 (customer only paid for remaining items)
-  const orderHasActualRefunds = hasActualRefunds(order);
+  const orderHasActualRefunds = hasActualRefunds(order, isoTargetDate);
   const isPartialCapture = !orderHasActualRefunds &&
     order.currentSubtotalPrice !== undefined &&
     order.currentSubtotalPrice.lt(order.subtotalPrice);
 
-  // TypeScript needs explicit check even though isPartialCapture guarantees currentSubtotalPrice is defined
-  const netSales: Decimal = isPartialCapture && order.currentSubtotalPrice !== undefined
-    ? order.currentSubtotalPrice  // Partial capture or cancel-type: use current
-    : order.subtotalPrice;        // Normal or ACTUAL refunded: use original
+  // Determine netSales using point-in-time amounts when applicable
+  let netSales: Decimal;
+  if (isPartialCapture && order.currentSubtotalPrice !== undefined) {
+    // Partial capture or cancel-type: use current (adjusted for future refunds)
+    if (isoTargetDate) {
+      const { subtotal } = getPointInTimeAmounts(order, isoTargetDate);
+      netSales = subtotal;
+    } else {
+      netSales = order.currentSubtotalPrice;
+    }
+  } else {
+    // Normal or ACTUAL refunded: use original
+    netSales = order.subtotalPrice;
+  }
 
   // GIFT CARD PRODUCT SALES: Separate gift card product revenue from regular sales
-  // Gift card sales go to liability (2320), not revenue (3000)
   const giftCardProductSales = calculateGiftCardProductSales(order);
-  const regularSales = netSales.minus(giftCardProductSales);
 
-  // CREDIT: Sales Revenue (NET - post-discount amount, excluding gift card products)
-  // Add discount info to memo for transparency
+  // CREDIT: Sales Tax
+  const taxAmount = calculateTaxAmount(order, isoTargetDate);
+
+  // Shipping
+  const shippingAmount = order.totalShipping || new Decimal(0);
+
+  // Total debit (what was actually captured/paid)
+  const totalDebit = paymentBreakdowns.reduce((sum, b) => sum.plus(b.amount), new Decimal(0));
+
+  // PLUG FALLBACK: If calculated credits don't match debits, use capture-amount-as-ground-truth
+  // This handles cases where Shopify's current* fields don't accurately reflect the point-in-time state
+  const calculatedCredits = netSales.plus(taxAmount).plus(shippingAmount);
+  const imbalance = totalDebit.minus(calculatedCredits).abs();
+
+  let regularSales: Decimal;
+  let usedTax = taxAmount;
+  let usedShipping = shippingAmount;
+  let usedGiftCardSales = giftCardProductSales;
+
+  if (imbalance.greaterThan(new Decimal('0.02'))) {
+    // Entry won't balance — use plug method: tax is proportional, sales is the plug
+    const orderTotal = order.totalPrice.isZero() ? totalDebit : order.totalPrice;
+    const orderTax = order.totalTax || new Decimal(0);
+
+    // Proportional tax based on capture amount
+    usedTax = orderTotal.isZero()
+      ? new Decimal(0)
+      : totalDebit.times(orderTax).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+    // Gift card sales proportional
+    usedGiftCardSales = orderTotal.isZero()
+      ? new Decimal(0)
+      : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+    // Shipping proportional
+    usedShipping = orderTotal.isZero()
+      ? new Decimal(0)
+      : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+    // Sales = plug (ensures perfect balance)
+    regularSales = totalDebit.minus(usedTax).minus(usedShipping).minus(usedGiftCardSales);
+
+    console.log(
+      `🔌 Order ${order.name}: Using plug method - ` +
+      `capture=$${totalDebit.toFixed(2)}, tax=$${usedTax.toFixed(2)}, ` +
+      `shipping=$${usedShipping.toFixed(2)}, giftCard=$${usedGiftCardSales.toFixed(2)}, ` +
+      `sales(plug)=$${regularSales.toFixed(2)} ` +
+      `(original imbalance: $${imbalance.toFixed(2)})`
+    );
+  } else {
+    regularSales = netSales.minus(giftCardProductSales);
+  }
+
+  // CREDIT: Sales Revenue
   const hasDiscount = order.totalDiscounts && order.totalDiscounts.gt(0);
   const discountInfo = hasDiscount
     ? ` (Net: $${regularSales.toFixed(2)}, Discount: $${order.totalDiscounts.toFixed(2)})`
     : '';
 
-  // Only create sales entry if there are regular (non-gift-card) sales
   if (regularSales.greaterThan(0)) {
     entries.push({
       date: targetDate,
@@ -330,47 +433,41 @@ export async function createOrderJournalEntries(
     });
   }
 
-  // CREDIT: Gift Card Liability (for gift card product sales - deferred revenue)
-  // Gift card sales are NOT revenue until redeemed
-  if (giftCardProductSales.greaterThan(0)) {
+  // CREDIT: Gift Card Liability
+  if (usedGiftCardSales.greaterThan(0)) {
     entries.push({
       date: targetDate,
       reference,
       account: accountMappings.gift_card_liability.accountCode,
       accountName: accountMappings.gift_card_liability.accountName,
       debit: new Decimal(0),
-      credit: giftCardProductSales,
+      credit: usedGiftCardSales,
       memo: `Gift Card Sale - Order ${order.name}`,
     });
   }
 
-  // NO DISCOUNT ENTRY - discounts are already reflected in NET sales amount
-
   // CREDIT: Sales Tax (only if > 0)
-  // PARTIAL CAPTURE FIX: Calculate tax proportionally for partial captures
-  const taxAmount = calculateTaxAmount(order);
-  if (taxAmount && taxAmount.greaterThan(0)) {
+  if (usedTax && usedTax.greaterThan(0)) {
     entries.push({
       date: targetDate,
       reference,
       account: accountMappings.sales_tax.accountCode,
       accountName: accountMappings.sales_tax.accountName,
       debit: new Decimal(0),
-      credit: taxAmount,
+      credit: usedTax,
       memo: `Sales Tax - Order ${order.name}`,
     });
   }
 
   // CREDIT: Shipping Revenue (only if > 0)
-  const shippingAmount = order.totalShipping;
-  if (shippingAmount && shippingAmount.greaterThan(0)) {
+  if (usedShipping && usedShipping.greaterThan(0)) {
     entries.push({
       date: targetDate,
       reference,
       account: accountMappings.shipping_revenue.accountCode,
       accountName: accountMappings.shipping_revenue.accountName,
       debit: new Decimal(0),
-      credit: shippingAmount,
+      credit: usedShipping,
       memo: `Shipping - Order ${order.name}`,
     });
   }

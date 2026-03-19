@@ -260,7 +260,18 @@ export async function reconcileOrdersByDate(
             txn => formatDateOnly(txn.processedAt) === lastCaptureDate
           );
 
-          if (refundsAreSameDay) {
+          // Determine capture total for this order
+          const captureTotal = pointInTimeCaptureTransactions.reduce(
+            (sum, txn) => sum.plus(txn.amount), new Decimal(0)
+          );
+
+          // Skip same-day adjustment when this is a REAL refund (not a discount-as-refund):
+          // - Order is fully refunded (financialStatus === 'refunded'), OR
+          // - Refund amount >= 50% of capture (too large to be a discount adjustment)
+          const isRealRefund = order.financialStatus === 'refunded' ||
+            (captureTotal.greaterThan(0) && refundTotal.dividedBy(captureTotal).gte(new Decimal('0.50')));
+
+          if (refundsAreSameDay && !isRealRefund) {
             // Adjust last capture amount by subtracting same-day refund total
             effectiveCaptureTransactions = pointInTimeCaptureTransactions.map((txn, i) =>
               i === lastCaptureIdx
@@ -273,6 +284,12 @@ export async function reconcileOrdersByDate(
               `capture ${pointInTimeCaptureTransactions[lastCaptureIdx].amount.toFixed(2)} → ` +
               `${effectiveCaptureTransactions[lastCaptureIdx].amount.toFixed(2)} ` +
               `(refund: ${refundTotal.toFixed(2)})`
+            );
+          } else if (refundsAreSameDay && isRealRefund) {
+            console.log(
+              `🔄 Order ${order.name}: Same-day refund NOT adjusted (real refund) - ` +
+              `capture $${captureTotal.toFixed(2)}, refund $${refundTotal.toFixed(2)}, ` +
+              `financialStatus=${order.financialStatus}`
             );
           }
         }
@@ -504,7 +521,8 @@ async function processOrderCaptures(
     formattedDate,
     accessToken,
     preCalculatedCogs,
-    captureRatio
+    captureRatio,
+    targetDate  // Pass YYYY-MM-DD for point-in-time filtering
   );
 
   journalEntries.push(...entries);
@@ -544,7 +562,7 @@ async function processOrderCaptures(
       totalDiscounts: captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio) : order.totalDiscounts,
       financialStatus: order.financialStatus,
       lineItems: order.lineItems,
-      hasActualRefunds: hasActualRefunds(order),
+      hasActualRefunds: hasActualRefunds(order, targetDate),
       isMultiCaptureSplit: !!captureRatio,
     };
 
@@ -597,7 +615,7 @@ async function processOrderCaptures(
         totalDiscounts: captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio) : order.totalDiscounts,
         financialStatus: order.financialStatus,
         lineItems: order.lineItems,
-        hasActualRefunds: hasActualRefunds(order),
+        hasActualRefunds: hasActualRefunds(order, targetDate),
         isMultiCaptureSplit: !!captureRatio,
       },
       enrichedData: undefined,
@@ -665,7 +683,7 @@ async function processOrderRefunds(
         totalDiscounts: order.totalDiscounts,
         financialStatus: order.financialStatus,
         lineItems: order.lineItems,
-        hasActualRefunds: hasActualRefunds(order),
+        hasActualRefunds: hasActualRefunds(order, targetDate),
       },
       enrichedData: enrichedData || undefined,
       payout: {
@@ -704,7 +722,7 @@ async function processOrderRefunds(
         totalDiscounts: order.totalDiscounts,
         financialStatus: order.financialStatus,
         lineItems: order.lineItems,
-        hasActualRefunds: hasActualRefunds(order),
+        hasActualRefunds: hasActualRefunds(order, targetDate),
       },
       enrichedData: undefined,
       payout: {
