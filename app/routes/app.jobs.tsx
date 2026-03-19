@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useRevalidator, useActionData, Form } from 'react-router';
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { getShopJobs, clearCompletedJobs, cancelPendingJobs, cancelAllProcessingJobs, type ExportJob } from '../services/background-jobs.server';
+import { getShopJobs, clearCompletedJobs, clearFailedJobs, cancelPendingJobs, cancelAllProcessingJobs, type ExportJob } from '../services/background-jobs.server';
 import { processPendingJobs } from '../services/job-processor.server';
 import { format } from 'date-fns';
 import { JobProgressBar } from '../components/JobProgressBar';
@@ -35,6 +35,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (actionType === 'clearCompleted') {
     const count = await clearCompletedJobs(shop);
     return { success: true, message: `Cleared ${count} completed/failed jobs`, count };
+  }
+
+  if (actionType === 'clearFailed') {
+    const count = await clearFailedJobs(shop);
+    return { success: true, message: `Cleared ${count} failed jobs`, count };
   }
 
   if (actionType === 'cancelPending') {
@@ -89,17 +94,12 @@ export default function Jobs() {
   const revalidator = useRevalidator();
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Debug logging
-  console.log('[Jobs Page] Active jobs:', activeJobs);
-  console.log('[Jobs Page] Active jobs count:', activeJobs.length);
-
-  // Auto-refresh every 5 seconds if there are pending or processing jobs
-  // (Progress bars poll separately at 2 seconds)
+  // Auto-refresh every 5 minutes if there are pending or processing jobs
   useEffect(() => {
     if (activeJobs.length > 0) {
       const interval = setInterval(() => {
         revalidator.revalidate();
-      }, 5000);
+      }, 300000);
 
       return () => clearInterval(interval);
     }
@@ -223,6 +223,26 @@ export default function Jobs() {
                 disabled={statusCounts.completed + statusCounts.failed === 0}
               >
                 🗑️ Clear Completed ({statusCounts.completed + statusCounts.failed})
+              </button>
+            </Form>
+            <Form method="post" style={{ display: 'inline' }}>
+              <input type="hidden" name="action" value="clearFailed" />
+              <button
+                type="submit"
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #C9CCCF',
+                  backgroundColor: '#ffffff',
+                  color: '#D72C0D',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                disabled={statusCounts.failed === 0}
+              >
+                🗑️ Clear Failed ({statusCounts.failed})
               </button>
             </Form>
             <Form method="post" style={{ display: 'inline' }}>
@@ -460,7 +480,7 @@ export default function Jobs() {
       {activeJobs.length > 0 && (
         <div style={{ marginTop: '20px' }}>
           <s-banner tone="info">
-            🔄 Auto-refreshing every 5 seconds ({activeJobs.length} active {activeJobs.length === 1 ? 'job' : 'jobs'})
+            🔄 Auto-refreshing every 5 minutes ({activeJobs.length} active {activeJobs.length === 1 ? 'job' : 'jobs'})
           </s-banner>
         </div>
       )}

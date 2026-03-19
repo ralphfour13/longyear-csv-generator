@@ -648,8 +648,8 @@ async function processOrderCaptures(
   }
 
   // Rate limiting delay: prevents rapid sequential enrichment calls
-  // when processing multiple orders (500ms = 2 calls/second max)
-  await sleep(500);
+  // when processing multiple orders (250ms = 4 calls/second = Shopify's limit)
+  await sleep(250);
 }
 
 /**
@@ -754,8 +754,8 @@ async function processOrderRefunds(
   }
 
   // Rate limiting delay: prevents rapid sequential enrichment calls
-  // when processing multiple orders (500ms = 2 calls/second max)
-  await sleep(500);
+  // when processing multiple orders (250ms = 4 calls/second = Shopify's limit)
+  await sleep(250);
 }
 
 /**

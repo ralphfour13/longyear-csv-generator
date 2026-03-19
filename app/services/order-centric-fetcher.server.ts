@@ -339,9 +339,9 @@ async function fetchOrdersByDate(
             }
           }
 
-          // Rate limiting: Wait 500ms between calls (2 calls/second to stay well under limit)
+          // Rate limiting: Wait 250ms between calls (4 calls/second = Shopify's limit)
           if (i < data.orders.length - 1) {
-            await sleep(500);
+            await sleep(250);
           }
         }
 
