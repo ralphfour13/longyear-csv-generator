@@ -162,10 +162,6 @@ function transformToReconciliationRow(
   // This flag is already set in the reconciler
   const orderHasActualRefunds = order.hasActualRefunds || false;
 
-  // Detect same-day refund pattern: both charge and refund transactions on same day
-  // For same-day refunds, use current (net) amounts instead of original
-  const hasSameDayRefund = hasChargeOnDate && hasRefundOnDate;
-
   // Check if totals are reduced
   const hasReducedSubtotal = order.currentSubtotalPrice !== undefined &&
     order.currentSubtotalPrice.lt(order.subtotalPrice);
@@ -174,8 +170,7 @@ function transformToReconciliationRow(
 
   // Calculate sales - use original subtotalPrice for orders with actual refunds
   // Only use currentSubtotalPrice for partial captures (items removed BEFORE payment)
-  // OR for same-day refunds where we want to show the net amount
-  const useCurrentAmounts = (hasReducedSubtotal && !orderHasActualRefunds) || hasSameDayRefund;
+  const useCurrentAmounts = hasReducedSubtotal && !orderHasActualRefunds;
   const sales = (useCurrentAmounts && order.currentSubtotalPrice !== undefined)
     ? order.currentSubtotalPrice
     : order.subtotalPrice;
@@ -203,8 +198,8 @@ function transformToReconciliationRow(
   // Calculate payment breakdown
   const paymentBreakdown = effectiveEnrichedData.paymentBreakdown;
   // Use original totalPrice for orders with actual refunds to show historical state
-  // Use currentTotalPrice for partial captures OR same-day refunds (net amount)
-  const useCurrentTotal = (hasReducedTotal && !orderHasActualRefunds) || hasSameDayRefund;
+  // Use currentTotalPrice for partial captures only
+  const useCurrentTotal = hasReducedTotal && !orderHasActualRefunds;
   const paymentTotal = (useCurrentTotal && order.currentTotalPrice)
     ? order.currentTotalPrice
     : order.totalPrice;

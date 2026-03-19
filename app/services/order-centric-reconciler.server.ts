@@ -307,64 +307,12 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
-        // SAME-DAY REFUND ADJUSTMENT: When a discount is applied as a post-capture refund
-        // (e.g., capture $54.50 then immediately refund $4.00), the capture amount exceeds
-        // the order total. Subtract same-day refunds from capture to keep journal balanced.
-        let effectiveCaptureTransactions = pointInTimeCaptureTransactions;
-        let sameDayRefundsHandled = false;
-
-        if (refundTransactions.length > 0) {
-          const refundTotal = refundTransactions.reduce(
-            (sum, txn) => sum.plus(txn.amount), new Decimal(0)
-          );
-
-          // Check if refunds are same-day as last capture (discount-as-refund pattern)
-          const lastCaptureIdx = pointInTimeCaptureTransactions.length - 1;
-          const lastCaptureDate = formatDateOnly(pointInTimeCaptureTransactions[lastCaptureIdx].processedAt);
-          const refundsAreSameDay = refundTransactions.every(
-            txn => formatDateOnly(txn.processedAt) === lastCaptureDate
-          );
-
-          // Determine capture total for this order
-          const captureTotal = pointInTimeCaptureTransactions.reduce(
-            (sum, txn) => sum.plus(txn.amount), new Decimal(0)
-          );
-
-          // Skip same-day adjustment when this is a REAL refund (not a discount-as-refund):
-          // - Order is fully refunded (financialStatus === 'refunded'), OR
-          // - Refund amount >= 50% of capture (too large to be a discount adjustment)
-          const isRealRefund = order.financialStatus === 'refunded' ||
-            (captureTotal.greaterThan(0) && refundTotal.dividedBy(captureTotal).gte(new Decimal('0.50')));
-
-          if (refundsAreSameDay && !isRealRefund) {
-            // Adjust last capture amount by subtracting same-day refund total
-            effectiveCaptureTransactions = pointInTimeCaptureTransactions.map((txn, i) =>
-              i === lastCaptureIdx
-                ? { ...txn, amount: txn.amount.minus(refundTotal) }
-                : txn
-            );
-            sameDayRefundsHandled = true;
-            console.log(
-              `🔄 Order ${order.name}: Same-day refund adjustment - ` +
-              `capture ${pointInTimeCaptureTransactions[lastCaptureIdx].amount.toFixed(2)} → ` +
-              `${effectiveCaptureTransactions[lastCaptureIdx].amount.toFixed(2)} ` +
-              `(refund: ${refundTotal.toFixed(2)})`
-            );
-          } else if (refundsAreSameDay && isRealRefund) {
-            console.log(
-              `🔄 Order ${order.name}: Same-day refund NOT adjusted (real refund) - ` +
-              `capture $${captureTotal.toFixed(2)}, refund $${refundTotal.toFixed(2)}, ` +
-              `financialStatus=${order.financialStatus}`
-            );
-          }
-        }
-
-        // Process captures (using point-in-time filtered transactions, adjusted for same-day refunds)
+        // Process captures (using point-in-time filtered transactions)
         await processOrderCaptures(
           shop,
           accessToken,
           order,
-          effectiveCaptureTransactions,
+          pointInTimeCaptureTransactions,
           targetDate,
           journalEntries,
           enrichedTransactions,
@@ -375,8 +323,8 @@ export async function reconcileOrdersByDate(
           enrichmentCache
         );
 
-        // Process refunds (if any on target date - skip if already handled as same-day adjustment)
-        if (refundTransactions.length > 0 && !sameDayRefundsHandled) {
+        // Process refunds (if any on target date)
+        if (refundTransactions.length > 0) {
           await processOrderRefunds(
             shop,
             accessToken,
