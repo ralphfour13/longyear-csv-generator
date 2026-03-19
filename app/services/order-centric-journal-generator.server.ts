@@ -41,6 +41,15 @@ import type { CogsCalculation } from '../types/cin7';
  */
 
 /**
+ * Apply a proportional ratio to an amount (for multi-CC-capture date splits).
+ * Returns the original amount if no ratio is provided.
+ */
+function applyRatio(amount: Decimal, ratio?: Decimal): Decimal {
+  if (!ratio) return amount;
+  return amount.times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+}
+
+/**
  * Calculate the total value of gift card products sold in an order.
  *
  * Gift cards are identified by:
@@ -169,7 +178,8 @@ export async function createOrderJournalEntries(
   paymentBreakdowns: PaymentMethodBreakdown[],
   targetDate: string,
   accessToken?: string,
-  preCalculatedCogs?: CogsCalculation
+  preCalculatedCogs?: CogsCalculation,
+  captureRatio?: Decimal
 ): Promise<JournalEntry[]> {
   const entries: JournalEntry[] = [];
   const reference = `SO-${order.name}`;
@@ -188,6 +198,79 @@ export async function createOrderJournalEntries(
     });
   }
 
+  // MULTI-CC-CAPTURE SPLIT: When captureRatio is set, this is a partial-date entry.
+  // Tax and shipping are proportionally allocated; sales is the plug to balance.
+  if (captureRatio) {
+    // Total debit = sum of payment breakdowns (actual capture amounts for this date)
+    const totalDebit = paymentBreakdowns.reduce((sum, b) => sum.plus(b.amount), new Decimal(0));
+
+    // Proportional tax
+    const fullTax = calculateTaxAmount(order);
+    const scaledTax = applyRatio(fullTax, captureRatio);
+
+    // Proportional shipping
+    const fullShipping = order.totalShipping || new Decimal(0);
+    const scaledShipping = applyRatio(fullShipping, captureRatio);
+
+    // Proportional gift card product sales (deferred revenue)
+    const fullGiftCardSales = calculateGiftCardProductSales(order);
+    const scaledGiftCardSales = applyRatio(fullGiftCardSales, captureRatio);
+
+    // Sales = plug number (ensures entry balances perfectly)
+    const regularSales = totalDebit.minus(scaledTax).minus(scaledShipping).minus(scaledGiftCardSales);
+
+    // CREDIT: Sales Revenue (plug)
+    if (regularSales.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference,
+        account: accountMappings.sales_revenue.accountCode,
+        accountName: accountMappings.sales_revenue.accountName,
+        debit: new Decimal(0),
+        credit: regularSales,
+        memo: `Sales - Order ${order.name} (split capture)`,
+      });
+    }
+
+    // CREDIT: Gift Card Liability (proportional)
+    if (scaledGiftCardSales.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference,
+        account: accountMappings.gift_card_liability.accountCode,
+        accountName: accountMappings.gift_card_liability.accountName,
+        debit: new Decimal(0),
+        credit: scaledGiftCardSales,
+        memo: `Gift Card Sale - Order ${order.name} (split capture)`,
+      });
+    }
+
+    // CREDIT: Sales Tax (proportional)
+    if (scaledTax.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference,
+        account: accountMappings.sales_tax.accountCode,
+        accountName: accountMappings.sales_tax.accountName,
+        debit: new Decimal(0),
+        credit: scaledTax,
+        memo: `Sales Tax - Order ${order.name} (split capture)`,
+      });
+    }
+
+    // CREDIT: Shipping Revenue (proportional)
+    if (scaledShipping.greaterThan(0)) {
+      entries.push({
+        date: targetDate,
+        reference,
+        account: accountMappings.shipping_revenue.accountCode,
+        accountName: accountMappings.shipping_revenue.accountName,
+        debit: new Decimal(0),
+        credit: scaledShipping,
+        memo: `Shipping - Order ${order.name} (split capture)`,
+      });
+    }
+  } else {
   // SALES CALCULATION: Use original subtotal for ACTUAL refunded orders, current for partial captures
   //
   // KEY DISTINCTION:
@@ -291,6 +374,7 @@ export async function createOrderJournalEntries(
       memo: `Shipping - Order ${order.name}`,
     });
   }
+  } // end of non-captureRatio branch
 
   // Add COGS entries (if Cin7 enabled and order has line items)
   try {
@@ -321,11 +405,23 @@ export async function createOrderJournalEntries(
 
       // Always create COGS entries if order has products, even if calculation is $0
       // This ensures journal completeness and highlights missing COGS data
-      if (cogsCalculation.totalCogs.greaterThan(0)) {
+      // For multi-CC-capture splits, scale COGS by captureRatio
+      const effectiveCogs = captureRatio
+        ? {
+            ...cogsCalculation,
+            totalCogs: applyRatio(cogsCalculation.totalCogs, captureRatio),
+            lineItems: cogsCalculation.lineItems.map(item => ({
+              ...item,
+              totalCost: applyRatio(item.totalCost, captureRatio),
+            })),
+          }
+        : cogsCalculation;
+
+      if (effectiveCogs.totalCogs.greaterThan(0)) {
         const cogsEntries = await createCogsJournalEntries(
           shop,
           order.name,
-          cogsCalculation,
+          effectiveCogs,
           targetDate
         );
         entries.push(...cogsEntries);

@@ -155,9 +155,20 @@ function extractPaymentMethod(txn: Transaction): string | undefined {
  */
 export function validatePaymentTotal(
   order: Order,
-  paymentBreakdowns: PaymentMethodBreakdown[]
+  paymentBreakdowns: PaymentMethodBreakdown[],
+  skipTotalValidation?: boolean
 ): string[] {
   const errors: string[] = [];
+
+  // Skip total-match check for multi-CC-capture date splits
+  // (partial date captures won't equal full order total)
+  if (skipTotalValidation) {
+    // Still check for empty breakdowns below
+    if (paymentBreakdowns.length === 0) {
+      errors.push(`No payment breakdowns found for order ${order.name}`);
+    }
+    return errors;
+  }
 
   // Sum all payment amounts
   const totalPayments = paymentBreakdowns.reduce(

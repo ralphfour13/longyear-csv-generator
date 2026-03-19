@@ -325,6 +325,11 @@ function generateNotes(order: any, enrichedData: any): string {
     notes.push(`discount ${order.totalDiscounts.toFixed(2)}`);
   }
 
+  // Check for multi-capture split
+  if (order.isMultiCaptureSplit) {
+    notes.push('split capture');
+  }
+
   // Check for split payment (multiple payment methods)
   const paymentBreakdown = enrichedData.paymentBreakdown;
   const paymentMethods = [
