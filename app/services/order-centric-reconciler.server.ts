@@ -145,54 +145,95 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
-        // LAST-CAPTURE-DATE RULE: Order posts on the date of its LAST captured payment
-        // This ensures split-payment orders post as a complete unit (all legs balance)
-        // POINT-IN-TIME: Only consider captures up to target date (no future knowledge)
-        const lastCaptureDate = getOrderCaptureDate(order, targetDate);
-
-        if (!lastCaptureDate) {
-          // Should not happen since we checked for captures above, but safety check
-          continue;
-        }
-
         // Check for refunds on target date BEFORE deciding to skip order
         // This ensures refunds that occur on different dates than captures are still processed
         const refundTransactions = filterRefundTransactions(order, targetDate);
 
-        if (lastCaptureDate !== targetDate) {
-          // This order's last capture is on a different date
-          // BUT check if there are refunds on target date before skipping
-          if (refundTransactions.length > 0) {
-            // Process refunds for this order even though capture was on different date
-            await processOrderRefunds(
-              shop,
-              accessToken,
-              order,
-              refundTransactions,
-              targetDate,
-              journalEntries,
-              enrichedTransactions,
-              warnings
-            );
+        // MULTI-CC-CAPTURE DETECTION: Check if CC captures span multiple dates
+        // IMPORTANT: Look at ALL captures (not point-in-time filtered) to detect multi-date pattern.
+        // Otherwise, when processing Jan 5 for an order with CC captures on Jan 5 AND Jan 15,
+        // we'd only see 1 date and incorrectly post the full order on Jan 5.
+        const ccCapturesByDate = groupCCCapturesByDate(allCaptureTransactions);
+        const isMultiDateCCCapture = ccCapturesByDate.size > 1;
 
+        let captureRatio: Decimal | undefined;
+
+        if (isMultiDateCCCapture) {
+          // Multi-CC-capture path: each date gets its own proportional entry
+          const targetDateCCCaptures = ccCapturesByDate.get(targetDate) || [];
+
+          if (targetDateCCCaptures.length === 0 && refundTransactions.length === 0) {
+            // No CC captures and no refunds on this date - skip
+            continue;
+          }
+
+          if (targetDateCCCaptures.length === 0 && refundTransactions.length > 0) {
+            // Refund-only on this date for a multi-capture order
+            await processOrderRefunds(
+              shop, accessToken, order, refundTransactions, targetDate,
+              journalEntries, enrichedTransactions, warnings
+            );
             processedOrderIds.add(order.id);
             ordersProcessed++;
+            continue;
           }
-          // Skip capture processing (will be processed when we run reconciliation for that date)
-          continue;
+
+          // Compute captureRatio = targetDateCCTotal / orderEffectiveTotal
+          const targetDateCCTotal = targetDateCCCaptures.reduce(
+            (sum, txn) => sum.plus(txn.amount), new Decimal(0)
+          );
+          const orderEffectiveTotal = order.currentTotalPrice || order.totalPrice;
+          captureRatio = targetDateCCTotal.dividedBy(orderEffectiveTotal);
+
+          console.log(
+            `🔀 Order ${order.name}: Multi-CC-capture split - ` +
+            `${ccCapturesByDate.size} dates, targetDate ${targetDate}: ` +
+            `$${targetDateCCTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
+          );
+        } else {
+          // LAST-CAPTURE-DATE RULE: Order posts on the date of its LAST captured payment
+          // This ensures split-payment orders post as a complete unit (all legs balance)
+          // POINT-IN-TIME: Only consider captures up to target date (no future knowledge)
+          const lastCaptureDate = getOrderCaptureDate(order, targetDate);
+
+          if (!lastCaptureDate) {
+            // Should not happen since we checked for captures above, but safety check
+            continue;
+          }
+
+          if (lastCaptureDate !== targetDate) {
+            // This order's last capture is on a different date
+            // BUT check if there are refunds on target date before skipping
+            if (refundTransactions.length > 0) {
+              // Process refunds for this order even though capture was on different date
+              await processOrderRefunds(
+                shop, accessToken, order, refundTransactions, targetDate,
+                journalEntries, enrichedTransactions, warnings
+              );
+              processedOrderIds.add(order.id);
+              ordersProcessed++;
+            }
+            // Skip capture processing (will be processed when we run reconciliation for that date)
+            continue;
+          }
         }
 
-        // POINT-IN-TIME FILTERING: Only use captures on or before target date
-        // This ensures we don't process future transactions when generating historical journal entries
-        // Example: Order #80386 has manual payment on Jan 30 that shouldn't be included in Jan 10 export
-        const pointInTimeCaptureTransactions = allCaptureTransactions.filter((txn) => {
-          const txnDate = formatDateOnly(txn.processedAt);
-          return txnDate <= targetDate;
-        });
+        // POINT-IN-TIME FILTERING:
+        // - Multi-CC-capture: Use only targetDate captures (each date gets its own portion)
+        // - Normal: Use all captures on or before targetDate
+        const pointInTimeCaptureTransactions = isMultiDateCCCapture
+          ? allCaptureTransactions.filter((txn) => {
+              const txnDate = formatDateOnly(txn.processedAt);
+              return txnDate === targetDate;
+            })
+          : allCaptureTransactions.filter((txn) => {
+              const txnDate = formatDateOnly(txn.processedAt);
+              return txnDate <= targetDate;
+            });
 
         if (pointInTimeCaptureTransactions.length === 0) {
-          // No captures on or before target date, skip this order
-          console.log(`⏭️  Order ${order.name}: No captures on or before ${targetDate}`);
+          // No captures on target date (multi) or on/before target date (normal)
+          console.log(`⏭️  Order ${order.name}: No captures on ${isMultiDateCCCapture ? '' : 'or before '}${targetDate}`);
           continue;
         }
 
@@ -247,7 +288,8 @@ export async function reconcileOrdersByDate(
           enrichedTransactions,
           warnings,
           errors,
-          effectiveCogsDataMap
+          effectiveCogsDataMap,
+          captureRatio
         );
 
         // Process refunds (if any on target date - skip if already handled as same-day adjustment)
@@ -427,7 +469,8 @@ async function processOrderCaptures(
   enrichedTransactions: EnrichedTransaction[],
   warnings: string[],
   errors: string[],
-  cogsDataMap?: Map<string, CogsCalculation>
+  cogsDataMap?: Map<string, CogsCalculation>,
+  captureRatio?: Decimal
 ): Promise<void> {
   // Analyze payment methods
   const paymentBreakdowns = await analyzeOrderPayments(
@@ -436,8 +479,8 @@ async function processOrderCaptures(
     captureTransactions
   );
 
-  // Validate payment totals
-  const paymentErrors = validatePaymentTotal(order, paymentBreakdowns);
+  // Validate payment totals (skip for multi-CC-capture splits - partial date won't match order total)
+  const paymentErrors = validatePaymentTotal(order, paymentBreakdowns, !!captureRatio);
   if (paymentErrors.length > 0) {
     errors.push(...paymentErrors);
   }
@@ -460,7 +503,8 @@ async function processOrderCaptures(
     paymentBreakdowns,
     formattedDate,
     accessToken,
-    preCalculatedCogs
+    preCalculatedCogs,
+    captureRatio
   );
 
   journalEntries.push(...entries);
@@ -484,32 +528,37 @@ async function processOrderCaptures(
   try {
     const enrichedData = await enrichOrderData(shop, accessToken, order.id);
 
+    // For multi-CC-capture splits, scale enriched order amounts to match this date's portion
+    const captureTotal = captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0));
+    const enrichedOrder = {
+      id: order.id,
+      name: order.name,
+      createdAt: order.createdAt,
+      totalPrice: captureRatio ? captureTotal : order.totalPrice,
+      subtotalPrice: captureRatio ? captureTotal : order.subtotalPrice,
+      currentTotalPrice: captureRatio ? captureTotal : (order.currentTotalPrice || order.totalPrice),
+      currentSubtotalPrice: captureRatio ? captureTotal : order.currentSubtotalPrice,
+      currentTotalTax: captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio) : order.currentTotalTax,
+      totalTax: captureRatio ? scaleDecimal(order.totalTax, captureRatio) : order.totalTax,
+      totalShipping: captureRatio ? scaleDecimal(order.totalShipping, captureRatio) : order.totalShipping,
+      totalDiscounts: captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio) : order.totalDiscounts,
+      financialStatus: order.financialStatus,
+      lineItems: order.lineItems,
+      hasActualRefunds: hasActualRefunds(order),
+      isMultiCaptureSplit: !!captureRatio,
+    };
+
     enrichedTransactions.push({
       balanceTransaction: {
         id: captureTransactions[0].id, // Use first capture for reference
         type: 'charge',
         sourceOrderId: order.id,
         processedAt: captureTransactions[0].processedAt,
-        net: captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+        net: captureTotal,
         fee: new Decimal(0), // Fees tracked separately
-        gross: captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+        gross: captureTotal,
       },
-      order: {
-        id: order.id,
-        name: order.name,
-        createdAt: order.createdAt,
-        totalPrice: order.totalPrice,
-        subtotalPrice: order.subtotalPrice,
-        currentTotalPrice: order.currentTotalPrice || order.totalPrice,
-        currentSubtotalPrice: order.currentSubtotalPrice,
-        currentTotalTax: order.currentTotalTax,
-        totalTax: order.totalTax,
-        totalShipping: order.totalShipping,
-        totalDiscounts: order.totalDiscounts,
-        financialStatus: order.financialStatus,
-        lineItems: order.lineItems,
-        hasActualRefunds: hasActualRefunds(order),
-      },
+      order: enrichedOrder,
       enrichedData: enrichedData || undefined,
       payout: {
         id: 'Direct Payment', // Order-centric: no payout reference
@@ -523,31 +572,33 @@ async function processOrderCaptures(
 
     // Still push to enrichedTransactions with undefined enrichedData
     // so the order appears in ALL report CSVs (not silently dropped)
+    const captureTotal = captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0));
     enrichedTransactions.push({
       balanceTransaction: {
         id: captureTransactions[0].id,
         type: 'charge',
         sourceOrderId: order.id,
         processedAt: captureTransactions[0].processedAt,
-        net: captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+        net: captureTotal,
         fee: new Decimal(0),
-        gross: captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0)),
+        gross: captureTotal,
       },
       order: {
         id: order.id,
         name: order.name,
         createdAt: order.createdAt,
-        totalPrice: order.totalPrice,
-        subtotalPrice: order.subtotalPrice,
-        currentTotalPrice: order.currentTotalPrice || order.totalPrice,
-        currentSubtotalPrice: order.currentSubtotalPrice,
-        currentTotalTax: order.currentTotalTax,
-        totalTax: order.totalTax,
-        totalShipping: order.totalShipping,
-        totalDiscounts: order.totalDiscounts,
+        totalPrice: captureRatio ? captureTotal : order.totalPrice,
+        subtotalPrice: captureRatio ? captureTotal : order.subtotalPrice,
+        currentTotalPrice: captureRatio ? captureTotal : (order.currentTotalPrice || order.totalPrice),
+        currentSubtotalPrice: captureRatio ? captureTotal : order.currentSubtotalPrice,
+        currentTotalTax: captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio) : order.currentTotalTax,
+        totalTax: captureRatio ? scaleDecimal(order.totalTax, captureRatio) : order.totalTax,
+        totalShipping: captureRatio ? scaleDecimal(order.totalShipping, captureRatio) : order.totalShipping,
+        totalDiscounts: captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio) : order.totalDiscounts,
         financialStatus: order.financialStatus,
         lineItems: order.lineItems,
         hasActualRefunds: hasActualRefunds(order),
+        isMultiCaptureSplit: !!captureRatio,
       },
       enrichedData: undefined,
       payout: {
@@ -733,6 +784,49 @@ function formatDateOnly(isoTimestamp: string): string {
   // Parse MM/DD/YYYY format to YYYY-MM-DD
   const [month, day, year] = pacificDateString.split('/');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Check if a gateway is a credit card / clearing account gateway.
+ * These are gateways where the payment goes through a clearing account (e.g., Shopify Payments).
+ */
+function isCardGateway(gateway: string): boolean {
+  const normalized = gateway.toLowerCase().replace(/\s+/g, '_');
+  // shopify_payments is the primary CC gateway; add others as needed
+  return normalized === 'shopify_payments';
+}
+
+/**
+ * Group CC (card gateway) capture transactions by Pacific-timezone date.
+ * Includes ALL CC captures regardless of date to correctly detect multi-date patterns.
+ *
+ * @param transactions - All capture/sale transactions for an order
+ * @returns Map of date string (YYYY-MM-DD) → CC capture transactions on that date
+ */
+function groupCCCapturesByDate(transactions: Transaction[]): Map<string, Transaction[]> {
+  const groups = new Map<string, Transaction[]>();
+
+  for (const txn of transactions) {
+    if (!isCardGateway(txn.gateway)) continue;
+
+    const txnDate = formatDateOnly(txn.processedAt);
+
+    if (!groups.has(txnDate)) {
+      groups.set(txnDate, []);
+    }
+    groups.get(txnDate)!.push(txn);
+  }
+
+  return groups;
+}
+
+/**
+ * Scale a Decimal value by a ratio, handling undefined/null gracefully.
+ * Used for proportional allocation in multi-CC-capture splits.
+ */
+function scaleDecimal(value: Decimal | undefined, ratio: Decimal | undefined): Decimal {
+  if (!value || !ratio) return value || new Decimal(0);
+  return value.times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
 }
 
 /**

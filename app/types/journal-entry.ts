@@ -313,6 +313,7 @@ export interface EnrichedTransaction {
     financialStatus: string;
     lineItems: OrderLineItem[]; // Needed for Daily Reconciliation Report notes
     hasActualRefunds?: boolean; // True if order has actual refunds (not just cancellations)
+    isMultiCaptureSplit?: boolean; // True if this order's captures are split across multiple dates
   };
 
   // Enriched data for Daily Sales Report
