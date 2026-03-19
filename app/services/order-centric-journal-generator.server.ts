@@ -799,10 +799,23 @@ export async function createRefundJournalEntries(
         const diff = calculatedTotal.minus(totalRefundAmount).abs();
 
         if (diff.greaterThan(new Decimal('0.02'))) {
-          console.warn(
-            `⚠️ Refund amount mismatch for ${order.name}: ` +
-            `Calculated ${calculatedTotal.toFixed(2)} != Transaction ${totalRefundAmount.toFixed(2)} ` +
-            `(Diff: $${diff.toFixed(2)})`
+          // PLUG METHOD: Proportionally adjust refund amounts to match transaction total
+          // This mirrors the plug method used in createOrderJournalEntries (sale entries)
+          // and ensures sale + refund net to zero for voided/re-rung orders
+          const refundableAmount = totalRefundAmount.minus(shippingAdjustmentTotal);
+          const lineItemTotal = refundedSubtotal.plus(refundedTax);
+
+          if (lineItemTotal.greaterThan(0)) {
+            refundedTax = refundableAmount.times(refundedTax).dividedBy(lineItemTotal)
+              .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+            refundedSubtotal = refundableAmount.minus(refundedTax); // Subtotal is the plug
+          }
+
+          console.log(
+            `🔌 Refund ${order.name}: Using plug method - ` +
+            `refund=$${totalRefundAmount.toFixed(2)}, tax=$${refundedTax.toFixed(2)}, ` +
+            `subtotal(plug)=$${refundedSubtotal.toFixed(2)} ` +
+            `(original diff: $${diff.toFixed(2)})`
           );
         }
 
