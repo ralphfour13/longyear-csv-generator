@@ -11,7 +11,6 @@
 
 import { Decimal } from 'decimal.js';
 import type { Order, JournalEntry } from '../types/journal-entry';
-import { calculateTaxAmount } from './order-centric-journal-generator.server';
 
 /**
  * Consistency Check Result
@@ -24,10 +23,7 @@ export interface ConsistencyCheckResult {
   errorOrders: number;
   warningOrders: number;
   imbalancedEntries: ImbalancedEntry[];
-  salesMismatches: SalesMismatch[];
   cogsMismatches: CogsMismatch[];
-  taxMismatches: TaxMismatch[];
-  paymentMismatches: PaymentMismatch[];
 }
 
 /**
@@ -53,48 +49,12 @@ export interface ImbalancedEntry {
 }
 
 /**
- * Sales Mismatch
- */
-export interface SalesMismatch {
-  orderName: string;
-  reportedSales: Decimal;
-  journalSales: Decimal;
-  difference: Decimal;
-  severity: Severity;
-  impact: 'HIGH' | 'MEDIUM' | 'LOW';
-}
-
-/**
  * COGS Mismatch
  */
 export interface CogsMismatch {
   orderName: string;
   detailsCogs: Decimal;
   journalCogs: Decimal;
-  difference: Decimal;
-  severity: Severity;
-  impact: 'HIGH' | 'MEDIUM' | 'LOW';
-}
-
-/**
- * Tax Mismatch
- */
-export interface TaxMismatch {
-  orderName: string;
-  orderTax: Decimal;
-  journalTax: Decimal;
-  difference: Decimal;
-  severity: Severity;
-  impact: 'HIGH' | 'MEDIUM' | 'LOW';
-}
-
-/**
- * Payment Mismatch
- */
-export interface PaymentMismatch {
-  orderName: string;
-  orderTotal: Decimal;
-  paymentTotal: Decimal;
   difference: Decimal;
   severity: Severity;
   impact: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -131,38 +91,6 @@ export function checkJournalBalance(
   const balanced = difference.lessThanOrEqualTo(new Decimal('0.02')); // Allow 2 cent rounding
 
   return { balanced, difference };
-}
-
-/**
- * Check sales amount vs journal entries
- *
- * @param order - Order to validate
- * @param entries - Journal entries for this order
- * @returns Validation result
- */
-export function checkSalesVsPayment(
-  order: Order,
-  entries: JournalEntry[]
-): { matched: boolean; difference: Decimal } {
-  // Get sales revenue from journal entries (credits to sales account)
-  const salesEntries = entries.filter(
-    (e) =>
-      e.reference === `SO-${order.name}` &&
-      e.accountName?.toLowerCase().includes('sales')
-  );
-
-  const journalSales = salesEntries.reduce(
-    (sum, entry) => sum.plus(entry.credit).minus(entry.debit),
-    new Decimal(0)
-  );
-
-  // Calculate expected sales (subtotal after discounts)
-  const expectedSales = order.currentSubtotalPrice || order.subtotalPrice;
-
-  const difference = journalSales.minus(expectedSales).abs();
-  const matched = difference.lessThanOrEqualTo(new Decimal('0.50')); // Allow 50 cent tolerance
-
-  return { matched, difference };
 }
 
 /**
@@ -242,10 +170,7 @@ export async function generateConsistencyReport(
   targetDate?: string
 ): Promise<ConsistencyCheckResult> {
   const imbalancedEntries: ImbalancedEntry[] = [];
-  const salesMismatches: SalesMismatch[] = [];
   const cogsMismatches: CogsMismatch[] = [];
-  const taxMismatches: TaxMismatch[] = [];
-  const paymentMismatches: PaymentMismatch[] = [];
   const warnings: Array<{ orderId: string; orderName: string; type: string; message: string }> = [];
 
   const processedOrders = new Set<string>();
@@ -287,21 +212,6 @@ export async function generateConsistencyReport(
       }
     }
 
-    // 2. Check sales vs payment
-    const salesCheck = checkSalesVsPayment(order, orderEntries);
-    if (!salesCheck.matched) {
-      salesMismatches.push({
-        orderName: order.name,
-        reportedSales: order.currentSubtotalPrice || order.subtotalPrice,
-        journalSales: orderEntries
-          .filter((e) => e.accountName?.toLowerCase().includes('sales'))
-          .reduce((sum, e) => sum.plus(e.credit).minus(e.debit), new Decimal(0)),
-        difference: salesCheck.difference,
-        severity: 'WARNING', // Sales mismatches are data validation warnings
-        impact: salesCheck.difference.gt(50) ? 'HIGH' : salesCheck.difference.gt(5) ? 'MEDIUM' : 'LOW',
-      });
-    }
-
     // Point-in-time validation: Check for future refunds
     if (targetDate && hasFutureRefunds(order, targetDate)) {
       warnings.push({
@@ -312,70 +222,28 @@ export async function generateConsistencyReport(
       });
     }
 
-    // 3. Check tax amounts
-    const orderTax = calculateTaxAmount(order);
-    const journalTax = orderEntries
-      .filter((e) => e.accountName?.toLowerCase().includes('tax'))
-      .reduce((sum, e) => sum.plus(e.credit).minus(e.debit), new Decimal(0));
-
-    const taxDiff = journalTax.minus(orderTax).abs();
-    if (taxDiff.gt(0.50)) {
-      taxMismatches.push({
-        orderName: order.name,
-        orderTax,
-        journalTax,
-        difference: taxDiff,
-        severity: 'WARNING', // Tax mismatches are data validation warnings
-        impact: taxDiff.gt(10) ? 'HIGH' : taxDiff.gt(1) ? 'MEDIUM' : 'LOW',
-      });
-    }
-
-    // 4. Check payment total
-    const paymentEntries = orderEntries.filter(
-      (e) => e.debit.gt(0) && !e.accountName?.toLowerCase().includes('sales')
-    );
-    const paymentTotal = paymentEntries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
-    const paymentDiff = paymentTotal.minus(order.totalPrice).abs();
-
-    if (paymentDiff.gt(0.50)) {
-      paymentMismatches.push({
-        orderName: order.name,
-        orderTotal: order.totalPrice,
-        paymentTotal,
-        difference: paymentDiff,
-        severity: 'WARNING', // Payment mismatches are data validation warnings
-        impact: paymentDiff.gt(50) ? 'HIGH' : paymentDiff.gt(5) ? 'MEDIUM' : 'LOW',
-      });
-    }
   }
 
   // Calculate summary stats
   const errorOrders = new Set([
     ...imbalancedEntries.map((e) => e.orderName),
-    ...salesMismatches.filter((m) => m.impact === 'HIGH').map((m) => m.orderName),
   ]).size;
 
   const warningOrders = new Set([
-    ...salesMismatches.filter((m) => m.impact !== 'HIGH').map((m) => m.orderName),
     ...cogsMismatches.map((m) => m.orderName),
-    ...taxMismatches.map((m) => m.orderName),
-    ...paymentMismatches.map((m) => m.orderName),
   ]).size;
 
   const cleanOrders = orders.length - errorOrders - warningOrders;
 
   return {
-    hasErrors: imbalancedEntries.length > 0 || salesMismatches.some((m) => m.impact === 'HIGH'),
-    hasWarnings: salesMismatches.length > 0 || cogsMismatches.length > 0 || taxMismatches.length > 0,
+    hasErrors: imbalancedEntries.length > 0,
+    hasWarnings: cogsMismatches.length > 0,
     totalOrders: orders.length,
     cleanOrders,
     errorOrders,
     warningOrders,
     imbalancedEntries,
-    salesMismatches,
     cogsMismatches,
-    taxMismatches,
-    paymentMismatches,
   };
 }
 
@@ -398,31 +266,10 @@ export function generateErrorReportCsv(report: ConsistencyCheckResult): string {
     );
   }
 
-  // Sales mismatches
-  for (const mismatch of report.salesMismatches) {
-    lines.push(
-      `${mismatch.orderName},${mismatch.severity},Sales Mismatch,Report != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
-    );
-  }
-
   // COGS mismatches
   for (const mismatch of report.cogsMismatches) {
     lines.push(
       `${mismatch.orderName},${mismatch.severity},COGS Mismatch,Details != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
-    );
-  }
-
-  // Tax mismatches
-  for (const mismatch of report.taxMismatches) {
-    lines.push(
-      `${mismatch.orderName},${mismatch.severity},Tax Mismatch,Order != Journal,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
-    );
-  }
-
-  // Payment mismatches
-  for (const mismatch of report.paymentMismatches) {
-    lines.push(
-      `${mismatch.orderName},${mismatch.severity},Payment Mismatch,Total != Payment,$${mismatch.difference.toFixed(2)},${mismatch.impact}`
     );
   }
 

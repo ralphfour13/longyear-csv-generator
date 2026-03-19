@@ -56,10 +56,7 @@ export async function saveReconciliationMetric(
 
   const errorBreakdown = {
     imbalanced: consistencyReport.imbalancedEntries.length,
-    salesMismatch: consistencyReport.salesMismatches.length,
     cogsMismatch: consistencyReport.cogsMismatches.length,
-    taxMismatch: consistencyReport.taxMismatches.length,
-    paymentMismatch: consistencyReport.paymentMismatches.length,
   };
 
   // Upsert (update if exists, create if not)

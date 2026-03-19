@@ -235,7 +235,6 @@ export async function processExport(
     if (consistencyReport.hasErrors) {
       console.error('⚠️ Consistency Issues Found:');
       console.error(`  - ${consistencyReport.imbalancedEntries.length} imbalanced journal entries`);
-      console.error(`  - ${consistencyReport.salesMismatches.length} sales mismatches`);
       console.error(`  - ${consistencyReport.cogsMismatches.length} COGS mismatches`);
 
       // Log individual errors for tracking
@@ -248,9 +247,7 @@ export async function processExport(
 
     if (consistencyReport.hasWarnings) {
       console.warn('⚠️ Consistency Warnings:');
-      console.warn(`  - ${consistencyReport.salesMismatches.filter(m => m.impact !== 'HIGH').length} sales warnings`);
-      console.warn(`  - ${consistencyReport.taxMismatches.length} tax warnings`);
-      console.warn(`  - ${consistencyReport.paymentMismatches.length} payment warnings`);
+      console.warn(`  - ${consistencyReport.cogsMismatches.length} COGS warnings`);
     }
 
     // Log quality score
@@ -653,10 +650,7 @@ export async function processExport(
         const errorOrderNames = new Set<string>();
 
         consistencyReport.imbalancedEntries.forEach(entry => errorOrderNames.add(entry.orderName));
-        consistencyReport.salesMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
         consistencyReport.cogsMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
-        consistencyReport.taxMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
-        consistencyReport.paymentMismatches.forEach(mismatch => errorOrderNames.add(mismatch.orderName));
 
         // Filter orders to only those with errors/warnings
         const errorOrders = orders.filter(order => errorOrderNames.has(order.name));
