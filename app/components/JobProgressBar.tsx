@@ -103,9 +103,9 @@ export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarPro
     // Initial fetch
     fetchProgress();
 
-    // Poll every 2 seconds while job is processing
+    // Poll every 30 seconds while job is processing
     if (isPolling) {
-      pollInterval = setInterval(fetchProgress, 2000);
+      pollInterval = setInterval(fetchProgress, 30000);
     }
 
     return () => {

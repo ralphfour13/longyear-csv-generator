@@ -89,17 +89,12 @@ export default function Jobs() {
   const revalidator = useRevalidator();
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  // Debug logging
-  console.log('[Jobs Page] Active jobs:', activeJobs);
-  console.log('[Jobs Page] Active jobs count:', activeJobs.length);
-
-  // Auto-refresh every 5 seconds if there are pending or processing jobs
-  // (Progress bars poll separately at 2 seconds)
+  // Auto-refresh every 5 minutes if there are pending or processing jobs
   useEffect(() => {
     if (activeJobs.length > 0) {
       const interval = setInterval(() => {
         revalidator.revalidate();
-      }, 5000);
+      }, 300000);
 
       return () => clearInterval(interval);
     }
