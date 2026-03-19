@@ -361,7 +361,12 @@ async function fetchOrdersByDate(
         if (hasNextPage) {
           const linkHeader: string | null = response.headers.get('Link');
           if (linkHeader && linkHeader.includes('rel="next"')) {
-            const match: RegExpMatchArray | null = linkHeader.match(/page_info=([^&>]+)/);
+            // Extract page_info specifically from the rel="next" link
+            // Shopify Link headers on page 2+ contain both rel="previous" and rel="next"
+            // We must match the page_info from the "next" URL, not the first one found
+            const nextLinkMatch: RegExpMatchArray | null = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+            const nextUrl: string | null = nextLinkMatch ? nextLinkMatch[1] : null;
+            const match: RegExpMatchArray | null = nextUrl ? nextUrl.match(/page_info=([^&>]+)/) : null;
             if (match) {
               const nextPageInfo = match[1];
 
