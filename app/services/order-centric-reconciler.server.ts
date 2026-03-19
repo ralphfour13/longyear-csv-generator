@@ -22,15 +22,10 @@ import {
   validateOrderEntries,
   hasActualRefunds,
 } from './order-centric-journal-generator.server';
-import { enrichOrderData } from './enrichment/order-enrichment.server';
+import { enrichOrderData, type EnrichedOrderData } from './enrichment/order-enrichment.server';
 import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { Cin7ProductService } from './cin7/cin7-product-service.server';
-
-// Helper function for rate limiting delays
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 /**
  * Log order reconciliation values for debugging
@@ -114,6 +109,10 @@ export async function reconcileOrdersByDate(
     }
     const effectiveCogsDataMap = cogsDataMap || preCollectedCogsDataMap;
 
+    // Cache enrichment data to avoid duplicate API calls when an order
+    // has both captures and refunds processed separately
+    const enrichmentCache = new Map<string, EnrichedOrderData | null>();
+
     // Process each order
     for (const order of orders) {
       try {
@@ -147,7 +146,8 @@ export async function reconcileOrdersByDate(
               targetDate,
               journalEntries,
               enrichedTransactions,
-              warnings
+              warnings,
+              enrichmentCache
             );
 
             processedOrderIds.add(order.id);
@@ -191,7 +191,7 @@ export async function reconcileOrdersByDate(
             // Refund-only on this date for a multi-capture order
             await processOrderRefunds(
               shop, accessToken, order, refundTransactions, targetDate,
-              journalEntries, enrichedTransactions, warnings
+              journalEntries, enrichedTransactions, warnings, enrichmentCache
             );
             processedOrderIds.add(order.id);
             ordersProcessed++;
@@ -228,7 +228,7 @@ export async function reconcileOrdersByDate(
               // Process refunds for this order even though capture was on different date
               await processOrderRefunds(
                 shop, accessToken, order, refundTransactions, targetDate,
-                journalEntries, enrichedTransactions, warnings
+                journalEntries, enrichedTransactions, warnings, enrichmentCache
               );
               processedOrderIds.add(order.id);
               ordersProcessed++;
@@ -326,7 +326,8 @@ export async function reconcileOrdersByDate(
           warnings,
           errors,
           effectiveCogsDataMap,
-          captureRatio
+          captureRatio,
+          enrichmentCache
         );
 
         // Process refunds (if any on target date - skip if already handled as same-day adjustment)
@@ -339,7 +340,8 @@ export async function reconcileOrdersByDate(
             targetDate,
             journalEntries,
             enrichedTransactions,
-            warnings
+            warnings,
+            enrichmentCache
           );
         }
 
@@ -507,7 +509,8 @@ async function processOrderCaptures(
   warnings: string[],
   errors: string[],
   cogsDataMap?: Map<string, CogsCalculation>,
-  captureRatio?: Decimal
+  captureRatio?: Decimal,
+  enrichmentCache?: Map<string, EnrichedOrderData | null>
 ): Promise<void> {
   // Analyze payment methods
   const paymentBreakdowns = await analyzeOrderPayments(
@@ -562,9 +565,15 @@ async function processOrderCaptures(
     }
   }
 
-  // Enrich order data for reporting
+  // Enrich order data for reporting (use cache to avoid duplicate API calls)
   try {
-    const enrichedData = await enrichOrderData(shop, accessToken, order.id);
+    let enrichedData: EnrichedOrderData | null;
+    if (enrichmentCache?.has(order.id)) {
+      enrichedData = enrichmentCache.get(order.id) ?? null;
+    } else {
+      enrichedData = await enrichOrderData(shop, accessToken, order.id);
+      enrichmentCache?.set(order.id, enrichedData);
+    }
 
     // For multi-CC-capture splits, scale enriched order amounts to match this date's portion
     const captureTotal = captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0));
@@ -646,10 +655,6 @@ async function processOrderCaptures(
       },
     });
   }
-
-  // Rate limiting delay: prevents rapid sequential enrichment calls
-  // when processing multiple orders (250ms = 4 calls/second = Shopify's limit)
-  await sleep(250);
 }
 
 /**
@@ -663,7 +668,8 @@ async function processOrderRefunds(
   targetDate: string,
   journalEntries: JournalEntry[],
   enrichedTransactions: EnrichedTransaction[],
-  warnings: string[]
+  warnings: string[],
+  enrichmentCache?: Map<string, EnrichedOrderData | null>
 ): Promise<void> {
   const formattedDate = formatDate(targetDate);
   const entries = await createRefundJournalEntries(
@@ -675,9 +681,15 @@ async function processOrderRefunds(
 
   journalEntries.push(...entries);
 
-  // Enrich order data for refund reporting
+  // Enrich order data for refund reporting (use cache to avoid duplicate API calls)
   try {
-    const enrichedData = await enrichOrderData(shop, accessToken, order.id);
+    let enrichedData: EnrichedOrderData | null;
+    if (enrichmentCache?.has(order.id)) {
+      enrichedData = enrichmentCache.get(order.id) ?? null;
+    } else {
+      enrichedData = await enrichOrderData(shop, accessToken, order.id);
+      enrichmentCache?.set(order.id, enrichedData);
+    }
 
     enrichedTransactions.push({
       balanceTransaction: {
@@ -752,10 +764,6 @@ async function processOrderRefunds(
       },
     });
   }
-
-  // Rate limiting delay: prevents rapid sequential enrichment calls
-  // when processing multiple orders (250ms = 4 calls/second = Shopify's limit)
-  await sleep(250);
 }
 
 /**
