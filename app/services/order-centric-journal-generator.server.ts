@@ -768,11 +768,13 @@ export async function createRefundJournalEntries(
       let refundedSubtotal = new Decimal(0);
       let refundedTax = new Decimal(0);
 
-      // Calculate total refund amount for this refund object (sum of all its transactions)
-      const totalRefundAmount = refund?.transactions.reduce(
-        (sum, txn) => sum.plus(new Decimal(txn.amount).abs()),
-        new Decimal(0)
-      ) || refundAmount;
+      // Calculate total refund amount for this refund object (sum of non-void transactions only)
+      const totalRefundAmount = refund?.transactions
+        .filter(txn => txn.kind !== 'void')
+        .reduce(
+          (sum, txn) => sum.plus(new Decimal(txn.amount).abs()),
+          new Decimal(0)
+        ) || refundAmount;
 
       if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
         // PREFERRED METHOD: Calculate actual subtotal and tax from refund line items
