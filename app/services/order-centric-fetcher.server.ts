@@ -110,9 +110,9 @@ export async function fetchOrdersByCaptureDateRange(
   const createdStartDateTime = `${startDate}T00:00:00Z`;
   const createdEndDateTime = `${endDate}T23:59:59Z`;
 
-  // Query 2: updated_at with -7/+1 day from target (catches orders updated via refunds/edits in prior week)
+  // Query 2: updated_at with -2/+1 day from target (catches orders updated via refunds/edits near target date)
   // +1 day forward is sufficient — point-in-time processing doesn't need to look into the future
-  const updatedStartDate = addDays(targetDateStr, -7);
+  const updatedStartDate = addDays(targetDateStr, -2);
   const updatedEndDate = addDays(targetDateStr, 1);
   const updatedStartDateTime = `${updatedStartDate}T00:00:00Z`;
   const updatedEndDateTime = `${updatedEndDate}T23:59:59Z`;

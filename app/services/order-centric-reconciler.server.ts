@@ -75,7 +75,7 @@ export async function reconcileOrdersByDate(
     // The fetcher uses dual-query strategy:
     // - created_at: Uses -8/+1 day buffer (extra day covers boundary edge cases where
     //   orders created exactly 7 days before target date were missed)
-    // - updated_at: Uses -7/+1 day from targetDate to catch recently modified orders
+    // - updated_at: Uses -2/+1 day from targetDate to catch recently modified orders
     // +1 day forward buffer covers timezone edge cases; no need to look further ahead
     const startDate = addDays(targetDate, -8);
     const endDate = addDays(targetDate, 1);
