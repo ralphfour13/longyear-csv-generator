@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useRevalidator, useActionData, Form } from 'react-router';
 import { useEffect, useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { getShopJobs, clearCompletedJobs, clearFailedJobs, cancelPendingJobs, cancelAllProcessingJobs, type ExportJob } from '../services/background-jobs.server';
+import { getShopJobs, getJobStatus, createExportJob, clearCompletedJobs, clearFailedJobs, cancelPendingJobs, cancelAllProcessingJobs, type ExportJob } from '../services/background-jobs.server';
 import { processPendingJobs } from '../services/job-processor.server';
 import { format } from 'date-fns';
 import { JobProgressBar } from '../components/JobProgressBar';
@@ -51,6 +51,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Cancel ALL processing jobs (user-initiated, no time limit)
     const count = await cancelAllProcessingJobs(shop);
     return { success: true, message: `Cancelled ${count} processing jobs`, count };
+  }
+
+  if (actionType === 'retryJob') {
+    const jobId = formData.get('jobId');
+    if (!jobId || typeof jobId !== 'string') {
+      return { success: false, error: 'Job ID required' };
+    }
+
+    const job = await getJobStatus(jobId);
+    if (!job || job.status !== 'failed') {
+      return { success: false, error: 'Can only retry failed jobs' };
+    }
+
+    // Create a new job with the same parameters
+    const newJobId = await createExportJob(shop, job.startDate, job.endDate, job.fileOptions);
+
+    // Start processing in background
+    const accessToken = session.accessToken || '';
+    processPendingJobs(shop, accessToken).catch((error) => {
+      console.error('Retry job processing error:', error);
+    });
+
+    return {
+      success: true,
+      message: `Retrying export for ${job.startDate}. New job created.`,
+      newJobId,
+    };
   }
 
   if (actionType === 'processPending') {
@@ -455,9 +482,31 @@ export default function Jobs() {
                           📦 Download ({job.result.files.length} {job.result.files.length === 1 ? 'file' : 'files'})
                         </button>
                       ) : job.status === 'failed' ? (
-                        <span style={{ color: '#D72C0D', fontSize: '11px' }}>
-                          {job.error || 'Unknown error'}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: '#D72C0D', fontSize: '11px' }}>
+                            {job.error || 'Unknown error'}
+                          </span>
+                          <Form method="post" style={{ display: 'inline', flexShrink: 0 }}>
+                            <input type="hidden" name="action" value="retryJob" />
+                            <input type="hidden" name="jobId" value={job.id} />
+                            <button
+                              type="submit"
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '12px',
+                                color: '#0D5EAF',
+                                backgroundColor: '#E3F2FD',
+                                border: '1px solid #B3D4FC',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Retry
+                            </button>
+                          </Form>
+                        </div>
                       ) : job.status === 'processing' ? (
                         <span style={{ color: '#0D5EAF', fontSize: '11px' }}>
                           Processing...
