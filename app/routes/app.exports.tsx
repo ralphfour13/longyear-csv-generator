@@ -3,6 +3,7 @@ import { Form, useActionData, useLoaderData, useNavigation, useFetcher, useReval
 import { useEffect, useState, useRef } from 'react';
 import { authenticate } from '../shopify.server';
 import { listExports, getExportStats } from '../services/storage.server';
+import { getShopJobs } from '../services/background-jobs.server';
 import { format } from 'date-fns';
 import { JobProgressBar } from '../components/JobProgressBar';
 
@@ -10,7 +11,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  const exportFiles = await listExports(shop);
+  const [exportFiles, allJobs] = await Promise.all([
+    listExports(shop),
+    getShopJobs(shop),
+  ]);
 
   const exports = await Promise.all(
     exportFiles.slice(0, 20).map(async (filename) => {
@@ -19,7 +23,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     })
   );
 
-  return { shop, exports };
+  const activeJobs = allJobs.filter(
+    job => job.status === 'pending' || job.status === 'processing'
+  );
+
+  return { shop, exports, activeJobs };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -179,7 +187,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Exports() {
-  const { shop, exports } = useLoaderData<typeof loader>();
+  const { shop, exports, activeJobs } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
@@ -195,8 +203,6 @@ export default function Exports() {
   const [generateReconciliation, setGenerateReconciliation] = useState(true);
   const [currentJob, setCurrentJob] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<string>('');
-  const [showProgress, setShowProgress] = useState(false);
-  const [progressJobId, setProgressJobId] = useState<string | null>(null);
   const fetcher = useFetcher();
 
   const yesterday = new Date();
@@ -208,6 +214,15 @@ export default function Exports() {
     const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${filename}`;
     window.open(url, '_blank');
   };
+
+  // Auto-revalidate loader when there are active jobs so the queue list stays current
+  useEffect(() => {
+    if (activeJobs.length === 0) return;
+    const interval = setInterval(() => {
+      revalidator.revalidate();
+    }, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, [activeJobs.length, revalidator]);
 
   // Store polling interval ref so we can clear it when job completes
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -237,14 +252,6 @@ export default function Exports() {
       };
     }
   }, [actionData, fetcher]);
-
-  // Show progress bar when job is created
-  useEffect(() => {
-    if (actionData?.success && actionData?.jobId) {
-      setShowProgress(true);
-      setProgressJobId(actionData.jobId);
-    }
-  }, [actionData]);
 
   // Handle job status updates
   useEffect(() => {
@@ -326,24 +333,24 @@ export default function Exports() {
 
   return (
     <s-page heading="Export Center">
-      {/* Progress Bar for Active Job */}
-      {showProgress && progressJobId && (
-        <div style={{ marginBottom: '20px' }}>
-          <JobProgressBar
-            jobId={progressJobId}
-            onComplete={() => {
-              setShowProgress(false);
-              setProgressJobId(null);
-              // Refresh to show completed files
-              revalidator.revalidate();
-            }}
-            onError={(error) => {
-              console.error('Job error:', error);
-              setShowProgress(false);
-              setProgressJobId(null);
-            }}
-          />
-        </div>
+      {/* Active Jobs Queue */}
+      {activeJobs.length > 0 && (
+        <s-section heading={`Active Jobs (${activeJobs.length})`}>
+          <s-stack direction="block" gap="base">
+            {activeJobs.map((job) => (
+              <JobProgressBar
+                key={job.id}
+                jobId={job.id}
+                onComplete={() => {
+                  revalidator.revalidate();
+                }}
+                onError={() => {
+                  revalidator.revalidate();
+                }}
+              />
+            ))}
+          </s-stack>
+        </s-section>
       )}
 
       {currentJob && (
