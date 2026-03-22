@@ -86,13 +86,22 @@ export async function processPendingJobs(shop: string, accessToken: string): Pro
   processingShops.set(shop, true);
 
   try {
-    const jobs = await getShopJobs(shop);
-    const pendingJobs = jobs.filter((job) => job.status === 'pending');
+    // Loop to pick up jobs added while we were processing the previous batch
+    let hasMore = true;
+    while (hasMore) {
+      const jobs = await getShopJobs(shop);
+      const pendingJobs = jobs.filter((job) => job.status === 'pending');
 
-    console.log(`[Job Processor] Found ${pendingJobs.length} pending jobs for ${shop}`);
+      if (pendingJobs.length === 0) {
+        hasMore = false;
+        break;
+      }
 
-    for (const job of pendingJobs) {
-      await processJob(job.id, shop, accessToken);
+      console.log(`[Job Processor] Found ${pendingJobs.length} pending jobs for ${shop}`);
+
+      for (const job of pendingJobs) {
+        await processJob(job.id, shop, accessToken);
+      }
     }
 
     // Cleanup old jobs
