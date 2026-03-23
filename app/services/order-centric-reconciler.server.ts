@@ -568,8 +568,25 @@ async function processOrderCaptures(
       enrichmentCache?.set(order.id, enrichedData);
     }
 
-    // For multi-CC-capture splits, scale enriched order amounts to match this date's portion
+    // For multi-CC-capture splits, scale enriched data to match this date's portion
     const captureTotal = captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0));
+
+    // Scale payment breakdown for split captures so payment method columns
+    // match this date's captured amount (not the full order's total captures)
+    if (captureRatio && enrichedData) {
+      enrichedData = {
+        ...enrichedData,
+        paymentBreakdown: {
+          cash: enrichedData.paymentBreakdown.cash.times(captureRatio),
+          card: enrichedData.paymentBreakdown.card.times(captureRatio),
+          charge: enrichedData.paymentBreakdown.charge.times(captureRatio),
+          giftCard: enrichedData.paymentBreakdown.giftCard.times(captureRatio),
+          storeCredit: enrichedData.paymentBreakdown.storeCredit.times(captureRatio),
+          check: enrichedData.paymentBreakdown.check.times(captureRatio),
+        },
+      };
+    }
+
     const enrichedOrder = {
       id: order.id,
       name: order.name,
