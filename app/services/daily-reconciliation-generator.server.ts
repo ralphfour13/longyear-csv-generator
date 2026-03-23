@@ -134,24 +134,29 @@ function transformToReconciliationRow(
     const area = determineArea(order, effectiveEnrichedData);
     const tender = determineTender(effectiveEnrichedData.paymentBreakdown);
 
+    // Distribute refund amount to the correct payment method column based on tender type
+    // so that sum(payment methods) == paymentTotal
+    const refundAmount = refundTotal.neg(); // Negative value for refund
+    const zeroDec = new Decimal(0).toFixed(2);
+
     // Show refund as negative row with actual refund amount
     return [{
       orderNumber: order.name,
       originalSubtotal: '',
       discount: '',
-      netSubtotal: refundTotal.neg().toFixed(2),
+      netSubtotal: refundAmount.toFixed(2),
       tax: '',
       shipping: '',
       area,
       notes: 'refund only',
       tender,
-      paymentCash: new Decimal(0).toFixed(2),
-      paymentCard: new Decimal(0).toFixed(2),
-      paymentGiftCard: new Decimal(0).toFixed(2),
-      paymentStoreCredit: new Decimal(0).toFixed(2),
-      paymentCheck: new Decimal(0).toFixed(2),
-      paymentOther: new Decimal(0).toFixed(2),
-      paymentTotal: refundTotal.neg().toFixed(2),
+      paymentCash: (tender === 'CASH' || tender === 'cash') ? refundAmount.toFixed(2) : zeroDec,
+      paymentCard: tender === 'cc' ? refundAmount.toFixed(2) : zeroDec,
+      paymentGiftCard: tender === 'gift card' ? refundAmount.toFixed(2) : zeroDec,
+      paymentStoreCredit: tender === 'store credit' ? refundAmount.toFixed(2) : zeroDec,
+      paymentCheck: tender === 'check' ? refundAmount.toFixed(2) : zeroDec,
+      paymentOther: tender === 'charge' ? refundAmount.toFixed(2) : zeroDec,
+      paymentTotal: refundAmount.toFixed(2),
       giftCardSold: '',
       giftCardUsed: '',
     }];
