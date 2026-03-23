@@ -224,35 +224,43 @@ for dir in "$EXPORT_DIR"/export-*/; do
 
     # ========================================================================
     # CHECK 8: Recon SUMMARY totals match sum of its own data rows
+    # Uses python for proper CSV parsing (quoted fields with commas)
     # ========================================================================
     if [ -n "$SUMMARY_LINE" ]; then
-        RECON_TAX=$(echo "$SUMMARY_LINE" | awk -F',' '{print $5}')
-        RECON_SHIPPING=$(echo "$SUMMARY_LINE" | awk -F',' '{print $6}')
-        RECON_PAY_TOTAL=$(echo "$SUMMARY_LINE" | awk -F',' '{print $16}')
+        RECON_SUMMARY_CHECK=$(python3 -c "
+import csv
+summary_tax = summary_ship = summary_total = 0
+rows_tax = rows_ship = rows_total = 0
+with open('$RECON') as f:
+    reader = csv.reader(f)
+    next(reader)  # skip header
+    for row in reader:
+        if row[0].startswith('SUMMARY'):
+            summary_tax = float(row[4]) if row[4] else 0
+            summary_ship = float(row[5]) if row[5] else 0
+            summary_total = float(row[15]) if row[15] else 0
+        else:
+            rows_tax += float(row[4]) if row[4] else 0
+            rows_ship += float(row[5]) if row[5] else 0
+            rows_total += float(row[15]) if row[15] else 0
+errors = []
+if abs(rows_tax - summary_tax) > 0.01:
+    errors.append(f'tax:{summary_tax:.2f}:{rows_tax:.2f}')
+if abs(rows_ship - summary_ship) > 0.01:
+    errors.append(f'ship:{summary_ship:.2f}:{rows_ship:.2f}')
+if abs(rows_total - summary_total) > 0.01:
+    errors.append(f'total:{summary_total:.2f}:{rows_total:.2f}')
+for e in errors:
+    print(e)
+" 2>/dev/null)
 
-        # Sum the data rows
-        RECON_ROWS_TAX=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ {sum += $5} END {printf "%.2f", sum}' "$RECON")
-        RECON_ROWS_SHIPPING=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ {sum += $6} END {printf "%.2f", sum}' "$RECON")
-        RECON_ROWS_PAY_TOTAL=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ {sum += $16} END {printf "%.2f", sum}' "$RECON")
-
-        RECON_TAX_FMT=$(printf "%.2f" "$RECON_TAX")
-        RECON_SHIP_FMT=$(printf "%.2f" "${RECON_SHIPPING:-0}")
-        RECON_TOTAL_FMT=$(printf "%.2f" "$RECON_PAY_TOTAL")
-
-        if [ "$RECON_ROWS_TAX" != "$RECON_TAX_FMT" ]; then
-            echo -e "  ${RED}ERROR${NC} Recon SUMMARY tax ($RECON_TAX_FMT) != sum of rows ($RECON_ROWS_TAX)"
-            ERRORS=$((ERRORS + 1))
-            TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
-        fi
-        if [ "$RECON_ROWS_SHIPPING" != "$RECON_SHIP_FMT" ]; then
-            echo -e "  ${RED}ERROR${NC} Recon SUMMARY shipping ($RECON_SHIP_FMT) != sum of rows ($RECON_ROWS_SHIPPING)"
-            ERRORS=$((ERRORS + 1))
-            TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
-        fi
-        if [ "$RECON_ROWS_PAY_TOTAL" != "$RECON_TOTAL_FMT" ]; then
-            echo -e "  ${RED}ERROR${NC} Recon SUMMARY payment total ($RECON_TOTAL_FMT) != sum of rows ($RECON_ROWS_PAY_TOTAL)"
-            ERRORS=$((ERRORS + 1))
-            TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
+        if [ -n "$RECON_SUMMARY_CHECK" ]; then
+            echo "$RECON_SUMMARY_CHECK" | while IFS=: read -r field summary_val rows_val; do
+                echo -e "  ${RED}ERROR${NC} Recon SUMMARY $field ($summary_val) != sum of rows ($rows_val)"
+            done
+            RECON_SUMMARY_ERRORS=$(echo "$RECON_SUMMARY_CHECK" | wc -l | tr -d ' ')
+            ERRORS=$((ERRORS + RECON_SUMMARY_ERRORS))
+            TOTAL_ERRORS=$((TOTAL_ERRORS + RECON_SUMMARY_ERRORS))
         fi
     fi
 
@@ -261,14 +269,13 @@ for dir in "$EXPORT_DIR"/export-*/; do
     # (The journal entry and reconciliation should reflect the same accounting)
     # ========================================================================
     if [ -n "$SUMMARY_LINE" ]; then
-        RECON_PAY_CASH=$(echo "$SUMMARY_LINE" | awk -F',' '{print $10}')
-        RECON_PAY_CARD=$(echo "$SUMMARY_LINE" | awk -F',' '{print $11}')
-        RECON_PAY_GC=$(echo "$SUMMARY_LINE" | awk -F',' '{print $12}')
-        RECON_PAY_SC=$(echo "$SUMMARY_LINE" | awk -F',' '{print $13}')
-        RECON_PAY_CHECK=$(echo "$SUMMARY_LINE" | awk -F',' '{print $14}')
-        RECON_PAY_OTHER=$(echo "$SUMMARY_LINE" | awk -F',' '{print $15}')
-        RECON_NET_SUB=$(echo "$SUMMARY_LINE" | awk -F',' '{print $4}')
-        RECON_GC_SOLD=$(echo "$SUMMARY_LINE" | awk -F',' '{print $17}')
+        # Parse SUMMARY row with python for proper CSV handling
+        read -r RECON_NET_SUB RECON_TAX RECON_SHIPPING RECON_PAY_CASH RECON_PAY_CARD RECON_PAY_GC RECON_PAY_SC RECON_PAY_CHECK RECON_PAY_OTHER RECON_PAY_TOTAL RECON_GC_SOLD < <(python3 -c "
+import csv, io
+reader = csv.reader(io.StringIO('''$SUMMARY_LINE'''))
+for row in reader:
+    print(row[3] or '0', row[4] or '0', row[5] or '0', row[9] or '0', row[10] or '0', row[11] or '0', row[12] or '0', row[13] or '0', row[14] or '0', row[15] or '0', row[16] or '0')
+" 2>/dev/null)
 
         # Get JE amounts by account
         get_je_account() {
@@ -285,12 +292,19 @@ for dir in "$EXPORT_DIR"/export-*/; do
         JE_3000=$(get_je_account "3000.000")  # Sales
         JE_3040=$(get_je_account "3040.000")  # Shipping
 
-        # Count refund-only orders in recon (orders with "refund only" in notes)
-        REFUND_ONLY_COUNT=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ && $8 ~ /refund only/' "$RECON" | wc -l | tr -d ' ')
-
-        # Sum refund-only amounts from recon rows
-        REFUND_ONLY_CARD=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ && $8 ~ /refund only/ {sum += $11} END {printf "%.2f", sum}' "$RECON")
-        REFUND_ONLY_TAX=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ && $8 ~ /refund only/ {sum += $5} END {printf "%.2f", sum}' "$RECON")
+        # Count refund-only orders in recon
+        REFUND_ONLY_COUNT=$(python3 -c "
+import csv
+count = 0
+with open('$RECON') as f:
+    reader = csv.reader(f)
+    next(reader)
+    for row in reader:
+        if row[0].startswith('SUMMARY'): continue
+        if 'refund only' in (row[7] if len(row) > 7 else ''):
+            count += 1
+print(count)
+" 2>/dev/null)
 
         # JE vs Recon comparisons (reported as INFO since differences are expected
         # when the reconciliation includes cross-date refunds differently than the JE)
@@ -364,14 +378,30 @@ for dir in "$EXPORT_DIR"/export-*/; do
         ERRORS=$((ERRORS + 1))
         TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
     else
-        DETAIL_TAX_TOTAL=$(echo "$DETAIL_TOTALS" | awk -F',' '{print $18}')
-        DETAIL_SHIP_TOTAL=$(echo "$DETAIL_TOTALS" | awk -F',' '{print $19}')
-        DETAIL_CURRENT_TOTAL=$(echo "$DETAIL_TOTALS" | awk -F',' '{print $21}')
+        # Use python for CSV parsing because awk can't handle quoted fields with commas
+        # (e.g., tags like "captured-2026-01-27, Packing Slips Printed")
+        read -r DETAIL_TAX_TOTAL DETAIL_SHIP_TOTAL DETAIL_CURRENT_TOTAL < <(python3 -c "
+import csv, sys
+with open('$DETAIL') as f:
+    for row in csv.reader(f):
+        if row[0] == 'TOTALS':
+            print(row[17], row[18], row[20])
+")
 
-        # Sum data rows
-        DETAIL_ROWS_TAX=$(awk -F',' 'NR>1 && $1 !~ /^TOTALS/ {sum += $18} END {printf "%.2f", sum}' "$DETAIL")
-        DETAIL_ROWS_SHIP=$(awk -F',' 'NR>1 && $1 !~ /^TOTALS/ {sum += $19} END {printf "%.2f", sum}' "$DETAIL")
-        DETAIL_ROWS_TOTAL=$(awk -F',' 'NR>1 && $1 !~ /^TOTALS/ {sum += $21} END {printf "%.2f", sum}' "$DETAIL")
+        # Sum data rows using proper CSV parsing
+        read -r DETAIL_ROWS_TAX DETAIL_ROWS_SHIP DETAIL_ROWS_TOTAL < <(python3 -c "
+import csv
+tax=ship=total=0
+with open('$DETAIL') as f:
+    reader = csv.reader(f)
+    next(reader)  # skip header
+    for row in reader:
+        if row[0] == 'TOTALS': continue
+        tax += float(row[17]) if row[17] else 0
+        ship += float(row[18]) if row[18] else 0
+        total += float(row[20]) if row[20] else 0
+print(f'{tax:.2f} {ship:.2f} {total:.2f}')
+")
 
         DETAIL_TAX_FMT=$(printf "%.2f" "$DETAIL_TAX_TOTAL")
         DETAIL_SHIP_FMT=$(printf "%.2f" "${DETAIL_SHIP_TOTAL:-0}")
@@ -414,13 +444,21 @@ for dir in "$EXPORT_DIR"/export-*/; do
     RECON_ONLY=$(comm -13 <(echo "$DETAIL_ORDER_LIST") <(echo "$RECON_ORDER_LIST") 2>/dev/null || true)
     if [ -n "$RECON_ONLY" ]; then
         # Check if these are all refund-only rows
-        NON_REFUND_ONLY=""
-        while IFS= read -r order; do
-            IS_REFUND=$(awk -F',' -v o="$order" 'NR>1 && $1 == o && $8 ~ /refund only/ {found=1} END {print found+0}' "$RECON")
-            if [ "$IS_REFUND" != "1" ]; then
-                NON_REFUND_ONLY="$NON_REFUND_ONLY $order"
-            fi
-        done <<< "$RECON_ONLY"
+        # Check which recon-only orders are refund-only vs unexpected
+        NON_REFUND_ONLY=$(python3 -c "
+import csv, sys
+refund_orders = set()
+with open('$RECON') as f:
+    reader = csv.reader(f)
+    next(reader)
+    for row in reader:
+        if row[0].startswith('SUMMARY'): continue
+        if 'refund only' in (row[7] if len(row) > 7 else ''):
+            refund_orders.add(row[0])
+check_orders = '''$RECON_ONLY'''.strip().split('\n')
+non_refund = [o for o in check_orders if o and o not in refund_orders]
+print(' '.join(non_refund))
+" 2>/dev/null)
 
         if [ -n "$NON_REFUND_ONLY" ]; then
             echo -e "  ${RED}ERROR${NC} Orders in recon but NOT in detailed-sales (and NOT refund-only):$NON_REFUND_ONLY"
@@ -438,28 +476,45 @@ for dir in "$EXPORT_DIR"/export-*/; do
     # CHECK 12: Per-order totals match for SHARED orders (recon vs detailed-sales)
     # Only compare orders that appear in both files
     # ========================================================================
-    SHARED_ORDERS=$(comm -12 <(echo "$DETAIL_ORDER_LIST") <(echo "$RECON_ORDER_LIST") 2>/dev/null || true)
-    MISMATCHED_ORDERS=""
-    if [ -n "$SHARED_ORDERS" ]; then
-        while IFS= read -r order; do
-            # Recon: sum payment total for this order (may have multiple rows like refund pairs)
-            RECON_TOTAL=$(awk -F',' -v o="$order" 'NR>1 && $1 == o {sum += $16} END {printf "%.2f", sum}' "$RECON")
-            # Detailed-sales: current total
-            DETAIL_TOTAL=$(awk -F',' -v o="$order" 'NR>1 && $1 == o {printf "%.2f", $21}' "$DETAIL")
-
-            if [ "$RECON_TOTAL" != "$DETAIL_TOTAL" ]; then
-                MISMATCHED_ORDERS="$MISMATCHED_ORDERS\n         $order: recon=$RECON_TOTAL, detail=$DETAIL_TOTAL"
-            fi
-        done <<< "$SHARED_ORDERS"
-    fi
+    # Build per-order totals using python for proper CSV parsing
+    MISMATCHED_ORDERS=$(python3 -c "
+import csv
+recon_totals = {}
+detail_totals = {}
+with open('$RECON') as f:
+    reader = csv.reader(f)
+    next(reader)
+    for row in reader:
+        if row[0].startswith('SUMMARY'): continue
+        order = row[0]
+        amt = float(row[15]) if row[15] else 0
+        recon_totals[order] = recon_totals.get(order, 0) + amt
+with open('$DETAIL') as f:
+    reader = csv.reader(f)
+    next(reader)
+    for row in reader:
+        if row[0] == 'TOTALS': continue
+        detail_totals[row[0]] = float(row[20]) if row[20] else 0
+shared = set(recon_totals.keys()) & set(detail_totals.keys())
+mismatches = []
+for order in sorted(shared):
+    r = recon_totals[order]
+    d = detail_totals[order]
+    if abs(r - d) > 0.01:
+        mismatches.append(f'{order}: recon={r:.2f}, detail={d:.2f}')
+for m in mismatches[:5]:
+    print(m)
+if len(mismatches) > 5:
+    print(f'MORE:{len(mismatches) - 5}')
+" 2>/dev/null)
 
     if [ -n "$MISMATCHED_ORDERS" ]; then
-        # Count how many
-        MISMATCH_COUNT=$(echo -e "$MISMATCHED_ORDERS" | grep -c "recon=" || true)
+        MISMATCH_COUNT=$(echo "$MISMATCHED_ORDERS" | grep -c "recon=" || true)
+        MORE_COUNT=$(echo "$MISMATCHED_ORDERS" | grep "^MORE:" | sed 's/^MORE://' || true)
         echo -e "  ${YELLOW}WARN${NC} $MISMATCH_COUNT order(s) with different totals in recon vs detailed-sales:"
-        echo -e "$MISMATCHED_ORDERS" | head -5
-        if [ "$MISMATCH_COUNT" -gt 5 ]; then
-            echo "         ... and $((MISMATCH_COUNT - 5)) more"
+        echo "$MISMATCHED_ORDERS" | grep -v "^MORE:" | sed 's/^/         /'
+        if [ -n "$MORE_COUNT" ]; then
+            echo "         ... and $MORE_COUNT more"
         fi
         WARNINGS=$((WARNINGS + 1))
         TOTAL_WARNINGS=$((TOTAL_WARNINGS + 1))
@@ -467,45 +522,72 @@ for dir in "$EXPORT_DIR"/export-*/; do
 
     # ========================================================================
     # CHECK 13: Recon per-order payment total == sum of payment method columns
+    # CHECK 14: Recon per-order: payment total should equal net_subtotal + tax + shipping
+    # Uses python for proper CSV parsing (quoted fields with commas)
     # ========================================================================
-    RECON_PAY_MISMATCH=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ {
-        pay_total = $16 + 0
-        pay_sum = $10 + $11 + $12 + $13 + $14 + $15
-        diff = pay_total - pay_sum
-        if (diff > 0.01 || diff < -0.01) {
-            printf "%s: total=%.2f, sum=%.2f, diff=%.2f\n", $1, pay_total, pay_sum, diff
-        }
-    }' "$RECON")
+    RECON_CHECKS=$(python3 -c "
+import csv
+pay_mismatches = []
+calc_mismatches = []
+with open('$RECON') as f:
+    reader = csv.reader(f)
+    next(reader)  # skip header
+    for row in reader:
+        if row[0].startswith('SUMMARY'): continue
+        order = row[0]
+        try:
+            pay_cash = float(row[9]) if row[9] else 0
+            pay_card = float(row[10]) if row[10] else 0
+            pay_gc = float(row[11]) if row[11] else 0
+            pay_sc = float(row[12]) if row[12] else 0
+            pay_check = float(row[13]) if row[13] else 0
+            pay_other = float(row[14]) if row[14] else 0
+            pay_total = float(row[15]) if row[15] else 0
+            pay_sum = pay_cash + pay_card + pay_gc + pay_sc + pay_check + pay_other
+            diff = pay_total - pay_sum
+            if abs(diff) > 0.01:
+                pay_mismatches.append(f'{order}: total={pay_total:.2f}, sum={pay_sum:.2f}, diff={diff:.2f}')
+            # Check net+tax+ship == payment total (skip refund-only)
+            notes = row[7] if len(row) > 7 else ''
+            if 'refund only' not in notes:
+                net_sub = float(row[3]) if row[3] else 0
+                tax = float(row[4]) if row[4] else 0
+                shipping = float(row[5]) if row[5] else 0
+                calc = net_sub + tax + shipping
+                cdiff = pay_total - calc
+                if abs(cdiff) > 0.01:
+                    calc_mismatches.append(f'{order}: pay={pay_total:.2f}, calc(net+tax+ship)={calc:.2f} ({net_sub:.2f}+{tax:.2f}+{shipping:.2f}), diff={cdiff:.2f}')
+        except (ValueError, IndexError):
+            pass
+if pay_mismatches:
+    print('PAY_MISMATCH:' + '|'.join(pay_mismatches[:5]))
+    if len(pay_mismatches) > 5:
+        print(f'PAY_MORE:{len(pay_mismatches) - 5}')
+if calc_mismatches:
+    print('CALC_MISMATCH:' + '|'.join(calc_mismatches[:5]))
+    if len(calc_mismatches) > 5:
+        print(f'CALC_MORE:{len(calc_mismatches) - 5}')
+" 2>/dev/null)
 
+    RECON_PAY_MISMATCH=$(echo "$RECON_CHECKS" | grep "^PAY_MISMATCH:" | sed 's/^PAY_MISMATCH://' || true)
     if [ -n "$RECON_PAY_MISMATCH" ]; then
         echo -e "  ${RED}ERROR${NC} Recon orders where payment total != sum of payment methods:"
-        echo "$RECON_PAY_MISMATCH" | head -5 | sed 's/^/         /'
+        echo "$RECON_PAY_MISMATCH" | tr '|' '\n' | sed 's/^/         /'
+        PAY_MORE=$(echo "$RECON_CHECKS" | grep "^PAY_MORE:" | sed 's/^PAY_MORE://' || true)
+        if [ -n "$PAY_MORE" ]; then
+            echo "         ... and $PAY_MORE more"
+        fi
         ERRORS=$((ERRORS + 1))
         TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
     fi
 
-    # ========================================================================
-    # CHECK 14: Recon per-order: payment total should equal net_subtotal + tax + shipping
-    # (for non-refund-only orders)
-    # ========================================================================
-    RECON_CALC_MISMATCH=$(awk -F',' 'NR>1 && $1 !~ /^SUMMARY/ && $8 !~ /refund only/ {
-        net_sub = $4 + 0
-        tax = $5 + 0
-        shipping = $6 + 0
-        pay_total = $16 + 0
-        calc = net_sub + tax + shipping
-        diff = pay_total - calc
-        if (diff > 0.01 || diff < -0.01) {
-            printf "%s: pay=%.2f, calc(net+tax+ship)=%.2f (%.2f+%.2f+%.2f), diff=%.2f\n", $1, pay_total, calc, net_sub, tax, shipping, diff
-        }
-    }' "$RECON")
-
+    RECON_CALC_MISMATCH=$(echo "$RECON_CHECKS" | grep "^CALC_MISMATCH:" | sed 's/^CALC_MISMATCH://' || true)
     if [ -n "$RECON_CALC_MISMATCH" ]; then
         echo -e "  ${RED}ERROR${NC} Recon orders where payment != net_subtotal + tax + shipping:"
-        echo "$RECON_CALC_MISMATCH" | head -5 | sed 's/^/         /'
-        MISMATCH_TOTAL=$(echo "$RECON_CALC_MISMATCH" | wc -l | tr -d ' ')
-        if [ "$MISMATCH_TOTAL" -gt 5 ]; then
-            echo "         ... and $((MISMATCH_TOTAL - 5)) more"
+        echo "$RECON_CALC_MISMATCH" | tr '|' '\n' | sed 's/^/         /'
+        CALC_MORE=$(echo "$RECON_CHECKS" | grep "^CALC_MORE:" | sed 's/^CALC_MORE://' || true)
+        if [ -n "$CALC_MORE" ]; then
+            echo "         ... and $CALC_MORE more"
         fi
         ERRORS=$((ERRORS + 1))
         TOTAL_ERRORS=$((TOTAL_ERRORS + 1))
