@@ -41,6 +41,7 @@ export interface ShippingAddress {
 
 export interface OrderTransaction {
   kind: string; // "sale", "capture", "refund", etc.
+  status: string; // "success", "failure", "pending", "error"
   processedAt: string; // ISO timestamp
   amount: Decimal;
   gateway: string; // "shopify_payments", "cash", "gift_card", etc.
@@ -354,6 +355,7 @@ function parseShippingAddress(address: any): ShippingAddress {
 function parseTransactions(transactions: any[]): OrderTransaction[] {
   return transactions.map((txn) => ({
     kind: txn.kind || 'unknown',
+    status: txn.status || 'unknown',
     processedAt: txn.processed_at || txn.created_at || '',
     amount: new Decimal(txn.amount || 0),
     gateway: txn.gateway || 'unknown',
@@ -388,9 +390,9 @@ export function calculatePaymentBreakdown(transactions: OrderTransaction[]): Pay
     card: new Decimal(0),
   };
 
-  // Only consider successful captures/sales (not refunds, not authorizations)
+  // Only consider successful captures/sales (not refunds, not authorizations, not failed attempts)
   const captureTransactions = transactions.filter(
-    (txn) => txn.kind === 'sale' || txn.kind === 'capture'
+    (txn) => (txn.kind === 'sale' || txn.kind === 'capture') && txn.status === 'success'
   );
 
   for (const txn of captureTransactions) {
