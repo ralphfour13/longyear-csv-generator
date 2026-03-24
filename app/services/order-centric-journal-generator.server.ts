@@ -144,7 +144,7 @@ function formatDateOnly(isoTimestamp: string): string {
  * @param maxDate - Cutoff date (YYYY-MM-DD). Refunds after this date are added back.
  * @returns Adjusted subtotal and tax as of maxDate
  */
-function getPointInTimeAmounts(order: Order, maxDate: string): { subtotal: Decimal; tax: Decimal } {
+export function getPointInTimeAmounts(order: Order, maxDate: string): { subtotal: Decimal; tax: Decimal } {
   let adjustedSubtotal = order.currentSubtotalPrice ?? order.subtotalPrice;
   let adjustedTax = order.currentTotalTax ?? order.totalTax ?? new Decimal(0);
 
