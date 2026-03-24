@@ -784,15 +784,12 @@ export async function createRefundJournalEntries(
         const diff = calculatedTotal.minus(totalRefundAmount).abs();
 
         if (diff.greaterThan(new Decimal('0.02'))) {
-          // PLUG METHOD: Proportionally adjust refund amounts to match transaction total
-          // This mirrors the plug method used in createOrderJournalEntries (sale entries)
-          // and ensures sale + refund net to zero for voided/re-rung orders
+          // PLUG METHOD: Keep tax at its line-item value, subtotal absorbs the difference.
+          // This mirrors the sale-side plug method and ensures sale + refund entries
+          // net to zero for voided/re-rung orders (same tax on both sides).
           const refundableAmount = totalRefundAmount.minus(shippingAdjustmentTotal);
-          const lineItemTotal = refundedSubtotal.plus(refundedTax);
 
-          if (lineItemTotal.greaterThan(0)) {
-            refundedTax = refundableAmount.times(refundedTax).dividedBy(lineItemTotal)
-              .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+          if (refundableAmount.greaterThan(0)) {
             refundedSubtotal = refundableAmount.minus(refundedTax); // Subtotal is the plug
           }
 
