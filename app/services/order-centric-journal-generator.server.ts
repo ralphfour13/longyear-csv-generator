@@ -377,31 +377,14 @@ export async function createOrderJournalEntries(
   const imbalance = totalDebit.minus(calculatedCredits).abs();
 
   let regularSales: Decimal;
-  let usedTax = taxAmount;
-  let usedShipping = shippingAmount;
-  let usedGiftCardSales = giftCardProductSales;
+  const usedTax = taxAmount;
+  const usedShipping = shippingAmount;
+  const usedGiftCardSales = giftCardProductSales;
 
   if (imbalance.greaterThan(new Decimal('0.02'))) {
-    // Entry won't balance — use plug method: tax is proportional, sales is the plug
-    const orderTotal = order.totalPrice.isZero() ? totalDebit : order.totalPrice;
-    const orderTax = order.totalTax || new Decimal(0);
-
-    // Proportional tax based on capture amount
-    usedTax = orderTotal.isZero()
-      ? new Decimal(0)
-      : totalDebit.times(orderTax).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-
-    // Gift card sales proportional
-    usedGiftCardSales = orderTotal.isZero()
-      ? new Decimal(0)
-      : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-
-    // Shipping proportional
-    usedShipping = orderTotal.isZero()
-      ? new Decimal(0)
-      : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-
-    // Sales = plug (ensures perfect balance)
+    // Entry won't balance — use plug method: sales absorbs the difference
+    // Tax, shipping, and gift card sales stay at their original fixed values.
+    // Only sales acts as the plug to absorb capture/total differences (e.g., refund discrepancies).
     regularSales = totalDebit.minus(usedTax).minus(usedShipping).minus(usedGiftCardSales);
 
     console.log(

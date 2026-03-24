@@ -134,6 +134,7 @@ export interface Order {
   totalDiscounts: Decimal; // Discount amount
   currency: string;
   financialStatus: string; // "paid", "pending", "refunded", etc.
+  closedAt?: string; // ISO timestamp when order was closed (fully paid + fulfilled)
   lineItems: OrderLineItem[];
   transactions?: Transaction[]; // Payment transactions
   refunds?: Refund[]; // Refund details (for proper tax splitting)
