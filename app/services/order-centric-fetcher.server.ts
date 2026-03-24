@@ -487,6 +487,7 @@ function parseOrder(orderData: any): Order {
     totalDiscounts: new Decimal(orderData.total_discounts || 0),
     currency: orderData.currency,
     financialStatus: orderData.financial_status,
+    closedAt: orderData.closed_at || undefined,
     lineItems,
     transactions: [], // Will be populated separately
     refunds, // Refund details for proper tax splitting

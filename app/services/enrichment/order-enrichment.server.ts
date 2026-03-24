@@ -21,6 +21,7 @@ export interface EnrichedOrderData {
   paymentBreakdown: PaymentBreakdown;
   fulfillmentStatus: string;
   financialStatus: string;
+  closedAt?: string;
   totalShippingPrice: Decimal;
   currentTotalPrice: Decimal;
   totalRefunded: Decimal;
@@ -264,6 +265,7 @@ export async function enrichOrderData(
   const paymentBreakdown = calculatePaymentBreakdown(transactions);
   const fulfillmentStatus = orderData.fulfillment_status || 'unfulfilled';
   const financialStatus = orderData.financial_status || 'pending';
+  const closedAt = orderData.closed_at || undefined;
   const totalShippingPrice = new Decimal(
     orderData.total_shipping_price_set?.shop_money?.amount ||
     orderData.total_shipping_price ||
@@ -287,6 +289,7 @@ export async function enrichOrderData(
     paymentBreakdown,
     fulfillmentStatus,
     financialStatus,
+    closedAt,
     totalShippingPrice,
     currentTotalPrice,
     totalRefunded,

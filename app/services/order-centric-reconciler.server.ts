@@ -173,6 +173,32 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
+        // GIFT CARD-ONLY ORDERS: Post on closed_at (fulfillment) date instead of sale transaction date.
+        // Gift card 'sale' transactions fire immediately at order creation, but accounting
+        // should match CC behavior (post when order is fulfilled).
+        const giftCardOnly = isGiftCardOnlyOrder(order);
+        if (giftCardOnly) {
+          const closedDate = order.closedAt ? formatDateOnly(order.closedAt) : null;
+          if (!closedDate || closedDate !== targetDate) {
+            // Check for refunds on this date
+            const refundTxns = filterRefundTransactions(order, targetDate);
+            if (refundTxns.length > 0) {
+              await processOrderRefunds(
+                shop, accessToken, order, refundTxns, targetDate,
+                journalEntries, enrichedTransactions, warnings, enrichmentCache
+              );
+              processedOrderIds.add(order.id);
+              ordersProcessed++;
+            } else if (!closedDate) {
+              console.log(
+                `⏭️  Order ${order.name}: Gift card-only, not yet fulfilled (no closed_at)`
+              );
+            }
+            continue;
+          }
+          // closedDate === targetDate: fall through to normal processing
+        }
+
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
         // Check this BEFORE capture logic to catch refund-only transactions
         const allCaptureTransactions = order.transactions?.filter(
@@ -255,10 +281,11 @@ export async function reconcileOrdersByDate(
             `${ccCapturesByDate.size} dates, targetDate ${targetDate}: ` +
             `$${targetDateCCTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
           );
-        } else {
+        } else if (!giftCardOnly) {
           // LAST-CAPTURE-DATE RULE: Order posts on the date of its LAST captured payment
           // This ensures split-payment orders post as a complete unit (all legs balance)
           // POINT-IN-TIME: Only consider captures up to target date (no future knowledge)
+          // NOTE: Gift card-only orders skip this — they already validated via closed_at above.
           const lastCaptureDate = getOrderCaptureDate(order, targetDate);
 
           if (!lastCaptureDate) {
@@ -284,17 +311,20 @@ export async function reconcileOrdersByDate(
         }
 
         // POINT-IN-TIME FILTERING:
+        // - Gift card-only: Use ALL sale transactions (posted on closed_at date, not sale date)
         // - Multi-CC-capture: Use only targetDate captures (each date gets its own portion)
         // - Normal: Use all captures on or before targetDate
-        const pointInTimeCaptureTransactions = isMultiDateCCCapture
-          ? allCaptureTransactions.filter((txn) => {
-              const txnDate = formatDateOnly(txn.processedAt);
-              return txnDate === targetDate;
-            })
-          : allCaptureTransactions.filter((txn) => {
-              const txnDate = formatDateOnly(txn.processedAt);
-              return txnDate <= targetDate;
-            });
+        const pointInTimeCaptureTransactions = giftCardOnly
+          ? allCaptureTransactions // Gift card-only: all sales posted on closed_at date
+          : isMultiDateCCCapture
+            ? allCaptureTransactions.filter((txn) => {
+                const txnDate = formatDateOnly(txn.processedAt);
+                return txnDate === targetDate;
+              })
+            : allCaptureTransactions.filter((txn) => {
+                const txnDate = formatDateOnly(txn.processedAt);
+                return txnDate <= targetDate;
+              });
 
         if (pointInTimeCaptureTransactions.length === 0) {
           // No captures on target date (multi) or on/before target date (normal)
@@ -840,6 +870,18 @@ function formatDateOnly(isoTimestamp: string): string {
   // Parse MM/DD/YYYY format to YYYY-MM-DD
   const [month, day, year] = pacificDateString.split('/');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Check if an order was paid entirely by gift card (no CC, no cash, no other methods).
+ * Gift card-only orders post on closed_at (fulfillment) date instead of sale transaction date.
+ */
+function isGiftCardOnlyOrder(order: Order): boolean {
+  if (!order.transactions || order.transactions.length === 0) return false;
+  const captures = order.transactions.filter(
+    (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
+  );
+  return captures.length > 0 && captures.every(txn => txn.gateway === 'gift_card');
 }
 
 /**
