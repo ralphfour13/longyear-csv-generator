@@ -21,6 +21,7 @@ import {
   createFeeEntries,
   validateOrderEntries,
   hasActualRefunds,
+  getPointInTimeAmounts,
 } from './order-centric-journal-generator.server';
 import { enrichOrderData, type EnrichedOrderData } from './enrichment/order-enrichment.server';
 import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
@@ -618,6 +619,11 @@ async function processOrderCaptures(
       };
     }
 
+    // POINT-IN-TIME: Compute current values as of targetDate, undoing future refunds.
+    // Shopify's currentSubtotalPrice/currentTotalTax reflect ALL refunds (including future ones).
+    // The DR and DSR need values that only reflect refunds up to targetDate.
+    const pointInTime = getPointInTimeAmounts(order, targetDate);
+
     const enrichedOrder = {
       id: order.id,
       name: order.name,
@@ -625,8 +631,8 @@ async function processOrderCaptures(
       totalPrice: captureRatio ? captureTotal : order.totalPrice,
       subtotalPrice: captureRatio ? captureTotal : order.subtotalPrice,
       currentTotalPrice: captureRatio ? captureTotal : (order.currentTotalPrice || order.totalPrice),
-      currentSubtotalPrice: captureRatio ? captureTotal : order.currentSubtotalPrice,
-      currentTotalTax: captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio) : order.currentTotalTax,
+      currentSubtotalPrice: captureRatio ? captureTotal : pointInTime.subtotal,
+      currentTotalTax: captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio) : pointInTime.tax,
       totalTax: captureRatio ? scaleDecimal(order.totalTax, captureRatio) : order.totalTax,
       totalShipping: captureRatio ? scaleDecimal(order.totalShipping, captureRatio) : order.totalShipping,
       totalDiscounts: captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio) : order.totalDiscounts,
@@ -661,6 +667,7 @@ async function processOrderCaptures(
     // Still push to enrichedTransactions with undefined enrichedData
     // so the order appears in ALL report CSVs (not silently dropped)
     const captureTotal = captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0));
+    const pointInTimeFallback = getPointInTimeAmounts(order, targetDate);
     enrichedTransactions.push({
       balanceTransaction: {
         id: captureTransactions[0].id,
@@ -678,8 +685,8 @@ async function processOrderCaptures(
         totalPrice: captureRatio ? captureTotal : order.totalPrice,
         subtotalPrice: captureRatio ? captureTotal : order.subtotalPrice,
         currentTotalPrice: captureRatio ? captureTotal : (order.currentTotalPrice || order.totalPrice),
-        currentSubtotalPrice: captureRatio ? captureTotal : order.currentSubtotalPrice,
-        currentTotalTax: captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio) : order.currentTotalTax,
+        currentSubtotalPrice: captureRatio ? captureTotal : pointInTimeFallback.subtotal,
+        currentTotalTax: captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio) : pointInTimeFallback.tax,
         totalTax: captureRatio ? scaleDecimal(order.totalTax, captureRatio) : order.totalTax,
         totalShipping: captureRatio ? scaleDecimal(order.totalShipping, captureRatio) : order.totalShipping,
         totalDiscounts: captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio) : order.totalDiscounts,
@@ -732,6 +739,9 @@ async function processOrderRefunds(
       enrichmentCache?.set(order.id, enrichedData);
     }
 
+    // POINT-IN-TIME: Use adjusted current values for refund-path orders too
+    const refundPointInTime = getPointInTimeAmounts(order, targetDate);
+
     enrichedTransactions.push({
       balanceTransaction: {
         id: refundTransactions[0].id,
@@ -749,8 +759,8 @@ async function processOrderRefunds(
         totalPrice: order.totalPrice,
         subtotalPrice: order.subtotalPrice,
         currentTotalPrice: order.currentTotalPrice || order.totalPrice,
-        currentSubtotalPrice: order.currentSubtotalPrice,
-        currentTotalTax: order.currentTotalTax,
+        currentSubtotalPrice: refundPointInTime.subtotal,
+        currentTotalTax: refundPointInTime.tax,
         totalTax: order.totalTax,
         totalShipping: order.totalShipping,
         totalDiscounts: order.totalDiscounts,
@@ -771,6 +781,7 @@ async function processOrderRefunds(
 
     // Still push to enrichedTransactions with undefined enrichedData
     // so the refund appears in ALL report CSVs (not silently dropped)
+    const refundPointInTimeFallback = getPointInTimeAmounts(order, targetDate);
     enrichedTransactions.push({
       balanceTransaction: {
         id: refundTransactions[0].id,
@@ -788,8 +799,8 @@ async function processOrderRefunds(
         totalPrice: order.totalPrice,
         subtotalPrice: order.subtotalPrice,
         currentTotalPrice: order.currentTotalPrice || order.totalPrice,
-        currentSubtotalPrice: order.currentSubtotalPrice,
-        currentTotalTax: order.currentTotalTax,
+        currentSubtotalPrice: refundPointInTimeFallback.subtotal,
+        currentTotalTax: refundPointInTimeFallback.tax,
         totalTax: order.totalTax,
         totalShipping: order.totalShipping,
         totalDiscounts: order.totalDiscounts,
