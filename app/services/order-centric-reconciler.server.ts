@@ -176,10 +176,15 @@ export async function reconcileOrdersByDate(
         // GIFT CARD-ONLY ORDERS: Post on closed_at (fulfillment) date instead of sale transaction date.
         // Gift card 'sale' transactions fire immediately at order creation, but accounting
         // should match CC behavior (post when order is fulfilled).
+        // Fallback: if closed_at is not set (common for POS orders), use the sale transaction date
+        // since POS orders are fulfilled instantly at creation.
         const giftCardOnly = isGiftCardOnlyOrder(order);
         if (giftCardOnly) {
           const closedDate = order.closedAt ? formatDateOnly(order.closedAt) : null;
-          if (!closedDate || closedDate !== targetDate) {
+          const saleTxnDate = getOrderCaptureDate(order, targetDate);
+          const effectiveDate = closedDate || saleTxnDate;
+
+          if (!effectiveDate || effectiveDate !== targetDate) {
             // Check for refunds on this date
             const refundTxns = filterRefundTransactions(order, targetDate);
             if (refundTxns.length > 0) {
@@ -189,14 +194,10 @@ export async function reconcileOrdersByDate(
               );
               processedOrderIds.add(order.id);
               ordersProcessed++;
-            } else if (!closedDate) {
-              console.log(
-                `⏭️  Order ${order.name}: Gift card-only, not yet fulfilled (no closed_at)`
-              );
             }
             continue;
           }
-          // closedDate === targetDate: fall through to normal processing
+          // effectiveDate === targetDate: fall through to normal processing
         }
 
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
