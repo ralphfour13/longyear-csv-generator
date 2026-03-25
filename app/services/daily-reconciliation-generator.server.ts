@@ -232,13 +232,12 @@ function transformToReconciliationRow(
     return { netSales, tax, shipping, total, giftCardLiability };
   })() : null;
 
-  const netSubtotal = combinedJe ? combinedJe.netSales.abs() : sales;
-  const taxAmount = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
-  const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
-  // Payment total = sum of all credit-side amounts (sales + tax + shipping + gift card sold).
   // Gift card liability (2320) is included only when positive (credit = GC product sold),
   // NOT when negative (debit = GC redeemed as payment), to avoid double-counting.
   const giftCardSoldAmount = combinedJe?.giftCardLiability.gt(0) ? combinedJe.giftCardLiability : new Decimal(0);
+  const netSubtotal = combinedJe ? combinedJe.netSales.abs().plus(giftCardSoldAmount) : sales;
+  const taxAmount = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
+  const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
   const paymentTotal = combinedJe
     ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(giftCardSoldAmount)
     : order.totalPrice;
