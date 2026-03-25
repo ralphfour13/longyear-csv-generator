@@ -153,27 +153,18 @@ function transformToReportRow(
   const tax4 = enrichedData.taxLines[3] || { title: '', rate: '', price: new Decimal(0) };
   const tax5 = enrichedData.taxLines[4] || { title: '', rate: '', price: new Decimal(0) };
 
-  // Tax total calculation - use original totalTax for orders with actual refunds
-  // Only use currentTotalTax for partial captures (items removed BEFORE payment)
-  // This ensures reports show historical state, not future-modified state
-  const hasReducedTotal = order.currentTotalPrice !== undefined &&
-    order.currentTotalPrice.lt(order.totalPrice);
-
-  // Flag is already set in the reconciler
-  const orderHasActualRefunds = order.hasActualRefunds || false;
-
-  const taxTotal = (hasReducedTotal && !orderHasActualRefunds)
-    ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
-    : (order.totalTax ?? new Decimal(0));
+  // USE JE SUMMARY for tax total to match JE exactly
+  const je = enrichedTxn.jeSummary;
+  const taxTotal = je ? je.tax.abs() : (order.totalTax ?? new Decimal(0));
+  const jeShipping = je ? je.shipping.abs() : order.totalShipping;
 
   // Payment breakdown from the capture transaction
   const paymentBreakdown = enrichedData.paymentBreakdown;
 
-  // Current total - use order.currentTotalPrice for accuracy
-  // The paymentBreakdown sum can be wrong due to duplicate transactions in enrichment
-  // FIX: Both currentTotal1 and currentTotal2 should show the actual captured amount
-  const currentTotal1 = order.currentTotalPrice.toFixed(2);
-  const currentTotal2 = order.currentTotalPrice.toFixed(2);
+  // Current total from JE summary (authoritative) or fallback to order
+  const currentTotal = je ? je.totalPayment.toFixed(2) : order.currentTotalPrice.toFixed(2);
+  const currentTotal1 = currentTotal;
+  const currentTotal2 = currentTotal;
 
   // Calculate total refund by summing all refund transactions for this order
   // FIX: Aggregate refunds from all transactions, don't create separate rows
@@ -211,7 +202,7 @@ function transformToReportRow(
     tax5Rate: tax5.rate,
     tax5Price: tax5.price.toFixed(2),
     taxTotal: taxTotal.toFixed(2),
-    totalShipping: order.totalShipping.toFixed(2),
+    totalShipping: jeShipping.toFixed(2),
     totalRefund,
     currentTotal1,
     cash: paymentBreakdown.cash.toFixed(2),

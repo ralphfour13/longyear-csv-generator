@@ -126,37 +126,39 @@ function transformToReconciliationRow(
   const isRefundOnlyOnDate = !hasChargeOnDate && hasRefundOnDate;
 
   if (isRefundOnlyOnDate) {
-    // Calculate refund total from enriched transactions
-    const refundTotal = transactions
-      .filter(t => t.balanceTransaction.type === 'refund')
-      .reduce((sum, t) => sum.plus(t.balanceTransaction.net), new Decimal(0));
-
     const area = determineArea(order, effectiveEnrichedData);
     const tender = determineTender(effectiveEnrichedData.paymentBreakdown);
-
-    // Distribute refund amount to the correct payment method column based on tender type
-    // so that sum(payment methods) == paymentTotal
-    const refundAmount = refundTotal.neg(); // Negative value for refund
     const zeroDec = new Decimal(0).toFixed(2);
 
-    // Show refund as negative row with actual refund amount
+    // USE JE SUMMARY for refund-only rows to match JE exactly (split sales vs tax)
+    const refundJe = transactions.find(t => t.jeSummary)?.jeSummary;
+    const refundSales = refundJe ? refundJe.netSales : (() => {
+      const total = transactions
+        .filter(t => t.balanceTransaction.type === 'refund')
+        .reduce((sum, t) => sum.plus(t.balanceTransaction.net), new Decimal(0));
+      return total.neg();
+    })();
+    const refundTax = refundJe ? refundJe.tax : new Decimal(0);
+    const refundShipping = refundJe ? refundJe.shipping : new Decimal(0);
+    const refundTotal = refundJe ? refundJe.totalPayment : refundSales;
+
     return [{
       orderNumber: order.name,
       originalSubtotal: '',
       discount: '',
-      netSubtotal: refundAmount.toFixed(2),
-      tax: '',
-      shipping: '',
+      netSubtotal: refundSales.toFixed(2),
+      tax: refundTax.isZero() ? '' : refundTax.toFixed(2),
+      shipping: refundShipping.isZero() ? '' : refundShipping.toFixed(2),
       area,
       notes: 'refund only',
       tender,
-      paymentCash: (tender === 'CASH' || tender === 'cash') ? refundAmount.toFixed(2) : zeroDec,
-      paymentCard: tender === 'cc' ? refundAmount.toFixed(2) : zeroDec,
-      paymentGiftCard: tender === 'gift card' ? refundAmount.toFixed(2) : zeroDec,
-      paymentStoreCredit: tender === 'store credit' ? refundAmount.toFixed(2) : zeroDec,
-      paymentCheck: tender === 'check' ? refundAmount.toFixed(2) : zeroDec,
-      paymentOther: tender === 'charge' ? refundAmount.toFixed(2) : zeroDec,
-      paymentTotal: refundAmount.toFixed(2),
+      paymentCash: (tender === 'CASH' || tender === 'cash') ? refundTotal.toFixed(2) : zeroDec,
+      paymentCard: tender === 'cc' ? refundTotal.toFixed(2) : zeroDec,
+      paymentGiftCard: tender === 'gift card' ? refundTotal.toFixed(2) : zeroDec,
+      paymentStoreCredit: tender === 'store credit' ? refundTotal.toFixed(2) : zeroDec,
+      paymentCheck: tender === 'check' ? refundTotal.toFixed(2) : zeroDec,
+      paymentOther: tender === 'charge' ? refundTotal.toFixed(2) : zeroDec,
+      paymentTotal: refundTotal.toFixed(2),
       giftCardSold: '',
       giftCardUsed: '',
     }];
@@ -167,11 +169,9 @@ function transformToReconciliationRow(
   // This flag is already set in the reconciler
   const orderHasActualRefunds = order.hasActualRefunds || false;
 
-  // Check if totals are reduced
+  // Check if totals are reduced (for partial capture detection)
   const hasReducedSubtotal = order.currentSubtotalPrice !== undefined &&
     order.currentSubtotalPrice.lt(order.subtotalPrice);
-  const hasReducedTotal = order.currentTotalPrice !== undefined &&
-    order.currentTotalPrice.lt(order.totalPrice);
 
   // Calculate sales - use original subtotalPrice for orders with actual refunds
   // Only use currentSubtotalPrice for partial captures (items removed BEFORE payment)
@@ -198,22 +198,38 @@ function transformToReconciliationRow(
   // Calculate discount information for transparency
   const originalSubtotal = order.subtotalPrice;
   const discount = order.totalDiscounts || new Decimal(0);
-  const netSubtotal = sales; // Already calculated as NET above
 
   // Calculate payment breakdown
   const paymentBreakdown = effectiveEnrichedData.paymentBreakdown;
-  // Use original totalPrice for orders with actual refunds to show historical state
-  // Use currentTotalPrice for partial captures only
-  const useCurrentTotal = hasReducedTotal && !orderHasActualRefunds;
-  const paymentTotal = (useCurrentTotal && order.currentTotalPrice)
-    ? order.currentTotalPrice
-    : order.totalPrice;
 
-  // Calculate tax - use original totalTax for orders with actual refunds
-  // Use currentTotalTax for partial captures OR same-day refunds (net amount)
-  const taxAmount = (useCurrentTotal)
-    ? (order.currentTotalTax ?? order.totalTax ?? new Decimal(0))
-    : (order.totalTax ?? new Decimal(0));
+  // USE JE SUMMARY as source of truth for sales, tax, shipping, total.
+  // This ensures the DR matches the JE exactly — no independent calculation that can diverge.
+  const je = transactions[0].jeSummary;
+  // For refund-only orders that were handled above, jeSummary may not apply here.
+  // For sale+refund on same order, combine all transaction jeSummaries.
+  const combinedJe = je ? (() => {
+    let netSales = je.netSales;
+    let tax = je.tax;
+    let shipping = je.shipping;
+    let total = je.totalPayment;
+    // If there are multiple enriched transactions for this order (e.g., sale + refund),
+    // combine their summaries
+    for (let i = 1; i < transactions.length; i++) {
+      const other = transactions[i].jeSummary;
+      if (other) {
+        netSales = netSales.plus(other.netSales);
+        tax = tax.plus(other.tax);
+        shipping = shipping.plus(other.shipping);
+        total = total.plus(other.totalPayment);
+      }
+    }
+    return { netSales, tax, shipping, total };
+  })() : null;
+
+  const netSubtotal = combinedJe ? combinedJe.netSales.abs() : sales;
+  const taxAmount = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
+  const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
+  const paymentTotal = combinedJe ? combinedJe.total : order.totalPrice;
 
   // If refunded, create original sale row
   if (order.financialStatus === 'refunded') {
@@ -223,7 +239,7 @@ function transformToReconciliationRow(
       discount: discount.neg().toFixed(2),
       netSubtotal: netSubtotal.neg().toFixed(2), // Negative for refund
       tax: taxAmount.neg().toFixed(2),
-      shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.neg().toFixed(2) : '',
+      shipping: shippingAmount.gt(0) ? shippingAmount.neg().toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
@@ -245,7 +261,7 @@ function transformToReconciliationRow(
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
       tax: taxAmount.toFixed(2),
-      shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
+      shipping: shippingAmount.gt(0) ? shippingAmount.toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
@@ -267,7 +283,7 @@ function transformToReconciliationRow(
       discount: discount.toFixed(2),
       netSubtotal: netSubtotal.toFixed(2),
       tax: taxAmount.toFixed(2),
-      shipping: (order.totalShipping && order.totalShipping.gt(0)) ? order.totalShipping.toFixed(2) : '',
+      shipping: shippingAmount.gt(0) ? shippingAmount.toFixed(2) : '',
       area,
       notes: notes || '',
       tender,
