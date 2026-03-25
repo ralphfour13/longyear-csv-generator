@@ -132,7 +132,6 @@ function transformToReconciliationRow(
 
     // USE JE SUMMARY for refund-only rows to match JE exactly (split sales vs tax)
     const refundJe = transactions.find(t => t.jeSummary)?.jeSummary;
-    console.log(`📊 DR ${order.name} (refund-only): jeSummary=${refundJe ? 'present' : 'MISSING'}, txns=${transactions.length}`);
     const refundSales = refundJe ? refundJe.netSales : (() => {
       const total = transactions
         .filter(t => t.balanceTransaction.type === 'refund')
@@ -206,12 +205,6 @@ function transformToReconciliationRow(
   // USE JE SUMMARY as source of truth for sales, tax, shipping, total.
   // This ensures the DR matches the JE exactly — no independent calculation that can diverge.
   const je = transactions[0].jeSummary;
-  console.log(`📊 DR ${order.name}: jeSummary=${je ? 'present' : 'MISSING'}, ` +
-    `transactions=${transactions.length}, types=${transactions.map(t => t.balanceTransaction.type).join(',')}`);
-  if (je) {
-    console.log(`  netSales=${je.netSales.toFixed(2)}, tax=${je.tax.toFixed(2)}, ` +
-      `shipping=${je.shipping.toFixed(2)}, totalPayment=${je.totalPayment.toFixed(2)}`);
-  }
   // For refund-only orders that were handled above, jeSummary may not apply here.
   // For sale+refund on same order, combine all transaction jeSummaries.
   const combinedJe = je ? (() => {
