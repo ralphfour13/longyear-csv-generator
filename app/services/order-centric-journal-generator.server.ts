@@ -377,14 +377,30 @@ export async function createOrderJournalEntries(
   const imbalance = totalDebit.minus(calculatedCredits).abs();
 
   let regularSales: Decimal;
-  const usedTax = taxAmount;
-  const usedShipping = shippingAmount;
-  const usedGiftCardSales = giftCardProductSales;
+  let usedTax = taxAmount;
+  let usedShipping = shippingAmount;
+  let usedGiftCardSales = giftCardProductSales;
 
   if (imbalance.greaterThan(new Decimal('0.02'))) {
-    // Entry won't balance — use plug method: sales absorbs the difference
-    // Tax, shipping, and gift card sales stay at their original fixed values.
-    // Only sales acts as the plug to absorb capture/total differences (e.g., refund discrepancies).
+    // Entry won't balance — use plug method.
+    // TWO CASES:
+    // 1. capture < totalPrice (exchange, partial capture, same-day void):
+    //    Scale tax/shipping/gc proportionally — capture only covers a portion of the order.
+    // 2. capture >= totalPrice (refund-after-capture):
+    //    Keep tax/shipping/gc at original values — the full order was captured.
+    if (totalDebit.lt(order.totalPrice)) {
+      const orderTotal = order.totalPrice;
+      usedTax = orderTotal.isZero()
+        ? new Decimal(0)
+        : totalDebit.times(taxAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      usedGiftCardSales = orderTotal.isZero()
+        ? new Decimal(0)
+        : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      usedShipping = orderTotal.isZero()
+        ? new Decimal(0)
+        : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+    }
+    // Sales = plug (ensures perfect balance)
     regularSales = totalDebit.minus(usedTax).minus(usedShipping).minus(usedGiftCardSales);
 
     console.log(
@@ -392,7 +408,8 @@ export async function createOrderJournalEntries(
       `capture=$${totalDebit.toFixed(2)}, tax=$${usedTax.toFixed(2)}, ` +
       `shipping=$${usedShipping.toFixed(2)}, giftCard=$${usedGiftCardSales.toFixed(2)}, ` +
       `sales(plug)=$${regularSales.toFixed(2)} ` +
-      `(original imbalance: $${imbalance.toFixed(2)})`
+      `(original imbalance: $${imbalance.toFixed(2)}, ` +
+      `${totalDebit.lt(order.totalPrice) ? 'proportional' : 'fixed'})`
     );
   } else {
     regularSales = netSales.minus(giftCardProductSales);
@@ -784,12 +801,15 @@ export async function createRefundJournalEntries(
         const diff = calculatedTotal.minus(totalRefundAmount).abs();
 
         if (diff.greaterThan(new Decimal('0.02'))) {
-          // PLUG METHOD: Keep tax at its line-item value, subtotal absorbs the difference.
-          // This mirrors the sale-side plug method and ensures sale + refund entries
-          // net to zero for voided/re-rung orders (same tax on both sides).
+          // PLUG METHOD: Proportionally scale tax, subtotal is the plug.
+          // This mirrors the sale-side proportional scaling and ensures
+          // same-day void/re-ring entries cancel perfectly (both sides use same formula).
           const refundableAmount = totalRefundAmount.minus(shippingAdjustmentTotal);
+          const lineItemTotal = refundedSubtotal.plus(refundedTax);
 
-          if (refundableAmount.greaterThan(0)) {
+          if (lineItemTotal.greaterThan(0) && refundableAmount.greaterThan(0)) {
+            refundedTax = refundableAmount.times(refundedTax).dividedBy(lineItemTotal)
+              .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
             refundedSubtotal = refundableAmount.minus(refundedTax); // Subtotal is the plug
           }
 
