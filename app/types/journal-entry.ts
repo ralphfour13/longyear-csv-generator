@@ -342,6 +342,17 @@ export interface EnrichedTransaction {
     totalRefunded: Decimal;
   };
 
+  // JE-derived summary: authoritative sales/tax/shipping from the journal entry lines.
+  // Used by DR and DSR generators to ensure all export files match the JE exactly.
+  jeSummary?: {
+    netSales: Decimal;      // Net sales (3000 account, credit - debit)
+    tax: Decimal;           // Tax (2110 account, credit - debit)
+    shipping: Decimal;      // Shipping (3040 account, credit - debit)
+    giftCardLiability: Decimal; // Gift card liability (2320 account, credit - debit)
+    storeCredit: Decimal;   // Store credit (2340 account)
+    totalPayment: Decimal;  // Total payment (sum of debit accounts: 1051 + 1061 + 2320 + 2340)
+  };
+
   // Payout context
   payout: {
     id: string;

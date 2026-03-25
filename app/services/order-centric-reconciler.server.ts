@@ -29,6 +29,37 @@ import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { Cin7ProductService } from './cin7/cin7-product-service.server';
 
 /**
+ * Compute a per-order summary from JE lines. Used by DR/DSR generators
+ * to ensure all export files match the JE exactly.
+ * Credit accounts (3000, 2110, 3040, 2320) are summed as credit - debit (positive = credit).
+ * Debit accounts (1051, 1061) are summed as debit - credit (positive = debit/payment).
+ */
+function computeJESummary(entries: JournalEntry[]) {
+  const zero = new Decimal(0);
+  let netSales = zero;
+  let tax = zero;
+  let shipping = zero;
+  let giftCardLiability = zero;
+  let storeCredit = zero;
+  let totalPayment = zero;
+
+  for (const e of entries) {
+    const acct = e.account;
+    const netCredit = e.credit.minus(e.debit);
+    const netDebit = e.debit.minus(e.credit);
+
+    if (acct.startsWith('3000')) netSales = netSales.plus(netCredit);
+    else if (acct.startsWith('2110')) tax = tax.plus(netCredit);
+    else if (acct.startsWith('3040')) shipping = shipping.plus(netCredit);
+    else if (acct.startsWith('2320')) giftCardLiability = giftCardLiability.plus(netCredit);
+    else if (acct.startsWith('2340')) storeCredit = storeCredit.plus(netDebit);
+    else totalPayment = totalPayment.plus(netDebit); // 1051, 1061, etc.
+  }
+
+  return { netSales, tax, shipping, giftCardLiability, storeCredit, totalPayment };
+}
+
+/**
  * Log order reconciliation values for debugging
  * Shows original vs current values to help diagnose partial capture/refund issues
  */
@@ -575,6 +606,9 @@ async function processOrderCaptures(
 
   journalEntries.push(...entries);
 
+  // Compute JE summary for DR/DSR alignment
+  const jeSummary = computeJESummary(entries);
+
   // Validate entries balance
   const reference = `SO-${order.name}`;
   const validationErrors = validateOrderEntries(entries, reference);
@@ -654,6 +688,7 @@ async function processOrderCaptures(
       },
       order: enrichedOrder,
       enrichedData: enrichedData || undefined,
+      jeSummary,
       payout: {
         id: 'Direct Payment', // Order-centric: no payout reference
         date: targetDate,
@@ -696,6 +731,7 @@ async function processOrderCaptures(
         isMultiCaptureSplit: !!captureRatio,
       },
       enrichedData: undefined,
+      jeSummary,
       payout: {
         id: 'Direct Payment',
         date: targetDate,
@@ -728,6 +764,9 @@ async function processOrderRefunds(
   );
 
   journalEntries.push(...entries);
+
+  // Compute JE summary for DR/DSR alignment
+  const refundJeSummary = computeJESummary(entries);
 
   // Enrich order data for refund reporting (use cache to avoid duplicate API calls)
   try {
@@ -769,6 +808,7 @@ async function processOrderRefunds(
         hasActualRefunds: hasActualRefunds(order, targetDate),
       },
       enrichedData: enrichedData || undefined,
+      jeSummary: refundJeSummary,
       payout: {
         id: 'Direct Payment',
         date: targetDate,
@@ -809,6 +849,7 @@ async function processOrderRefunds(
         hasActualRefunds: hasActualRefunds(order, targetDate),
       },
       enrichedData: undefined,
+      jeSummary: refundJeSummary,
       payout: {
         id: 'Direct Payment',
         date: targetDate,
