@@ -140,7 +140,11 @@ function transformToReconciliationRow(
     })();
     const refundTax = refundJe ? refundJe.tax : new Decimal(0);
     const refundShipping = refundJe ? refundJe.shipping : new Decimal(0);
-    const refundTotal = refundJe ? refundJe.totalPayment : refundSales;
+    // Use netSales+tax+shipping (not totalPayment) — totalPayment excludes 2320/2340 debits,
+    // so gift card refunds would show $0. The sum of credits matches the actual refund amount.
+    const refundTotal = refundJe
+      ? refundJe.netSales.plus(refundJe.tax).plus(refundJe.shipping)
+      : refundSales;
 
     return [{
       orderNumber: order.name,
