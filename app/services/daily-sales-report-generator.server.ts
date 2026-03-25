@@ -153,16 +153,43 @@ function transformToReportRow(
   const tax4 = enrichedData.taxLines[3] || { title: '', rate: '', price: new Decimal(0) };
   const tax5 = enrichedData.taxLines[4] || { title: '', rate: '', price: new Decimal(0) };
 
-  // USE JE SUMMARY for tax total to match JE exactly
-  const je = enrichedTxn.jeSummary;
-  const taxTotal = je ? je.tax.abs() : (order.totalTax ?? new Decimal(0));
-  const jeShipping = je ? je.shipping.abs() : order.totalShipping;
+  // USE JE SUMMARY for tax, shipping, and totals to match JE exactly.
+  // Combine all jeSummaries for this order (capture + refund) so same-day refunds net correctly.
+  const combinedJe = (() => {
+    const first = enrichedTxn.jeSummary;
+    if (!first) return null;
+    let netSales = first.netSales;
+    let tax = first.tax;
+    let shipping = first.shipping;
+    let totalPayment = first.totalPayment;
+    let giftCardLiability = first.giftCardLiability;
+    if (allOrderTransactions) {
+      for (const txn of allOrderTransactions) {
+        if (txn === enrichedTxn) continue; // skip the one we already counted
+        const other = txn.jeSummary;
+        if (other) {
+          netSales = netSales.plus(other.netSales);
+          tax = tax.plus(other.tax);
+          shipping = shipping.plus(other.shipping);
+          totalPayment = totalPayment.plus(other.totalPayment);
+          giftCardLiability = giftCardLiability.plus(other.giftCardLiability);
+        }
+      }
+    }
+    return { netSales, tax, shipping, totalPayment, giftCardLiability };
+  })();
+  const taxTotal = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
+  const jeShipping = combinedJe ? combinedJe.shipping.abs() : order.totalShipping;
 
   // Payment breakdown from the capture transaction
   const paymentBreakdown = enrichedData.paymentBreakdown;
 
-  // Current total from JE summary (authoritative) or fallback to order
-  const currentTotal = je ? je.totalPayment.toFixed(2) : order.currentTotalPrice.toFixed(2);
+  // Current total from JE summary: sales + tax + shipping (matches what JE records in 3000/2110/3040).
+  // This excludes gift card liability (2320) so gift card product sales show $0 total, matching the JE.
+  // Uses combinedJe so same-day refunds net correctly.
+  const currentTotal = combinedJe
+    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).toFixed(2)
+    : order.currentTotalPrice.toFixed(2);
   const currentTotal1 = currentTotal;
   const currentTotal2 = currentTotal;
 
