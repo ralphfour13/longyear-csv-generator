@@ -62,8 +62,6 @@ execSync(`unzip -o "${zipPath}" -d "${tmpDir}"`, { stdio: 'pipe' });
 const files = fs.readdirSync(tmpDir);
 const dateMatch = files[0]?.match(/(\d{4}-\d{2}-\d{2})/);
 const exportDate = dateMatch?.[1] || 'unknown';
-const day = parseInt(exportDate.split('-')[2] || '0');
-
 console.log(`\n${'='.repeat(70)}`);
 console.log(`  Export Analysis: ${exportDate}`);
 console.log(`${'='.repeat(70)}\n`);
@@ -204,17 +202,21 @@ if (!internalOk && fs.existsSync(drFile)) {
 const orderDataFile = path.join(tmpDir, `order-data_${exportDate}.json`);
 if (fs.existsSync(orderDataFile)) {
   const orders = JSON.parse(fs.readFileSync(orderDataFile, 'utf-8'));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const refundedOrders = orders.filter((o: any) =>
     ['partially_refunded', 'refunded'].includes(o.financialStatus)
   );
 
   if (refundedOrders.length > 0) {
     console.log(`## Orders with Refunds (${refundedOrders.length})\n`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const o of refundedOrders) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const futureRefunds = (o.refunds || []).filter((r: any) =>
         r.createdAt && r.createdAt.slice(0, 10) > exportDate
       );
       if (futureRefunds.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dates = futureRefunds.map((r: any) => r.createdAt.slice(0, 10));
         console.log(`  #${o.orderNumber}: ${o.financialStatus} — future refunds on ${dates.join(', ')}`);
       }
