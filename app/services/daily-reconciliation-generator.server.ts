@@ -216,6 +216,7 @@ function transformToReconciliationRow(
     let tax = je.tax;
     let shipping = je.shipping;
     let total = je.totalPayment;
+    let giftCardLiability = je.giftCardLiability;
     // If there are multiple enriched transactions for this order (e.g., sale + refund),
     // combine their summaries
     for (let i = 1; i < transactions.length; i++) {
@@ -225,18 +226,20 @@ function transformToReconciliationRow(
         tax = tax.plus(other.tax);
         shipping = shipping.plus(other.shipping);
         total = total.plus(other.totalPayment);
+        giftCardLiability = giftCardLiability.plus(other.giftCardLiability);
       }
     }
-    return { netSales, tax, shipping, total };
+    return { netSales, tax, shipping, total, giftCardLiability };
   })() : null;
 
   const netSubtotal = combinedJe ? combinedJe.netSales.abs() : sales;
   const taxAmount = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
   const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
   // Payment total = sum of all credit-side amounts (sales + tax + shipping + gift card liability).
-  // This matches the total debits in the JE and correctly includes gift card/store credit payments.
+  // This matches the total debits in the JE. Gift card liability (2320) is included so gift card
+  // product sales show the full payment amount (e.g., $500 GC sale shows paymentTotal=500).
   const paymentTotal = combinedJe
-    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs())
+    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(combinedJe.giftCardLiability.abs())
     : order.totalPrice;
 
   // If refunded ON OR BEFORE this date, create negative+positive pair to show the void.

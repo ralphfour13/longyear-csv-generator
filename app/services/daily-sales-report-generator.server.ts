@@ -194,11 +194,11 @@ function transformToReportRow(
   // Payment breakdown from the capture transaction
   const paymentBreakdown = enrichedData.paymentBreakdown;
 
-  // Current total from JE summary: sales + tax + shipping (matches what JE records in 3000/2110/3040).
-  // This excludes gift card liability (2320) so gift card product sales show $0 total, matching the JE.
-  // Uses combinedJe so same-day refunds net correctly.
+  // Current total from JE summary: sales + tax + shipping + gift card liability.
+  // Includes gift card liability (2320) so gift card product sales show the full payment amount
+  // (e.g., $500 GC sale shows currentTotal=500). Uses combinedJe so same-day refunds net correctly.
   const currentTotal = combinedJe
-    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).toFixed(2)
+    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(combinedJe.giftCardLiability.abs()).toFixed(2)
     : order.currentTotalPrice.toFixed(2);
   const currentTotal1 = currentTotal;
   const currentTotal2 = currentTotal;
