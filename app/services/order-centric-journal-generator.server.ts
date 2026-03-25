@@ -389,16 +389,32 @@ export async function createOrderJournalEntries(
     // 2. capture >= totalPrice (refund-after-capture):
     //    Keep tax/shipping/gc at original values — the full order was captured.
     if (totalDebit.lt(order.totalPrice)) {
-      const orderTotal = order.totalPrice;
-      usedTax = orderTotal.isZero()
-        ? new Decimal(0)
-        : totalDebit.times(taxAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-      usedGiftCardSales = orderTotal.isZero()
-        ? new Decimal(0)
-        : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-      usedShipping = orderTotal.isZero()
-        ? new Decimal(0)
-        : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      const currentTotal = order.currentTotalPrice || order.totalPrice;
+      const removedTotal = order.totalPrice.minus(currentTotal);
+      const currentTax = order.currentTotalTax ?? order.totalTax ?? new Decimal(0);
+      if (totalDebit.minus(removedTotal).abs().lte(new Decimal('0.02'))) {
+        // EXCHANGE: capture ≈ removed items' total. Use exact item-level values.
+        usedTax = (order.totalTax || new Decimal(0)).minus(currentTax);
+        usedShipping = order.totalShipping.minus(order.totalShipping || new Decimal(0)); // shipping doesn't change in exchanges
+        usedGiftCardSales = new Decimal(0); // gift card products unlikely in exchanges
+      } else if (totalDebit.minus(currentTotal).abs().lte(new Decimal('0.02'))) {
+        // NORMAL PARTIAL CAPTURE: capture ≈ remaining items' total. Use current values.
+        usedTax = currentTax;
+        usedShipping = order.totalShipping || new Decimal(0); // shipping typically stays
+        usedGiftCardSales = giftCardProductSales; // keep as-is
+      } else {
+        // NEITHER PATTERN (e.g., same-day void): proportional fallback
+        const orderTotal = order.totalPrice;
+        usedTax = orderTotal.isZero()
+          ? new Decimal(0)
+          : totalDebit.times(taxAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        usedGiftCardSales = orderTotal.isZero()
+          ? new Decimal(0)
+          : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        usedShipping = orderTotal.isZero()
+          ? new Decimal(0)
+          : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+      }
     }
     // Sales = plug (ensures perfect balance)
     regularSales = totalDebit.minus(usedTax).minus(usedShipping).minus(usedGiftCardSales);
