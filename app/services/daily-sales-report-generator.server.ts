@@ -82,11 +82,21 @@ export function generateDailySalesReport(
     // Find the capture transaction (charge type) for this order
     const captureTransaction = transactions.find(txn => txn.balanceTransaction.type === 'charge');
 
-    // Only create a row if there's a capture (skip refund-only orders)
     if (captureTransaction) {
+      // Normal order: create row from capture transaction
       const row = transformToReportRow(captureTransaction, transactions);
       if (row) {
         rows.push(row);
+      }
+    } else {
+      // Refund-only order (original capture on earlier date, only refund on this date)
+      // Include as negative row so DSR totals match JE/DR
+      const refundTxn = transactions.find(txn => txn.balanceTransaction.type === 'refund');
+      if (refundTxn?.jeSummary && refundTxn.order) {
+        const row = transformRefundOnlyToReportRow(refundTxn);
+        if (row) {
+          rows.push(row);
+        }
       }
     }
   }
@@ -250,6 +260,81 @@ function transformToReportRow(
     transactionGateway: transaction?.gateway || '',
     transactionPaymentMethod: transaction?.paymentMethod || '',
     fulfillmentStatus: enrichedData.fulfillmentStatus,
+  };
+}
+
+/**
+ * Transform a refund-only order into a DSR row with negative values from jeSummary.
+ * These are orders where the original capture was on an earlier date and only the
+ * refund posted on this date. Without this, the DSR totals would be higher than JE/DR.
+ */
+function transformRefundOnlyToReportRow(
+  enrichedTxn: EnrichedTransaction,
+): DailySalesReportRow | null {
+  const order = enrichedTxn.order;
+  const je = enrichedTxn.jeSummary;
+  if (!order || !je) return null;
+
+  const enrichedData = enrichedTxn.enrichedData;
+  const zero = new Decimal(0);
+  const zeroStr = '0.00';
+
+  // Use jeSummary for all values (already negative for refunds)
+  const sales = je.netSales;
+  const tax = je.tax;
+  const shipping = je.shipping;
+  const total = sales.plus(tax).plus(shipping);
+
+  // Get tax line details from enrichment if available
+  const taxLines = enrichedData?.taxLines || [];
+  const tax1 = taxLines[0] || { title: '', rate: '', price: zero };
+  const tax2 = taxLines[1] || { title: '', rate: '', price: zero };
+  const tax3 = taxLines[2] || { title: '', rate: '', price: zero };
+  const tax4 = taxLines[3] || { title: '', rate: '', price: zero };
+  const tax5 = taxLines[4] || { title: '', rate: '', price: zero };
+
+  const refundAmount = enrichedTxn.balanceTransaction.gross.abs();
+
+  return {
+    name: order.name,
+    tags: enrichedData?.tags || '',
+    tax1Title: tax1.title,
+    tax1Rate: tax1.rate,
+    tax1Price: tax1.price.neg().toFixed(2),
+    tax2Title: tax2.title,
+    tax2Rate: tax2.rate,
+    tax2Price: tax2.price.neg().toFixed(2),
+    tax3Title: tax3.title,
+    tax3Rate: tax3.rate,
+    tax3Price: tax3.price.neg().toFixed(2),
+    tax4Title: tax4.title,
+    tax4Rate: tax4.rate,
+    tax4Price: tax4.price.neg().toFixed(2),
+    tax5Title: tax5.title,
+    tax5Rate: tax5.rate,
+    tax5Price: tax5.price.neg().toFixed(2),
+    taxTotal: tax.toFixed(2),
+    totalShipping: shipping.toFixed(2),
+    totalRefund: refundAmount.toFixed(2),
+    currentTotal1: total.toFixed(2),
+    cash: zeroStr,
+    charge: zeroStr,
+    giftCard: zeroStr,
+    storeCredit: zeroStr,
+    check: zeroStr,
+    currentTotal2: total.toFixed(2),
+    paymentStatus: order.financialStatus,
+    orderFulfillmentStatus: enrichedData?.fulfillmentStatus || '',
+    shippingAddress1: enrichedData?.shippingAddress?.address1 || '',
+    shippingAddress2: enrichedData?.shippingAddress?.address2 || '',
+    shippingZip: enrichedData?.shippingAddress?.zip || '',
+    shippingCity: enrichedData?.shippingAddress?.city || '',
+    transactionKind: 'refund',
+    transactionProcessedAt: enrichedTxn.balanceTransaction.processedAt,
+    transactionAmount: enrichedTxn.balanceTransaction.gross.neg().toFixed(2),
+    transactionGateway: '',
+    transactionPaymentMethod: '',
+    fulfillmentStatus: enrichedData?.fulfillmentStatus || '',
   };
 }
 
