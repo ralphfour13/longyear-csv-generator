@@ -194,11 +194,12 @@ function transformToReportRow(
   // Payment breakdown from the capture transaction
   const paymentBreakdown = enrichedData.paymentBreakdown;
 
-  // Current total from JE summary: sales + tax + shipping + gift card liability.
-  // Includes gift card liability (2320) so gift card product sales show the full payment amount
-  // (e.g., $500 GC sale shows currentTotal=500). Uses combinedJe so same-day refunds net correctly.
+  // Current total from JE summary: sales + tax + shipping + gift card sold.
+  // Gift card liability (2320) is included only when positive (credit = GC product sold),
+  // NOT when negative (debit = GC redeemed as payment), to avoid double-counting.
+  const giftCardSoldAmount = combinedJe?.giftCardLiability.gt(0) ? combinedJe.giftCardLiability : new Decimal(0);
   const currentTotal = combinedJe
-    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(combinedJe.giftCardLiability.abs()).toFixed(2)
+    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(giftCardSoldAmount).toFixed(2)
     : order.currentTotalPrice.toFixed(2);
   const currentTotal1 = currentTotal;
   const currentTotal2 = currentTotal;
