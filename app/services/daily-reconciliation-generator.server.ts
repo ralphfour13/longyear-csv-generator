@@ -229,10 +229,17 @@ function transformToReconciliationRow(
   const netSubtotal = combinedJe ? combinedJe.netSales.abs() : sales;
   const taxAmount = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
   const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
-  const paymentTotal = combinedJe ? combinedJe.total : order.totalPrice;
+  // Payment total = sum of all credit-side amounts (sales + tax + shipping + gift card liability).
+  // This matches the total debits in the JE and correctly includes gift card/store credit payments.
+  const paymentTotal = combinedJe
+    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs())
+    : order.totalPrice;
 
-  // If refunded, create original sale row
-  if (order.financialStatus === 'refunded') {
+  // If refunded ON OR BEFORE this date, create negative+positive pair to show the void.
+  // Use hasActualRefunds (point-in-time) instead of financialStatus (current state),
+  // so orders refunded on a FUTURE date don't get a void pair on the capture date.
+  const isRefundedOnDate = order.hasActualRefunds && order.financialStatus === 'refunded';
+  if (isRefundedOnDate) {
     rows.push({
       orderNumber: order.name,
       originalSubtotal: originalSubtotal.neg().toFixed(2),
