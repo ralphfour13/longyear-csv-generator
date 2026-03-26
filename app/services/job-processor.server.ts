@@ -1,5 +1,6 @@
 import { getJobStatus, updateJobStatus, cleanupOldJobs, getShopJobs } from './background-jobs.server';
 import { processExport } from './batch-processor.server';
+import { processSalesTaxReport } from './sales-tax-processor.server';
 
 // Track processing state per shop to prevent concurrent processing of the same shop's jobs
 // Key: shop domain, Value: true if currently processing
@@ -22,43 +23,83 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
     });
 
     const startTime = Date.now();
-    console.log(
-      `[Job ${jobId}] Starting export for ${shop}`,
-      `\n  Date: ${job.startDate}`,
-      `\n  Files: ${Object.entries(job.fileOptions).filter(([, v]) => v).map(([k]) => k).join(', ')}`
-    );
 
-    // All jobs are now single-date exports (date ranges are split into separate jobs)
-    const result = await processExport(
-      shop,
-      accessToken,
-      job.startDate,
-      job.fileOptions,
-      jobId  // Pass jobId for progress tracking
-    );
+    // Route to appropriate processor based on job type
+    if (job.jobType === 'sales-tax' && job.salesTaxRequest) {
+      console.log(
+        `[Job ${jobId}] Starting sales tax report for ${shop}`,
+        `\n  Period: ${job.salesTaxRequest.periodType === 'month'
+          ? `${job.salesTaxRequest.year}-${String(job.salesTaxRequest.month).padStart(2, '0')}`
+          : `Q${job.salesTaxRequest.quarter} ${job.salesTaxRequest.year}`}`,
+      );
 
-    // Mark as completed
-    await updateJobStatus(jobId, {
-      status: 'completed',
-      completedAt: new Date().toISOString(),
-      progress: undefined,  // Clear progress on completion
-      result: {
-        success: true,
-        message: `Export completed for ${job.startDate}`,
-        filename: result.filename,
-        files: result.files,
-        entryCount: result.entryCount,
-        balanced: result.balanced,
-      },
-    });
+      const result = await processSalesTaxReport(
+        shop,
+        accessToken,
+        job.salesTaxRequest,
+        jobId,
+      );
 
-    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(
-      `[Job ${jobId}] ✓ Completed in ${duration}s`,
-      `\n  Entries: ${result.entryCount}`,
-      `\n  Files: ${result.files.length}`,
-      `\n  Balanced: ${result.balanced ? 'YES' : 'NO'}`
-    );
+      await updateJobStatus(jobId, {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        progress: undefined,
+        result: {
+          success: true,
+          message: `Sales tax report generated`,
+          filename: result.filename,
+          orderCount: result.orderCount,
+          filteredCount: result.filteredCount,
+        },
+      });
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(
+        `[Job ${jobId}] ✓ Sales tax report completed in ${duration}s`,
+        `\n  Orders processed: ${result.orderCount}`,
+        `\n  Orders in report: ${result.filteredCount}`,
+        `\n  File: ${result.filename}`,
+      );
+    } else {
+      // Default: standard export job
+      console.log(
+        `[Job ${jobId}] Starting export for ${shop}`,
+        `\n  Date: ${job.startDate}`,
+        `\n  Files: ${Object.entries(job.fileOptions).filter(([, v]) => v).map(([k]) => k).join(', ')}`
+      );
+
+      // All jobs are now single-date exports (date ranges are split into separate jobs)
+      const result = await processExport(
+        shop,
+        accessToken,
+        job.startDate,
+        job.fileOptions,
+        jobId  // Pass jobId for progress tracking
+      );
+
+      // Mark as completed
+      await updateJobStatus(jobId, {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        progress: undefined,  // Clear progress on completion
+        result: {
+          success: true,
+          message: `Export completed for ${job.startDate}`,
+          filename: result.filename,
+          files: result.files,
+          entryCount: result.entryCount,
+          balanced: result.balanced,
+        },
+      });
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(
+        `[Job ${jobId}] ✓ Completed in ${duration}s`,
+        `\n  Entries: ${result.entryCount}`,
+        `\n  Files: ${result.files.length}`,
+        `\n  Balanced: ${result.balanced ? 'YES' : 'NO'}`
+      );
+    }
   } catch (error) {
     console.error(`[Job ${jobId}] Failed:`, error);
 

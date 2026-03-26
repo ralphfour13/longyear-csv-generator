@@ -9,9 +9,16 @@ export interface ExportJob {
   id: string;
   shop: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
+  jobType?: 'export' | 'sales-tax'; // Defaults to 'export' for backwards compatibility
   startDate: string;
   endDate?: string;
   fileOptions: FileGenerationOptions;
+  salesTaxRequest?: {
+    periodType: 'month' | 'quarter';
+    year: number;
+    month?: number;
+    quarter?: number;
+  };
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
@@ -86,6 +93,42 @@ export async function createExportJob(
     `[Job] Created job ${jobId} for shop ${shop}`,
     `\n  Date range: ${dateRange}`,
     `\n  File options: ${fileTypes}`
+  );
+
+  return jobId;
+}
+
+/**
+ * Create a new sales tax report job
+ */
+export async function createSalesTaxJob(
+  shop: string,
+  salesTaxRequest: { periodType: 'month' | 'quarter'; year: number; month?: number; quarter?: number },
+): Promise<string> {
+  await ensureJobsDir();
+
+  const jobId = `salestax_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const job: ExportJob = {
+    id: jobId,
+    shop,
+    status: 'pending',
+    jobType: 'sales-tax',
+    startDate: '', // Not used for sales tax jobs
+    fileOptions: {}, // Not used for sales tax jobs
+    salesTaxRequest,
+    createdAt: new Date().toISOString(),
+  };
+
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
+
+  const periodLabel = salesTaxRequest.periodType === 'month'
+    ? `${salesTaxRequest.year}-${String(salesTaxRequest.month).padStart(2, '0')}`
+    : `Q${salesTaxRequest.quarter} ${salesTaxRequest.year}`;
+
+  console.log(
+    `[Job] Created sales tax job ${jobId} for shop ${shop}`,
+    `\n  Period: ${periodLabel}`,
   );
 
   return jobId;

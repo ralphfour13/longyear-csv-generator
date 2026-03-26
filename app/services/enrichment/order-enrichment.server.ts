@@ -25,6 +25,7 @@ export interface EnrichedOrderData {
   totalShippingPrice: Decimal;
   currentTotalPrice: Decimal;
   totalRefunded: Decimal;
+  sourceName?: string; // "pos", "web", "shopify_draft_order", etc.
 }
 
 export interface TaxLine {
@@ -38,6 +39,9 @@ export interface ShippingAddress {
   address2: string;
   zip: string;
   city: string;
+  provinceCode?: string; // "CA", "NV", etc.
+  province?: string; // "California", "Nevada", etc.
+  countryCode?: string; // "US", "CA", etc.
 }
 
 export interface OrderTransaction {
@@ -266,6 +270,7 @@ export async function enrichOrderData(
   const fulfillmentStatus = orderData.fulfillment_status || 'unfulfilled';
   const financialStatus = orderData.financial_status || 'pending';
   const closedAt = orderData.closed_at || undefined;
+  const sourceName = orderData.source_name || '';
   const totalShippingPrice = new Decimal(
     orderData.total_shipping_price_set?.shop_money?.amount ||
     orderData.total_shipping_price ||
@@ -293,6 +298,7 @@ export async function enrichOrderData(
     totalShippingPrice,
     currentTotalPrice,
     totalRefunded,
+    sourceName,
   };
 }
 
@@ -347,6 +353,9 @@ function parseShippingAddress(address: any): ShippingAddress {
     address2: address.address2 || '',
     zip: address.zip || '',
     city: address.city || '',
+    provinceCode: address.province_code || '',
+    province: address.province || '',
+    countryCode: address.country_code || '',
   };
 }
 
