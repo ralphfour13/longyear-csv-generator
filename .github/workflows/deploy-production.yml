@@ -1,6 +1,7 @@
 name: Deploy to Production
 
 on:
+  workflow_dispatch:
   push:
     branches: [Production]
     paths-ignore:
@@ -67,7 +68,7 @@ jobs:
       - name: Check for Shopify config changes
         id: check
         run: |
-          if git diff --name-only HEAD^ HEAD | grep -q "shopify.app.toml"; then
+          if git diff --name-only HEAD^ HEAD 2>/dev/null | grep -q "shopify.app.toml"; then
             echo "shopify_changed=true" >> $GITHUB_OUTPUT
             echo "✓ Shopify configuration changed - will deploy to Shopify"
           else
