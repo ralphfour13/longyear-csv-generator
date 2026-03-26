@@ -328,7 +328,7 @@ export interface EnrichedTransaction {
   enrichedData?: {
     tags: string;
     taxLines: Array<{ title: string; rate: string; price: Decimal }>;
-    shippingAddress: { address1: string; address2: string; zip: string; city: string };
+    shippingAddress: { address1: string; address2: string; zip: string; city: string; provinceCode?: string; province?: string; countryCode?: string };
     transactions: Array<{
       kind: string;
       processedAt: string;
@@ -347,6 +347,7 @@ export interface EnrichedTransaction {
     fulfillmentStatus: string;
     financialStatus: string;
     totalRefunded: Decimal;
+    sourceName?: string;
   };
 
   // JE-derived summary: authoritative sales/tax/shipping from the journal entry lines.
