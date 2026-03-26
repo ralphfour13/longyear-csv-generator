@@ -70,6 +70,13 @@ export interface SyncConfig {
   lastExportDate?: string; // ISO date string (optional tracking)
   emailEnabled?: boolean; // Enable email notifications for scheduled exports
   emailRecipients?: string; // Comma-separated email addresses
+  // Files to generate during export (default true if not set)
+  generateDailySales?: boolean;
+  generatePayoutsOrders?: boolean;
+  generateJournalDetails?: boolean;
+  generateJournalSummary?: boolean;
+  generateCogsDetails?: boolean;
+  generateReconciliation?: boolean;
 }
 
 /**

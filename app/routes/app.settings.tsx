@@ -786,6 +786,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       csvFormat: (formData.get('csvFormat') as 'standard' | 'extended') || 'standard',
       emailEnabled: formData.get('emailEnabled') === 'true',
       emailRecipients: (formData.get('emailRecipients') as string) || '',
+      generateDailySales: formData.get('generateDailySales') === 'true',
+      generatePayoutsOrders: formData.get('generatePayoutsOrders') === 'true',
+      generateJournalDetails: formData.get('generateJournalDetails') === 'true',
+      generateJournalSummary: formData.get('generateJournalSummary') === 'true',
+      generateCogsDetails: formData.get('generateCogsDetails') === 'true',
+      generateReconciliation: formData.get('generateReconciliation') === 'true',
     };
 
     await saveShopConfig(shop, config);
@@ -842,9 +848,14 @@ export default function Settings() {
       <Form method="post">
         <s-section heading="Export Schedule">
           <s-stack direction="block" gap="large">
-            <s-paragraph>
-              Configure when and how journal entries are automatically exported to Sage 50.
-            </s-paragraph>
+            <s-stack direction="inline" gap="base" alignItems="center" justifyContent="space-between">
+              <s-paragraph>
+                Configure when and how journal entries are automatically exported to Sage 50.
+              </s-paragraph>
+              <s-button type="submit" variant="primary">
+                Save Settings
+              </s-button>
+            </s-stack>
 
             <s-stack direction="block" gap="base">
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
@@ -921,80 +932,11 @@ export default function Settings() {
           </s-stack>
         </s-section>
 
-        <s-section heading="Transaction Types">
-          <s-stack direction="block" gap="large">
-            <s-paragraph>
-              Select which transaction types to include in exports
-            </s-paragraph>
-
-            <s-stack direction="block" gap="base">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  name="orders"
-                  value="true"
-                  defaultChecked={config.transactionTypes.orders}
-                />
-                <s-text>Orders (Sales Revenue)</s-text>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  name="refunds"
-                  value="true"
-                  defaultChecked={config.transactionTypes.refunds}
-                />
-                <s-text>Refunds</s-text>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  name="payments"
-                  value="true"
-                  defaultChecked={config.transactionTypes.payments}
-                />
-                <s-text>Payments & Fees</s-text>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  name="inventory"
-                  value="true"
-                  defaultChecked={config.transactionTypes.inventory}
-                />
-                <s-text tone="neutral">Inventory Adjustments (Coming Soon)</s-text>
-              </label>
-            </s-stack>
-          </s-stack>
-        </s-section>
-
-        <s-section heading="CSV Format">
-          <s-stack direction="block" gap="large">
-            <s-stack direction="block" gap="base">
-              <s-text>Format Type</s-text>
-              <select
-                name="csvFormat"
-                defaultValue={config.csvFormat}
-                style={{
-                  width: '100%',
-                  maxWidth: '400px',
-                  padding: '10px',
-                  border: '1px solid var(--p-color-border)',
-                  borderRadius: 'var(--p-border-radius-200)',
-                  fontSize: '14px',
-                }}
-              >
-                <option value="standard">
-                  Standard (Date, Reference, Account, Debit, Credit, Memo)
-                </option>
-                <option value="extended">Extended (Additional reconciliation fields)</option>
-              </select>
-            </s-stack>
-          </s-stack>
-        </s-section>
+        <input type="hidden" name="orders" value="true" />
+        <input type="hidden" name="refunds" value="true" />
+        <input type="hidden" name="payments" value="true" />
+        <input type="hidden" name="inventory" value={config.transactionTypes.inventory ? 'true' : 'false'} />
+        <input type="hidden" name="csvFormat" value={config.csvFormat} />
 
         <s-section heading="Email Notifications">
           <s-stack direction="block" gap="base">
@@ -1066,193 +1008,233 @@ export default function Settings() {
           </s-stack>
         </Form>
 
-        <div style={{ marginTop: '24px' }}>
-          <s-button type="submit" variant="primary">
-            Save Settings
-          </s-button>
-        </div>
+        <s-section heading="Files to Generate">
+          <s-stack direction="block" gap="large">
+            <s-paragraph>
+              Select which files to generate when running exports.
+            </s-paragraph>
+
+            <s-stack direction="block" gap="base">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="generateDailySales"
+                  value="true"
+                  defaultChecked={config.generateDailySales !== false}
+                />
+                <s-text>Detailed Sales Report</s-text>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="generatePayoutsOrders"
+                  value="true"
+                  defaultChecked={config.generatePayoutsOrders !== false}
+                />
+                <s-text>Payouts with Orders</s-text>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="generateJournalDetails"
+                  value="true"
+                  defaultChecked={config.generateJournalDetails !== false}
+                />
+                <s-text>Journal Entry Details</s-text>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="generateJournalSummary"
+                  value="true"
+                  defaultChecked={config.generateJournalSummary !== false}
+                />
+                <s-text>Journal Entry Summary (Sage 50 Import)</s-text>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="generateCogsDetails"
+                  value="true"
+                  defaultChecked={config.generateCogsDetails !== false}
+                />
+                <s-text>COGS Details (if Cin7 enabled)</s-text>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="generateReconciliation"
+                  value="true"
+                  defaultChecked={config.generateReconciliation !== false}
+                />
+                <s-text>Daily Reconciliation Report (Quick review format)</s-text>
+              </label>
+            </s-stack>
+          </s-stack>
+        </s-section>
+
       </Form>
 
       <s-section heading="Cin7 Integration (COGS)">
         <s-stack direction="block" gap="large">
-          <s-paragraph>
-            Connect to Cin7 Core (Dear Systems) to automatically fetch Cost of Goods Sold (COGS) data for products.
-            Two files will be generated: detailed COGS breakdown and summary entries in journal file.
-          </s-paragraph>
-
           <Form method="post">
             <input type="hidden" name="actionType" value="saveCin7Settings" />
+            <input type="hidden" name="cin7CacheDuration" value="24" />
 
-            <s-stack direction="block" gap="base">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  name="cin7Enabled"
-                  value="true"
-                  defaultChecked={cin7Config.enabled}
-                />
-                <s-text>Enable Cin7 COGS integration</s-text>
-              </label>
-
-              <s-stack direction="block" gap="base">
-                <s-text>Cin7 Account ID</s-text>
-                <input
-                  type="text"
-                  name="cin7AccountId"
-                  defaultValue={cin7Config.accountId}
-                  placeholder="Your Cin7 Account ID"
-                  style={{
-                    width: '100%',
-                    maxWidth: '400px',
-                    padding: '10px',
-                    border: '1px solid var(--p-color-border)',
-                    borderRadius: 'var(--p-border-radius-200)',
-                    fontSize: '14px',
-                  }}
-                />
-                <s-text tone="neutral">
-                  Found in Cin7 Settings → Integrations → API
-                </s-text>
-              </s-stack>
-
-              <s-stack direction="block" gap="base">
-                <s-text>Cin7 API Key</s-text>
-                <input
-                  type="password"
-                  name="cin7ApiKey"
-                  defaultValue={cin7Config.apiKey}
-                  placeholder="Your Cin7 API Application Key"
-                  style={{
-                    width: '100%',
-                    maxWidth: '400px',
-                    padding: '10px',
-                    border: '1px solid var(--p-color-border)',
-                    borderRadius: 'var(--p-border-radius-200)',
-                    fontSize: '14px',
-                  }}
-                />
-                <s-text tone="neutral">
-                  API key is encrypted at rest using AES-256
-                </s-text>
-              </s-stack>
-
-              <div style={{ marginTop: '12px' }}>
+            <s-stack direction="block" gap="large">
+              <s-stack direction="inline" gap="base" alignItems="center" justifyContent="space-between">
+                <s-paragraph>
+                  Connect to Cin7 Core (Dear Systems) to automatically fetch Cost of Goods Sold (COGS) data for products.
+                  Two files will be generated: detailed COGS breakdown and summary entries in journal file.
+                </s-paragraph>
                 <s-button type="submit" variant="primary">
                   Save Cin7 Settings
                 </s-button>
-              </div>
-            </s-stack>
-          </Form>
-
-          <s-divider />
-
-          <s-text>Test Connection</s-text>
-          <Form method="post">
-            <input type="hidden" name="actionType" value="testCin7Connection" />
-            <input type="hidden" name="cin7AccountId" value={cin7Config.accountId} />
-            <input type="hidden" name="cin7ApiKey" value={cin7Config.apiKey} />
-
-            <s-stack direction="inline" gap="base">
-              <s-button type="submit">Test Cin7 Connection</s-button>
-              <s-text tone="neutral">
-                Last tested: {cin7Config.lastTested ? new Date(cin7Config.lastTested).toLocaleString() : 'Never'}
-              </s-text>
-            </s-stack>
-          </Form>
-
-          <s-divider />
-
-          <s-text>Advanced Settings</s-text>
-          <Form method="post">
-            <input type="hidden" name="actionType" value="saveCin7Settings" />
-            <input type="hidden" name="cin7Enabled" value={cin7Config.enabled ? 'true' : 'false'} />
-            <input type="hidden" name="cin7AccountId" value={cin7Config.accountId} />
-            <input type="hidden" name="cin7ApiKey" value={cin7Config.apiKey} />
-
-            <s-stack direction="block" gap="base">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  name="cin7CacheEnabled"
-                  value="true"
-                  defaultChecked={cin7Config.cacheEnabled}
-                />
-                <s-text>Enable COGS caching (24 hours)</s-text>
-              </label>
-
-              <s-stack direction="block" gap="base">
-                <s-text>Cache Duration (hours)</s-text>
-                <input
-                  type="number"
-                  name="cin7CacheDuration"
-                  defaultValue={cin7Config.cacheDurationHours}
-                  min="1"
-                  max="168"
-                  style={{
-                    width: '150px',
-                    padding: '10px',
-                    border: '1px solid var(--p-color-border)',
-                    borderRadius: 'var(--p-border-radius-200)',
-                    fontSize: '14px',
-                  }}
-                />
               </s-stack>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  name="cin7UseFallback"
-                  value="true"
-                  defaultChecked={cin7Config.useFallback}
-                />
-                <s-text>Use fallback cost when product not found</s-text>
-              </label>
+              <s-stack direction="block" gap="base">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name="cin7Enabled"
+                    value="true"
+                    defaultChecked={cin7Config.enabled}
+                  />
+                  <s-text>Enable Cin7 COGS integration</s-text>
+                </label>
+
+                <s-stack direction="block" gap="base">
+                  <s-text>Cin7 Account ID</s-text>
+                  <input
+                    type="text"
+                    name="cin7AccountId"
+                    defaultValue={cin7Config.accountId}
+                    placeholder="Your Cin7 Account ID"
+                    style={{
+                      width: '100%',
+                      maxWidth: '400px',
+                      padding: '10px',
+                      border: '1px solid var(--p-color-border)',
+                      borderRadius: 'var(--p-border-radius-200)',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <s-text tone="neutral">
+                    Found in Cin7 Settings → Integrations → API
+                  </s-text>
+                </s-stack>
+
+                <s-stack direction="block" gap="base">
+                  <s-text>Cin7 API Key</s-text>
+                  <input
+                    type="password"
+                    name="cin7ApiKey"
+                    defaultValue={cin7Config.apiKey}
+                    placeholder="Your Cin7 API Application Key"
+                    style={{
+                      width: '100%',
+                      maxWidth: '400px',
+                      padding: '10px',
+                      border: '1px solid var(--p-color-border)',
+                      borderRadius: 'var(--p-border-radius-200)',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <s-text tone="neutral">
+                    API key is encrypted at rest using AES-256
+                  </s-text>
+                </s-stack>
+              </s-stack>
+
+              <s-divider />
 
               <s-stack direction="block" gap="base">
-                <s-text>Fallback COGS (optional)</s-text>
-                <input
-                  type="number"
-                  name="cin7FallbackCost"
-                  defaultValue={cin7Config.fallbackCost || ''}
-                  placeholder="0.00"
-                  step="0.01"
-                  style={{
-                    width: '150px',
-                    padding: '10px',
-                    border: '1px solid var(--p-color-border)',
-                    borderRadius: 'var(--p-border-radius-200)',
-                    fontSize: '14px',
-                  }}
-                />
+                <s-text><strong>Advanced Settings</strong></s-text>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name="cin7CacheEnabled"
+                    value="true"
+                    defaultChecked={cin7Config.cacheEnabled ?? cin7Config.enabled}
+                  />
+                  <s-text>Enable COGS caching (24 hours)</s-text>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name="cin7UseFallback"
+                    value="true"
+                    defaultChecked={cin7Config.useFallback ?? cin7Config.enabled}
+                  />
+                  <s-text>Use fallback cost when product not found</s-text>
+                </label>
+
+                <s-stack direction="block" gap="base">
+                  <s-text>Fallback COGS (optional)</s-text>
+                  <input
+                    type="number"
+                    name="cin7FallbackCost"
+                    defaultValue={cin7Config.fallbackCost || ''}
+                    placeholder="0.00"
+                    step="0.01"
+                    style={{
+                      width: '150px',
+                      padding: '10px',
+                      border: '1px solid var(--p-color-border)',
+                      borderRadius: 'var(--p-border-radius-200)',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <s-text tone="neutral">
+                    Default cost to use when product not found in Cin7
+                  </s-text>
+                </s-stack>
+              </s-stack>
+            </s-stack>
+          </Form>
+
+          <s-divider />
+
+          <s-stack direction="block" gap="base">
+            <s-text><strong>Test Connection</strong></s-text>
+            <Form method="post">
+              <input type="hidden" name="actionType" value="testCin7Connection" />
+              <input type="hidden" name="cin7AccountId" value={cin7Config.accountId} />
+              <input type="hidden" name="cin7ApiKey" value={cin7Config.apiKey} />
+
+              <s-stack direction="inline" gap="base" alignItems="center">
+                <s-button type="submit">Test Cin7 Connection</s-button>
                 <s-text tone="neutral">
-                  Default cost to use when product not found in Cin7
+                  Last tested: {cin7Config.lastTested ? new Date(cin7Config.lastTested).toLocaleString() : 'Never'}
                 </s-text>
               </s-stack>
-
-              <div style={{ marginTop: '12px' }}>
-                <s-button type="submit">Save Advanced Settings</s-button>
-              </div>
-            </s-stack>
-          </Form>
+            </Form>
+          </s-stack>
 
           <s-divider />
 
-          <s-text>Cache Statistics</s-text>
           <s-stack direction="block" gap="base">
+            <s-text><strong>Cache Statistics</strong></s-text>
             <s-text>
               Cache Hits: {cin7CacheStats.hits} | Misses: {cin7CacheStats.misses} | Hit Rate: {cin7CacheStats.hitRate}%
             </s-text>
             <s-text>
               Cached Items: {cin7CacheStats.size}
             </s-text>
+            <Form method="post">
+              <input type="hidden" name="actionType" value="clearCin7Cache" />
+              <s-button type="submit" variant="secondary">
+                Clear COGS Cache
+              </s-button>
+            </Form>
           </s-stack>
-
-          <Form method="post">
-            <input type="hidden" name="actionType" value="clearCin7Cache" />
-            <s-button type="submit" variant="secondary">
-              Clear COGS Cache
-            </s-button>
-          </Form>
         </s-stack>
       </s-section>
 
@@ -1402,19 +1384,6 @@ export default function Settings() {
         </s-stack>
       </s-section>
 
-      <s-section heading="How It Works" slot="aside">
-        <s-stack direction="block" gap="base">
-          <s-text>
-            <strong>Manual Export:</strong> Go to Export Center and select specific dates to generate CSV on-demand.
-          </s-text>
-          <s-text>
-            <strong>Automatic Export:</strong> Enable nightly sync to generate CSV files at scheduled time.
-          </s-text>
-          <s-text>
-            <strong>Payout-First:</strong> Starts with bank deposits and works backwards for perfect reconciliation.
-          </s-text>
-        </s-stack>
-      </s-section>
     </s-page>
   );
 }
