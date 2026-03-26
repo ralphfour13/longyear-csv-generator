@@ -846,6 +846,7 @@ export default function Settings() {
       )}
 
       <Form method="post">
+        <s-stack direction="block" gap="large">
         <s-section heading="Export Schedule">
           <s-stack direction="block" gap="large">
             <s-stack direction="inline" gap="base" alignItems="center" justifyContent="space-between">
@@ -975,8 +976,6 @@ export default function Settings() {
 
             <s-divider />
 
-            <s-divider />
-
             <s-stack direction="block" gap="base">
               <s-text><strong>Test Email Configuration</strong></s-text>
               <s-text tone="neutral">
@@ -1078,7 +1077,7 @@ export default function Settings() {
             </s-stack>
           </s-stack>
         </s-section>
-
+        </s-stack>
       </Form>
 
       <s-section heading="Cin7 Integration (COGS)">
