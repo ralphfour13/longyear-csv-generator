@@ -246,7 +246,8 @@ export async function createOrderJournalEntries(
   accessToken?: string,
   preCalculatedCogs?: CogsCalculation,
   captureRatio?: Decimal,
-  isoTargetDate?: string  // YYYY-MM-DD format for point-in-time filtering
+  isoTargetDate?: string,  // YYYY-MM-DD format for point-in-time filtering
+  skipCogs?: boolean  // Skip all COGS/Cin7 processing
 ): Promise<JournalEntry[]> {
   const entries: JournalEntry[] = [];
   const reference = `SO-${order.name}`;
@@ -491,7 +492,7 @@ export async function createOrderJournalEntries(
 
   // Add COGS entries (if Cin7 enabled and order has line items)
   try {
-    const cin7Enabled = await isCin7Enabled(shop);
+    const cin7Enabled = !skipCogs && await isCin7Enabled(shop);
     if (cin7Enabled && order.lineItems.length > 0) {
       // Use pre-calculated COGS if provided (ensures consistency with COGS detail CSV),
       // otherwise calculate independently
