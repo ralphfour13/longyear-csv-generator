@@ -929,14 +929,13 @@ export default function Settings() {
                 </s-text>
               </s-stack>
             </s-stack>
+            <input type="hidden" name="orders" value="true" />
+            <input type="hidden" name="refunds" value="true" />
+            <input type="hidden" name="payments" value="true" />
+            <input type="hidden" name="inventory" value={config.transactionTypes.inventory ? 'true' : 'false'} />
+            <input type="hidden" name="csvFormat" value={config.csvFormat} />
           </s-stack>
         </s-section>
-
-        <input type="hidden" name="orders" value="true" />
-        <input type="hidden" name="refunds" value="true" />
-        <input type="hidden" name="payments" value="true" />
-        <input type="hidden" name="inventory" value={config.transactionTypes.inventory ? 'true' : 'false'} />
-        <input type="hidden" name="csvFormat" value={config.csvFormat} />
 
         <s-section heading="Email Notifications">
           <s-stack direction="block" gap="base">
@@ -976,37 +975,39 @@ export default function Settings() {
 
             <s-divider />
 
+            <s-divider />
+
             <s-stack direction="block" gap="base">
               <s-text><strong>Test Email Configuration</strong></s-text>
               <s-text tone="neutral">
                 Send a test email to verify your configuration is working.
               </s-text>
             </s-stack>
+
+            <Form method="post">
+              <input type="hidden" name="actionType" value="testEmail" />
+              <s-stack direction="block" gap="base">
+                <input
+                  type="email"
+                  name="testEmailRecipient"
+                  placeholder="test@example.com"
+                  required
+                  style={{
+                    width: '100%',
+                    maxWidth: '400px',
+                    padding: '10px',
+                    border: '1px solid var(--p-color-border)',
+                    borderRadius: 'var(--p-border-radius-200)',
+                    fontSize: '14px',
+                  }}
+                />
+                <s-button type="submit" variant="secondary">
+                  Send Test Email
+                </s-button>
+              </s-stack>
+            </Form>
           </s-stack>
         </s-section>
-
-        <Form method="post" style={{ marginTop: '16px' }}>
-          <input type="hidden" name="actionType" value="testEmail" />
-          <s-stack direction="block" gap="base">
-            <input
-              type="email"
-              name="testEmailRecipient"
-              placeholder="test@example.com"
-              required
-              style={{
-                width: '100%',
-                maxWidth: '400px',
-                padding: '10px',
-                border: '1px solid var(--p-color-border)',
-                borderRadius: 'var(--p-border-radius-200)',
-                fontSize: '14px',
-              }}
-            />
-            <s-button type="submit" variant="secondary">
-              Send Test Email
-            </s-button>
-          </s-stack>
-        </Form>
 
         <s-section heading="Files to Generate">
           <s-stack direction="block" gap="large">
