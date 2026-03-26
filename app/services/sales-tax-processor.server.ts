@@ -145,8 +145,8 @@ export async function processSalesTaxReport(
     }
 
     try {
-      // Pass empty COGS map to skip Cin7 API calls — sales tax report doesn't need COGS data
-      const result = await reconcileOrdersByDate(shop, accessToken, dayStr, undefined, new Map());
+      // Skip COGS/Cin7 — sales tax report doesn't need cost data
+      const result = await reconcileOrdersByDate(shop, accessToken, dayStr, undefined, undefined, true);
 
       if (result.enrichedTransactions.length > 0) {
         allEnrichedTransactions.push(...result.enrichedTransactions);

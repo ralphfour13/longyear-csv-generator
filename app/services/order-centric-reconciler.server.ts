@@ -94,7 +94,8 @@ export async function reconcileOrdersByDate(
   accessToken: string,
   targetDate: string,
   jobId?: string,  // Optional job ID for progress tracking
-  cogsDataMap?: Map<string, CogsCalculation>  // Pre-calculated COGS data for consistency
+  cogsDataMap?: Map<string, CogsCalculation>,  // Pre-calculated COGS data for consistency
+  skipCogs?: boolean  // Skip all COGS/Cin7 processing (e.g., for sales tax reports)
 ): Promise<OrderCentricReconciliationResult> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -128,7 +129,7 @@ export async function reconcileOrdersByDate(
     // PRE-COLLECT COGS DATA: Calculate COGS once before journal generation
     // This ensures both journal entries and COGS detail CSV use identical cost data
     let preCollectedCogsDataMap: Map<string, CogsCalculation> | undefined;
-    if (!cogsDataMap) {
+    if (!cogsDataMap && !skipCogs) {
       const cin7Enabled = await isCin7Enabled(shop);
       if (cin7Enabled) {
         try {
@@ -383,7 +384,8 @@ export async function reconcileOrdersByDate(
           errors,
           effectiveCogsDataMap,
           captureRatio,
-          enrichmentCache
+          enrichmentCache,
+          skipCogs
         );
 
         // Process refunds (if any on target date)
@@ -566,7 +568,8 @@ async function processOrderCaptures(
   errors: string[],
   cogsDataMap?: Map<string, CogsCalculation>,
   captureRatio?: Decimal,
-  enrichmentCache?: Map<string, EnrichedOrderData | null>
+  enrichmentCache?: Map<string, EnrichedOrderData | null>,
+  skipCogs?: boolean
 ): Promise<void> {
   // Analyze payment methods
   const paymentBreakdowns = await analyzeOrderPayments(
@@ -601,7 +604,8 @@ async function processOrderCaptures(
     accessToken,
     preCalculatedCogs,
     captureRatio,
-    targetDate  // Pass YYYY-MM-DD for point-in-time filtering
+    targetDate,  // Pass YYYY-MM-DD for point-in-time filtering
+    skipCogs
   );
 
   journalEntries.push(...entries);
