@@ -15,7 +15,6 @@ import type { SalesTaxReportRow, SalesTaxOrderSummary, ShopAddress } from '../ty
  */
 export function generateSalesTaxReport(
   enrichedTransactions: EnrichedTransaction[],
-  periodLabel: string,
   shopAddress: ShopAddress,
 ): string {
   // Group transactions by order
@@ -41,11 +40,8 @@ export function generateSalesTaxReport(
   // Convert to report rows
   const rows: SalesTaxReportRow[] = orderSummaries.map(summaryToRow);
 
-  // Calculate totals
-  const totalsRow = calculateTotalsRow(rows);
-
   // Generate CSV
-  return generateCSV(rows, totalsRow, periodLabel);
+  return generateCSV(rows);
 }
 
 /**
@@ -134,6 +130,11 @@ function buildOrderSummary(
     (sum, tl) => sum.plus(tl.price),
     new Decimal(0),
   );
+
+  // Exclude POS orders with no tax collected (out-of-state shipments)
+  if (isPOS && totalTaxCollected.isZero()) {
+    return null;
+  }
 
   // Gross sales = subtotal + discounts (before discounts removed)
   const grossSales = order.subtotalPrice.plus(order.totalDiscounts);
@@ -224,74 +225,6 @@ function summaryToRow(summary: SalesTaxOrderSummary): SalesTaxReportRow {
 }
 
 /**
- * Calculate totals row
- */
-function calculateTotalsRow(rows: SalesTaxReportRow[]): SalesTaxReportRow {
-  let grossSales = new Decimal(0);
-  let discountAmount = new Decimal(0);
-  let shippingCharged = new Decimal(0);
-  let taxableAmount = new Decimal(0);
-  let nonTaxableAmount = new Decimal(0);
-  let totalTaxCollected = new Decimal(0);
-  let refundAmount = new Decimal(0);
-  let refundTaxAmount = new Decimal(0);
-
-  for (const row of rows) {
-    grossSales = grossSales.plus(parseDecimal(row.grossSales));
-    discountAmount = discountAmount.plus(parseDecimal(row.discountAmount));
-    shippingCharged = shippingCharged.plus(parseDecimal(row.shippingCharged));
-    taxableAmount = taxableAmount.plus(parseDecimal(row.taxableAmount));
-    nonTaxableAmount = nonTaxableAmount.plus(parseDecimal(row.nonTaxableAmount));
-    totalTaxCollected = totalTaxCollected.plus(parseDecimal(row.totalTaxCollected));
-    refundAmount = refundAmount.plus(parseDecimal(row.refundAmount));
-    refundTaxAmount = refundTaxAmount.plus(parseDecimal(row.refundTaxAmount));
-  }
-
-  return {
-    orderNumber: 'TOTALS',
-    orderDate: '',
-    captureDate: '',
-    source: '',
-    shipToCity: '',
-    shipToState: '',
-    grossSales: grossSales.toFixed(2),
-    discountAmount: discountAmount.toFixed(2),
-    shippingCharged: shippingCharged.toFixed(2),
-    taxableAmount: taxableAmount.toFixed(2),
-    nonTaxableAmount: nonTaxableAmount.toFixed(2),
-    exemptReason: '',
-    tax1Title: '',
-    tax1Rate: '',
-    tax1Amount: '',
-    tax2Title: '',
-    tax2Rate: '',
-    tax2Amount: '',
-    tax3Title: '',
-    tax3Rate: '',
-    tax3Amount: '',
-    tax4Title: '',
-    tax4Rate: '',
-    tax4Amount: '',
-    tax5Title: '',
-    tax5Rate: '',
-    tax5Amount: '',
-    totalTaxCollected: totalTaxCollected.toFixed(2),
-    refundAmount: refundAmount.toFixed(2),
-    refundTaxAmount: refundTaxAmount.toFixed(2),
-  };
-}
-
-/**
- * Parse string to Decimal (handles empty strings as zero)
- */
-function parseDecimal(value: string): Decimal {
-  if (!value || value === '') {
-    return new Decimal(0);
-  }
-  return new Decimal(value);
-}
-
-/**
  * Format ISO date to YYYY-MM-DD
  */
 function formatDateOnly(isoDate: string): string {
@@ -304,14 +237,8 @@ function formatDateOnly(isoDate: string): string {
  */
 function generateCSV(
   rows: SalesTaxReportRow[],
-  totalsRow: SalesTaxReportRow,
-  periodLabel: string,
 ): string {
   const lines: string[] = [];
-
-  // Period label row
-  lines.push(escapeCSVField(`Sales Tax Report - ${periodLabel}`));
-  lines.push(''); // blank line
 
   // Header row
   const headers = [
@@ -352,9 +279,6 @@ function generateCSV(
   for (const row of rows) {
     lines.push(rowToCSVLine(row));
   }
-
-  // Totals row
-  lines.push(rowToCSVLine(totalsRow));
 
   return lines.join('\n');
 }

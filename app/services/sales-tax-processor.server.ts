@@ -179,7 +179,6 @@ export async function processSalesTaxReport(
 
   const csvContent = generateSalesTaxReport(
     allEnrichedTransactions,
-    label,
     shopAddress,
   );
 
