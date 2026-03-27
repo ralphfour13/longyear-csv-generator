@@ -48,6 +48,7 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
           success: true,
           message: `Sales tax report generated`,
           filename: result.filename,
+          files: [{ filename: result.filename }],
           orderCount: result.orderCount,
           filteredCount: result.filteredCount,
         },
