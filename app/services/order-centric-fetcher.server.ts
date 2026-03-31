@@ -463,6 +463,17 @@ function parseOrder(orderData: any): Order {
   // Parse refunds (if any)
   const refunds = parseRefunds(orderData.refunds || []);
 
+  // Extract last fulfillment date (actual ship date) from inline fulfillments array
+  const fulfillments = orderData.fulfillments || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const successFulfillments = fulfillments.filter((f: any) => f.status === 'success');
+  const fulfilledAt = successFulfillments.length > 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? successFulfillments.reduce((latest: string, f: any) =>
+        f.created_at > latest ? f.created_at : latest,
+      successFulfillments[0].created_at)
+    : undefined;
+
   return {
     id: orderData.id.toString(),
     orderNumber: orderData.order_number,
@@ -488,6 +499,7 @@ function parseOrder(orderData: any): Order {
     currency: orderData.currency,
     financialStatus: orderData.financial_status,
     closedAt: orderData.closed_at || undefined,
+    fulfilledAt,
     lineItems,
     transactions: [], // Will be populated separately
     refunds, // Refund details for proper tax splitting

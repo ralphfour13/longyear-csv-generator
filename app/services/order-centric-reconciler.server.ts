@@ -247,20 +247,21 @@ export async function reconcileOrdersByDate(
         // This ensures refunds that occur on different dates than captures are still processed
         const refundTransactions = filterRefundTransactions(order, targetDate);
 
-        // UNIFIED POSTING DATE: Post on fulfillment date (closedAt) when available,
+        // UNIFIED POSTING DATE: Post on fulfillment date (fulfilledAt or closedAt) when available,
         // otherwise fall back to last capture date. This ensures all payment legs
         // (gift card, CC, split tender) post together on the same date.
         const postingDate = getOrderPostingDate(order, targetDate);
-        const postingOnFulfillmentDate = !!order.closedAt && formatDateOnly(order.closedAt) === targetDate;
+        const hasFulfillmentDate = !!(order.fulfilledAt || order.closedAt);
+        const postingOnFulfillmentDate = hasFulfillmentDate && postingDate === targetDate;
 
         let captureRatio: Decimal | undefined;
         let isMultiDateCCCapture = false;
 
-        if (order.closedAt) {
-          // Fulfillment date available: order posts as a complete unit on closedAt date.
+        if (hasFulfillmentDate) {
+          // Fulfillment date available: order posts as a complete unit on that date.
           // No need for multi-CC-capture splitting — all captures are included.
           if (!postingOnFulfillmentDate) {
-            // closedAt is on a different date — check for refunds, then skip
+            // Fulfillment is on a different date — check for refunds, then skip
             if (refundTransactions.length > 0) {
               await processOrderRefunds(
                 shop, accessToken, order, refundTransactions, targetDate,
@@ -272,7 +273,7 @@ export async function reconcileOrdersByDate(
             continue;
           }
         } else if (postingDate) {
-          // Fallback path (no closedAt): use last capture date with multi-CC-capture detection.
+          // Fallback path (no fulfillment date): use last capture date with multi-CC-capture detection.
           // This handles POS orders, unfulfilled orders, and other edge cases.
           const ccCapturesByDate = groupCCCapturesByDate(allCaptureTransactions);
           isMultiDateCCCapture = ccCapturesByDate.size > 1;
@@ -912,15 +913,20 @@ function formatDateOnly(isoTimestamp: string): string {
 /**
  * Determine the posting date for an order.
  *
- * Unified rule: post on fulfillment date (closedAt) when available.
- * Fallback to last capture date for POS orders (closedAt often equals createdAt)
- * and unfulfilled orders.
+ * Priority: last fulfillment date (fulfilledAt) > closedAt > last capture date.
+ * fulfilledAt is the actual ship date from Shopify's fulfillments API.
+ * closedAt is only set when order status is "closed" (archived), which many
+ * fulfilled orders never get. Last capture date is the fallback for
+ * POS orders and unfulfilled orders.
  *
  * This ensures all payment legs (gift card, CC, split tender) post together
  * on the same date, eliminating timing mismatches when gift card captures
  * fire immediately at order creation but CC captures occur at fulfillment.
  */
 function getOrderPostingDate(order: Order, targetDate: string): string | null {
+  if (order.fulfilledAt) {
+    return formatDateOnly(order.fulfilledAt);
+  }
   if (order.closedAt) {
     return formatDateOnly(order.closedAt);
   }
