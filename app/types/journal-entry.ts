@@ -143,6 +143,7 @@ export interface Order {
   financialStatus: string; // "paid", "pending", "refunded", etc.
   closedAt?: string; // ISO timestamp when order was closed (fully paid + fulfilled)
   fulfilledAt?: string; // ISO timestamp of last fulfillment (actual ship date)
+  sourceName?: string; // "pos", "web", "shopify_draft_order", etc.
   lineItems: OrderLineItem[];
   transactions?: Transaction[]; // Payment transactions
   refunds?: Refund[]; // Refund details (for proper tax splitting)

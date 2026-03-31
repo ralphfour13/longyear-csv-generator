@@ -500,6 +500,7 @@ function parseOrder(orderData: any): Order {
     financialStatus: orderData.financial_status,
     closedAt: orderData.closed_at || undefined,
     fulfilledAt,
+    sourceName: orderData.source_name || undefined,
     lineItems,
     transactions: [], // Will be populated separately
     refunds, // Refund details for proper tax splitting
