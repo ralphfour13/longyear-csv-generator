@@ -404,17 +404,29 @@ export async function createOrderJournalEntries(
         usedShipping = order.totalShipping || new Decimal(0); // shipping typically stays
         usedGiftCardSales = giftCardProductSales; // keep as-is
       } else {
-        // NEITHER PATTERN (e.g., same-day void): proportional fallback
-        const orderTotal = order.totalPrice;
-        usedTax = orderTotal.isZero()
-          ? new Decimal(0)
-          : totalDebit.times(taxAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-        usedGiftCardSales = orderTotal.isZero()
-          ? new Decimal(0)
-          : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-        usedShipping = orderTotal.isZero()
-          ? new Decimal(0)
-          : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        // NEITHER PATTERN (e.g., same-day void): prefer actual Shopify values, plug only sales.
+        // Previously used proportional scaling which introduced rounding errors.
+        // Now that fulfillment date posting bundles all captures for GC orders,
+        // this path rarely fires. Use actual values when sales stays non-negative;
+        // fall back to proportional only if non-sales components exceed capture.
+        usedTax = taxAmount;
+        usedShipping = shippingAmount;
+        usedGiftCardSales = giftCardProductSales;
+
+        const testSales = totalDebit.minus(usedTax).minus(usedShipping).minus(usedGiftCardSales);
+        if (testSales.lt(0)) {
+          // Edge case: non-sales exceed capture → proportional fallback
+          const orderTotal = order.totalPrice;
+          usedTax = orderTotal.isZero()
+            ? new Decimal(0)
+            : totalDebit.times(taxAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+          usedGiftCardSales = orderTotal.isZero()
+            ? new Decimal(0)
+            : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+          usedShipping = orderTotal.isZero()
+            ? new Decimal(0)
+            : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+        }
       }
     }
     // Sales = plug (ensures perfect balance)
@@ -818,16 +830,24 @@ export async function createRefundJournalEntries(
         const diff = calculatedTotal.minus(totalRefundAmount).abs();
 
         if (diff.greaterThan(new Decimal('0.02'))) {
-          // PLUG METHOD: Proportionally scale tax, subtotal is the plug.
-          // This mirrors the sale-side proportional scaling and ensures
-          // same-day void/re-ring entries cancel perfectly (both sides use same formula).
+          // PLUG METHOD: Keep line-item tax as-is, plug only subtotal.
+          // Line-item tax from Shopify's API is authoritative; the small diff between
+          // line-item total and refund transaction amount is absorbed by the subtotal plug.
+          // Fall back to proportional only if subtotal would go negative (tax > refundable).
           const refundableAmount = totalRefundAmount.minus(shippingAdjustmentTotal);
-          const lineItemTotal = refundedSubtotal.plus(refundedTax);
+          const testSubtotal = refundableAmount.minus(refundedTax);
 
-          if (lineItemTotal.greaterThan(0) && refundableAmount.greaterThan(0)) {
-            refundedTax = refundableAmount.times(refundedTax).dividedBy(lineItemTotal)
-              .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-            refundedSubtotal = refundableAmount.minus(refundedTax); // Subtotal is the plug
+          if (testSubtotal.gte(0)) {
+            // Preferred: keep line-item tax, plug subtotal only
+            refundedSubtotal = testSubtotal;
+          } else {
+            // Edge case: tax exceeds refundable amount → proportional fallback
+            const lineItemTotal = refundedSubtotal.plus(refundedTax);
+            if (lineItemTotal.greaterThan(0) && refundableAmount.greaterThan(0)) {
+              refundedTax = refundableAmount.times(refundedTax).dividedBy(lineItemTotal)
+                .toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+              refundedSubtotal = refundableAmount.minus(refundedTax);
+            }
           }
 
           console.log(
