@@ -247,17 +247,16 @@ export async function reconcileOrdersByDate(
         // This ensures refunds that occur on different dates than captures are still processed
         const refundTransactions = filterRefundTransactions(order, targetDate);
 
-        // UNIFIED POSTING DATE: Post on fulfillment date (fulfilledAt or closedAt) when available,
-        // otherwise fall back to last capture date. This ensures all payment legs
-        // (gift card, CC, split tender) post together on the same date.
+        // POSTING DATE: For online orders with gift card transactions, use fulfillment date
+        // so all payment legs post together. For all other orders, use capture date.
         const postingDate = getOrderPostingDate(order, targetDate);
-        const hasFulfillmentDate = !!(order.fulfilledAt || order.closedAt);
-        const postingOnFulfillmentDate = hasFulfillmentDate && postingDate === targetDate;
+        const useFulfillmentDate = shouldUseFulfillmentDate(order) && !!(order.fulfilledAt || order.closedAt);
+        const postingOnFulfillmentDate = useFulfillmentDate && postingDate === targetDate;
 
         let captureRatio: Decimal | undefined;
         let isMultiDateCCCapture = false;
 
-        if (hasFulfillmentDate) {
+        if (useFulfillmentDate) {
           // Fulfillment date available: order posts as a complete unit on that date.
           // No need for multi-CC-capture splitting — all captures are included.
           if (!postingOnFulfillmentDate) {
@@ -913,24 +912,44 @@ function formatDateOnly(isoTimestamp: string): string {
 /**
  * Determine the posting date for an order.
  *
- * Priority: last fulfillment date (fulfilledAt) > closedAt > last capture date.
- * fulfilledAt is the actual ship date from Shopify's fulfillments API.
- * closedAt is only set when order status is "closed" (archived), which many
- * fulfilled orders never get. Last capture date is the fallback for
- * POS orders and unfulfilled orders.
+ * For online orders with gift card transactions: use fulfillment date
+ * (fulfilledAt > closedAt) so all payment legs post together. Gift card
+ * captures fire immediately at order creation, but the order should post
+ * when fulfilled (same day CC captures).
  *
- * This ensures all payment legs (gift card, CC, split tender) post together
- * on the same date, eliminating timing mismatches when gift card captures
- * fire immediately at order creation but CC captures occur at fulfillment.
+ * For all other orders (POS, pure CC online): use last capture date.
+ * POS orders fulfill instantly, and pure CC orders capture at fulfillment,
+ * so capture date is already correct.
  */
 function getOrderPostingDate(order: Order, targetDate: string): string | null {
-  if (order.fulfilledAt) {
-    return formatDateOnly(order.fulfilledAt);
-  }
-  if (order.closedAt) {
-    return formatDateOnly(order.closedAt);
+  if (shouldUseFulfillmentDate(order)) {
+    if (order.fulfilledAt) {
+      return formatDateOnly(order.fulfilledAt);
+    }
+    if (order.closedAt) {
+      return formatDateOnly(order.closedAt);
+    }
   }
   return getOrderCaptureDate(order, targetDate);
+}
+
+/**
+ * Check if an order should use fulfillment date for posting.
+ * Only online orders with gift card payment transactions need this,
+ * because gift card captures fire immediately at order creation
+ * (before fulfillment), causing a timing mismatch.
+ */
+function shouldUseFulfillmentDate(order: Order): boolean {
+  // POS orders fulfill instantly — no timing mismatch
+  if (order.sourceName === 'pos') return false;
+
+  // Only orders with gift card transactions need fulfillment date posting
+  if (!order.transactions || order.transactions.length === 0) return false;
+  return order.transactions.some(
+    (txn) => (txn.kind === 'capture' || txn.kind === 'sale') &&
+             txn.status === 'success' &&
+             txn.gateway === 'gift_card'
+  );
 }
 
 /**
