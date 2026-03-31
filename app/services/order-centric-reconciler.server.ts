@@ -188,22 +188,31 @@ export async function reconcileOrdersByDate(
         })();
 
         if (hasPendingCCAuth) {
-          // Still check for refunds on targetDate before skipping entirely
-          const refundTxns = filterRefundTransactions(order, targetDate);
-          if (refundTxns.length > 0) {
-            await processOrderRefunds(
-              shop, accessToken, order, refundTxns, targetDate,
-              journalEntries, enrichedTransactions, warnings, enrichmentCache
-            );
-            processedOrderIds.add(order.id);
-            ordersProcessed++;
-          } else {
-            console.log(
-              `⏭️  Order ${order.name}: Skipped - CC authorized but not captured by ${targetDate}. ` +
-              `Will post when CC capture occurs.`
-            );
+          // Exception: online gift card orders on their fulfillment date should post
+          // as a complete unit, even if CC auth was never captured (voided/manual).
+          const fulfillmentDate = order.fulfilledAt ? formatDateOnly(order.fulfilledAt)
+            : order.closedAt ? formatDateOnly(order.closedAt) : null;
+          const onFulfillmentDate = shouldUseFulfillmentDate(order) && fulfillmentDate === targetDate;
+
+          if (!onFulfillmentDate) {
+            // Normal pending CC auth behavior — process refunds only, skip sale
+            const refundTxns = filterRefundTransactions(order, targetDate);
+            if (refundTxns.length > 0) {
+              await processOrderRefunds(
+                shop, accessToken, order, refundTxns, targetDate,
+                journalEntries, enrichedTransactions, warnings, enrichmentCache
+              );
+              processedOrderIds.add(order.id);
+              ordersProcessed++;
+            } else {
+              console.log(
+                `⏭️  Order ${order.name}: Skipped - CC authorized but not captured by ${targetDate}. ` +
+                `Will post when CC capture occurs.`
+              );
+            }
+            continue;
           }
-          continue;
+          // Fall through — order posts as complete unit on fulfillment date
         }
 
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
