@@ -142,6 +142,7 @@ export interface Order {
   currency: string;
   financialStatus: string; // "paid", "pending", "refunded", etc.
   closedAt?: string; // ISO timestamp when order was closed (fully paid + fulfilled)
+  fulfilledAt?: string; // ISO timestamp of last fulfillment (actual ship date)
   lineItems: OrderLineItem[];
   transactions?: Transaction[]; // Payment transactions
   refunds?: Refund[]; // Refund details (for proper tax splitting)
