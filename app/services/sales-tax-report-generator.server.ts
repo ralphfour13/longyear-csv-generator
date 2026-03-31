@@ -100,44 +100,122 @@ function buildOrderSummary(
     shipToState = shopAddress.provinceCode;
   }
 
-  // Calculate taxable vs non-taxable from line items
-  let taxableAmount = new Decimal(0);
-  let nonTaxableAmount = new Decimal(0);
-  let exemptReason = '';
-
-  if (order.lineItems) {
-    for (const item of order.lineItems) {
-      const lineTotal = item.price.times(item.quantity).minus(item.totalDiscount);
-      if (item.taxable) {
-        taxableAmount = taxableAmount.plus(lineTotal);
-      } else {
-        nonTaxableAmount = nonTaxableAmount.plus(lineTotal);
+  // USE JE SUMMARY as source of truth for tax, shipping, and totals.
+  // Combine all jeSummaries for this order (capture + refund) so partial
+  // cancellations and same-day refunds are reflected correctly.
+  const combinedJe = (() => {
+    const first = transactions[0]?.jeSummary;
+    if (!first) return null;
+    let netSales = first.netSales;
+    let tax = first.tax;
+    let shipping = first.shipping;
+    let giftCardLiability = first.giftCardLiability;
+    for (let i = 1; i < transactions.length; i++) {
+      const other = transactions[i].jeSummary;
+      if (other) {
+        netSales = netSales.plus(other.netSales);
+        tax = tax.plus(other.tax);
+        shipping = shipping.plus(other.shipping);
+        giftCardLiability = giftCardLiability.plus(other.giftCardLiability);
       }
     }
-  }
+    return { netSales, tax, shipping, giftCardLiability };
+  })();
 
-  // Check for exempt reason via tags
-  const tags = enrichedData?.tags || '';
-  if (tags.toLowerCase().split(',').some(t => t.trim() === 'licenses')) {
-    exemptReason = 'License';
-  }
+  // Tax and shipping from jeSummary (with fallbacks to original order values)
+  const totalTaxCollected = combinedJe ? combinedJe.tax.abs() : (() => {
+    const taxLines = enrichedData?.taxLines || [];
+    return taxLines.reduce((sum, tl) => sum.plus(tl.price), new Decimal(0));
+  })();
+  const shippingCharged = combinedJe ? combinedJe.shipping.abs() : order.totalShipping;
 
-  // Tax lines from enrichment
-  const taxLines = enrichedData?.taxLines || [];
+  // Gift card liability (only when positive = GC product sold)
+  const giftCardSoldAmount = combinedJe?.giftCardLiability.gt(0)
+    ? combinedJe.giftCardLiability
+    : new Decimal(0);
 
-  // Total tax collected
-  const totalTaxCollected = taxLines.reduce(
-    (sum, tl) => sum.plus(tl.price),
-    new Decimal(0),
-  );
+  // Discount amount from jeSummary: grossSales - netSales - giftCardSold
+  // When jeSummary is available, derive discount so grossSales - discount = netSales + giftCardSold
+  const discountAmount = combinedJe
+    ? order.subtotalPrice.plus(order.totalDiscounts).minus(combinedJe.netSales.abs()).minus(giftCardSoldAmount)
+    : order.totalDiscounts;
+  // If the derived discount is negative (shouldn't happen), fall back to original
+  const effectiveDiscount = discountAmount.gte(0) ? discountAmount : order.totalDiscounts;
+
+  // Gross sales = netSales + giftCardSold + discounts (before discounts removed)
+  const grossSales = combinedJe
+    ? combinedJe.netSales.abs().plus(giftCardSoldAmount).plus(effectiveDiscount)
+    : order.subtotalPrice.plus(order.totalDiscounts);
 
   // Exclude POS orders with no tax collected (out-of-state shipments)
   if (isPOS && totalTaxCollected.isZero()) {
     return null;
   }
 
-  // Gross sales = subtotal + discounts (before discounts removed)
-  const grossSales = order.subtotalPrice.plus(order.totalDiscounts);
+  // Check for exempt reason via tags
+  const tags = enrichedData?.tags || '';
+  let exemptReason = '';
+  if (tags.toLowerCase().split(',').some(t => t.trim() === 'licenses')) {
+    exemptReason = 'License';
+  }
+
+  // Calculate taxable vs non-taxable from line items (original proportions)
+  let originalTaxable = new Decimal(0);
+  let originalNonTaxable = new Decimal(0);
+
+  if (order.lineItems) {
+    for (const item of order.lineItems) {
+      const lineTotal = item.price.times(item.quantity).minus(item.totalDiscount);
+      if (item.taxable) {
+        originalTaxable = originalTaxable.plus(lineTotal);
+      } else {
+        originalNonTaxable = originalNonTaxable.plus(lineTotal);
+      }
+    }
+  }
+
+  // When jeSummary is available, scale taxable/nonTaxable proportionally to match
+  // the jeSummary netSales (which reflects partial captures/cancellations)
+  let taxableAmount: Decimal;
+  let nonTaxableAmount: Decimal;
+  const netSalesFromJe = combinedJe ? combinedJe.netSales.abs().plus(giftCardSoldAmount) : null;
+
+  if (netSalesFromJe && !originalTaxable.plus(originalNonTaxable).isZero()) {
+    const originalTotal = originalTaxable.plus(originalNonTaxable);
+    const scale = netSalesFromJe.div(originalTotal);
+    taxableAmount = originalTaxable.times(scale).toDecimalPlaces(2);
+    nonTaxableAmount = netSalesFromJe.minus(taxableAmount); // remainder to avoid rounding gap
+  } else {
+    taxableAmount = originalTaxable;
+    nonTaxableAmount = originalNonTaxable;
+  }
+
+  // Tax lines from enrichment — scale proportionally when jeSummary tax differs
+  const originalTaxLines = enrichedData?.taxLines || [];
+  let taxLines: Array<{ title: string; rate: string; price: Decimal }>;
+
+  const originalTaxTotal = originalTaxLines.reduce(
+    (sum, tl) => sum.plus(tl.price), new Decimal(0),
+  );
+
+  if (combinedJe && !originalTaxTotal.isZero() && !originalTaxTotal.eq(totalTaxCollected)) {
+    // Scale each tax line proportionally so they sum to totalTaxCollected
+    const taxScale = totalTaxCollected.div(originalTaxTotal);
+    let scaledSum = new Decimal(0);
+    taxLines = originalTaxLines.map((tl, idx) => {
+      let scaledPrice: Decimal;
+      if (idx === originalTaxLines.length - 1) {
+        // Last line gets the remainder to avoid rounding discrepancy
+        scaledPrice = totalTaxCollected.minus(scaledSum);
+      } else {
+        scaledPrice = tl.price.times(taxScale).toDecimalPlaces(2);
+        scaledSum = scaledSum.plus(scaledPrice);
+      }
+      return { title: tl.title, rate: tl.rate, price: scaledPrice };
+    });
+  } else {
+    taxLines = originalTaxLines;
+  }
 
   // Capture date from the primary capture transaction
   const captureTxn = transactions.find(t => t.balanceTransaction.type === 'charge');
@@ -168,8 +246,8 @@ function buildOrderSummary(
     shipToCity,
     shipToState,
     grossSales,
-    discountAmount: order.totalDiscounts,
-    shippingCharged: order.totalShipping,
+    discountAmount: effectiveDiscount,
+    shippingCharged,
     taxableAmount,
     nonTaxableAmount,
     exemptReason,
