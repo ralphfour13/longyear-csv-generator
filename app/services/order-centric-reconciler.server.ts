@@ -206,33 +206,6 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
-        // GIFT CARD-ONLY ORDERS: Post on closed_at (fulfillment) date instead of sale transaction date.
-        // Gift card 'sale' transactions fire immediately at order creation, but accounting
-        // should match CC behavior (post when order is fulfilled).
-        // Fallback: if closed_at is not set (common for POS orders), use the sale transaction date
-        // since POS orders are fulfilled instantly at creation.
-        const giftCardOnly = isGiftCardOnlyOrder(order);
-        if (giftCardOnly) {
-          const closedDate = order.closedAt ? formatDateOnly(order.closedAt) : null;
-          const saleTxnDate = getOrderCaptureDate(order, targetDate);
-          const effectiveDate = closedDate || saleTxnDate;
-
-          if (!effectiveDate || effectiveDate !== targetDate) {
-            // Check for refunds on this date
-            const refundTxns = filterRefundTransactions(order, targetDate);
-            if (refundTxns.length > 0) {
-              await processOrderRefunds(
-                shop, accessToken, order, refundTxns, targetDate,
-                journalEntries, enrichedTransactions, warnings, enrichmentCache
-              );
-              processedOrderIds.add(order.id);
-              ordersProcessed++;
-            }
-            continue;
-          }
-          // effectiveDate === targetDate: fall through to normal processing
-        }
-
         // REFUND-ONLY ORDERS: Handle standalone refunds (where original sale was on prior date)
         // Check this BEFORE capture logic to catch refund-only transactions
         const allCaptureTransactions = order.transactions?.filter(
@@ -274,64 +247,21 @@ export async function reconcileOrdersByDate(
         // This ensures refunds that occur on different dates than captures are still processed
         const refundTransactions = filterRefundTransactions(order, targetDate);
 
-        // MULTI-CC-CAPTURE DETECTION: Check if CC captures span multiple dates
-        // IMPORTANT: Look at ALL captures (not point-in-time filtered) to detect multi-date pattern.
-        // Otherwise, when processing Jan 5 for an order with CC captures on Jan 5 AND Jan 15,
-        // we'd only see 1 date and incorrectly post the full order on Jan 5.
-        const ccCapturesByDate = groupCCCapturesByDate(allCaptureTransactions);
-        const isMultiDateCCCapture = ccCapturesByDate.size > 1;
+        // UNIFIED POSTING DATE: Post on fulfillment date (closedAt) when available,
+        // otherwise fall back to last capture date. This ensures all payment legs
+        // (gift card, CC, split tender) post together on the same date.
+        const postingDate = getOrderPostingDate(order, targetDate);
+        const postingOnFulfillmentDate = !!order.closedAt && formatDateOnly(order.closedAt) === targetDate;
 
         let captureRatio: Decimal | undefined;
+        let isMultiDateCCCapture = false;
 
-        if (isMultiDateCCCapture) {
-          // Multi-CC-capture path: each date gets its own proportional entry
-          const targetDateCCCaptures = ccCapturesByDate.get(targetDate) || [];
-
-          if (targetDateCCCaptures.length === 0 && refundTransactions.length === 0) {
-            // No CC captures and no refunds on this date - skip
-            continue;
-          }
-
-          if (targetDateCCCaptures.length === 0 && refundTransactions.length > 0) {
-            // Refund-only on this date for a multi-capture order
-            await processOrderRefunds(
-              shop, accessToken, order, refundTransactions, targetDate,
-              journalEntries, enrichedTransactions, warnings, enrichmentCache
-            );
-            processedOrderIds.add(order.id);
-            ordersProcessed++;
-            continue;
-          }
-
-          // Compute captureRatio = targetDateCCTotal / orderEffectiveTotal
-          const targetDateCCTotal = targetDateCCCaptures.reduce(
-            (sum, txn) => sum.plus(txn.amount), new Decimal(0)
-          );
-          const orderEffectiveTotal = order.currentTotalPrice || order.totalPrice;
-          captureRatio = targetDateCCTotal.dividedBy(orderEffectiveTotal);
-
-          console.log(
-            `🔀 Order ${order.name}: Multi-CC-capture split - ` +
-            `${ccCapturesByDate.size} dates, targetDate ${targetDate}: ` +
-            `$${targetDateCCTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
-          );
-        } else if (!giftCardOnly) {
-          // LAST-CAPTURE-DATE RULE: Order posts on the date of its LAST captured payment
-          // This ensures split-payment orders post as a complete unit (all legs balance)
-          // POINT-IN-TIME: Only consider captures up to target date (no future knowledge)
-          // NOTE: Gift card-only orders skip this — they already validated via closed_at above.
-          const lastCaptureDate = getOrderCaptureDate(order, targetDate);
-
-          if (!lastCaptureDate) {
-            // Should not happen since we checked for captures above, but safety check
-            continue;
-          }
-
-          if (lastCaptureDate !== targetDate) {
-            // This order's last capture is on a different date
-            // BUT check if there are refunds on target date before skipping
+        if (order.closedAt) {
+          // Fulfillment date available: order posts as a complete unit on closedAt date.
+          // No need for multi-CC-capture splitting — all captures are included.
+          if (!postingOnFulfillmentDate) {
+            // closedAt is on a different date — check for refunds, then skip
             if (refundTransactions.length > 0) {
-              // Process refunds for this order even though capture was on different date
               await processOrderRefunds(
                 shop, accessToken, order, refundTransactions, targetDate,
                 journalEntries, enrichedTransactions, warnings, enrichmentCache
@@ -339,17 +269,67 @@ export async function reconcileOrdersByDate(
               processedOrderIds.add(order.id);
               ordersProcessed++;
             }
-            // Skip capture processing (will be processed when we run reconciliation for that date)
             continue;
           }
+        } else if (postingDate) {
+          // Fallback path (no closedAt): use last capture date with multi-CC-capture detection.
+          // This handles POS orders, unfulfilled orders, and other edge cases.
+          const ccCapturesByDate = groupCCCapturesByDate(allCaptureTransactions);
+          isMultiDateCCCapture = ccCapturesByDate.size > 1;
+
+          if (isMultiDateCCCapture) {
+            // Multi-CC-capture path: each date gets its own proportional entry
+            const targetDateCCCaptures = ccCapturesByDate.get(targetDate) || [];
+
+            if (targetDateCCCaptures.length === 0 && refundTransactions.length === 0) {
+              continue;
+            }
+
+            if (targetDateCCCaptures.length === 0 && refundTransactions.length > 0) {
+              await processOrderRefunds(
+                shop, accessToken, order, refundTransactions, targetDate,
+                journalEntries, enrichedTransactions, warnings, enrichmentCache
+              );
+              processedOrderIds.add(order.id);
+              ordersProcessed++;
+              continue;
+            }
+
+            const targetDateCCTotal = targetDateCCCaptures.reduce(
+              (sum, txn) => sum.plus(txn.amount), new Decimal(0)
+            );
+            const orderEffectiveTotal = order.currentTotalPrice || order.totalPrice;
+            captureRatio = targetDateCCTotal.dividedBy(orderEffectiveTotal);
+
+            console.log(
+              `🔀 Order ${order.name}: Multi-CC-capture split - ` +
+              `${ccCapturesByDate.size} dates, targetDate ${targetDate}: ` +
+              `$${targetDateCCTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
+            );
+          } else if (postingDate !== targetDate) {
+            // Last capture date is on a different date — check for refunds, then skip
+            if (refundTransactions.length > 0) {
+              await processOrderRefunds(
+                shop, accessToken, order, refundTransactions, targetDate,
+                journalEntries, enrichedTransactions, warnings, enrichmentCache
+              );
+              processedOrderIds.add(order.id);
+              ordersProcessed++;
+            }
+            continue;
+          }
+        } else {
+          // No posting date (no closedAt, no captures) — should not reach here
+          // since we already checked for captures above, but safety guard
+          continue;
         }
 
         // POINT-IN-TIME FILTERING:
-        // - Gift card-only: Use ALL sale transactions (posted on closed_at date, not sale date)
-        // - Multi-CC-capture: Use only targetDate captures (each date gets its own portion)
-        // - Normal: Use all captures on or before targetDate
-        const pointInTimeCaptureTransactions = giftCardOnly
-          ? allCaptureTransactions // Gift card-only: all sales posted on closed_at date
+        // - Fulfillment date: Use ALL capture transactions (order posts as complete unit)
+        // - Multi-CC-capture (fallback): Use only targetDate captures (proportional split)
+        // - Normal fallback: Use all captures on or before targetDate
+        const pointInTimeCaptureTransactions = postingOnFulfillmentDate
+          ? allCaptureTransactions // Fulfillment date: all captures included
           : isMultiDateCCCapture
             ? allCaptureTransactions.filter((txn) => {
                 const txnDate = formatDateOnly(txn.processedAt);
@@ -930,15 +910,21 @@ function formatDateOnly(isoTimestamp: string): string {
 }
 
 /**
- * Check if an order was paid entirely by gift card (no CC, no cash, no other methods).
- * Gift card-only orders post on closed_at (fulfillment) date instead of sale transaction date.
+ * Determine the posting date for an order.
+ *
+ * Unified rule: post on fulfillment date (closedAt) when available.
+ * Fallback to last capture date for POS orders (closedAt often equals createdAt)
+ * and unfulfilled orders.
+ *
+ * This ensures all payment legs (gift card, CC, split tender) post together
+ * on the same date, eliminating timing mismatches when gift card captures
+ * fire immediately at order creation but CC captures occur at fulfillment.
  */
-function isGiftCardOnlyOrder(order: Order): boolean {
-  if (!order.transactions || order.transactions.length === 0) return false;
-  const captures = order.transactions.filter(
-    (txn) => (txn.kind === 'capture' || txn.kind === 'sale') && txn.status === 'success'
-  );
-  return captures.length > 0 && captures.every(txn => txn.gateway === 'gift_card');
+function getOrderPostingDate(order: Order, targetDate: string): string | null {
+  if (order.closedAt) {
+    return formatDateOnly(order.closedAt);
+  }
+  return getOrderCaptureDate(order, targetDate);
 }
 
 /**
