@@ -18,9 +18,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const activeJobs = allJobs.filter(
     job => job.status === 'pending' || job.status === 'processing'
   );
-  const completedJobs = allJobs.filter(
-    job => job.status === 'completed' || job.status === 'failed'
-  );
+  // Completed/failed jobs: reverse to show newest first in history table
+  const completedJobs = allJobs
+    .filter(job => job.status === 'completed' || job.status === 'failed')
+    .reverse();
 
   return { shop, allJobs, activeJobs, completedJobs };
 };
