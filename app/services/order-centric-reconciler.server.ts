@@ -313,18 +313,32 @@ export async function reconcileOrdersByDate(
             }
           }
         } else if (postingDate) {
-          // Fallback path (no fulfillment date): use last capture date with multi-date detection.
+          // Fallback path (no fulfillment date): use last capture date with multi-CC-capture detection.
           // This handles POS orders, unfulfilled orders, and other edge cases.
-          if (hasMultipleDates) {
-            isMultiDateCapture = true;
-            // Multi-date path: each date gets its own proportional entry
-            const targetDateCaptures = allCapturesByDate.get(targetDate) || [];
+          // IMPORTANT: Only detect multi-date splits for CC (card) gateways here.
+          // Non-CC gateways (gift_card, manual) on different dates are independent payments,
+          // not split captures. Using all-gateway detection would incorrectly apply a
+          // proportional ratio to orders like "gift card Jan 10 + manual Jan 30".
+          const ccCapturesByDate = new Map<string, Transaction[]>();
+          for (const txn of allCaptureTransactions) {
+            if (!isCardGateway(txn.gateway)) continue;
+            if ((txn.kind !== 'capture' && txn.kind !== 'sale') || txn.status !== 'success') continue;
+            const txnDate = formatDateOnly(txn.processedAt);
+            if (!ccCapturesByDate.has(txnDate)) ccCapturesByDate.set(txnDate, []);
+            ccCapturesByDate.get(txnDate)!.push(txn);
+          }
+          const hasMultipleCCDates = ccCapturesByDate.size > 1;
 
-            if (targetDateCaptures.length === 0 && refundTransactions.length === 0) {
+          if (hasMultipleCCDates) {
+            isMultiDateCapture = true;
+            // Multi-CC-capture path: each date gets its own proportional entry
+            const targetDateCCCaptures = ccCapturesByDate.get(targetDate) || [];
+
+            if (targetDateCCCaptures.length === 0 && refundTransactions.length === 0) {
               continue;
             }
 
-            if (targetDateCaptures.length === 0 && refundTransactions.length > 0) {
+            if (targetDateCCCaptures.length === 0 && refundTransactions.length > 0) {
               await processOrderRefunds(
                 shop, accessToken, order, refundTransactions, targetDate,
                 journalEntries, enrichedTransactions, warnings, enrichmentCache
@@ -334,16 +348,16 @@ export async function reconcileOrdersByDate(
               continue;
             }
 
-            const targetDateTotal = targetDateCaptures.reduce(
+            const targetDateCCTotal = targetDateCCCaptures.reduce(
               (sum, txn) => sum.plus(txn.amount), new Decimal(0)
             );
             const orderEffectiveTotal = order.currentTotalPrice || order.totalPrice;
-            captureRatio = targetDateTotal.dividedBy(orderEffectiveTotal);
+            captureRatio = targetDateCCTotal.dividedBy(orderEffectiveTotal);
 
             console.log(
-              `🔀 Order ${order.name}: Multi-date capture split - ` +
-              `${allCapturesByDate.size} dates, targetDate ${targetDate}: ` +
-              `$${targetDateTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
+              `🔀 Order ${order.name}: Multi-CC-capture split - ` +
+              `${ccCapturesByDate.size} dates, targetDate ${targetDate}: ` +
+              `$${targetDateCCTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
             );
           } else if (postingDate !== targetDate) {
             // Last capture date is on a different date — check for refunds, then skip
@@ -365,7 +379,8 @@ export async function reconcileOrdersByDate(
 
         // POINT-IN-TIME FILTERING:
         // - Fulfillment date (no multi-date): captures on or before fulfillment date
-        // - Multi-date capture: only targetDate captures (proportional split)
+        // - Multi-date capture (CC split): only targetDate captures (proportional split)
+        // - Multi-date (non-CC, e.g. gift_card + manual): only targetDate captures (no ratio)
         // - Normal single-date: all captures on or before targetDate
         const fulfillmentDate = postingOnFulfillmentDate && !isMultiDateCapture
           ? postingDate : null;
@@ -379,10 +394,15 @@ export async function reconcileOrdersByDate(
                 const txnDate = formatDateOnly(txn.processedAt);
                 return txnDate <= fulfillmentDate;
               })
-            : allCaptureTransactions.filter((txn) => {
-                const txnDate = formatDateOnly(txn.processedAt);
-                return txnDate <= targetDate;
-              });
+            : hasMultipleDates
+              ? allCaptureTransactions.filter((txn) => {
+                  const txnDate = formatDateOnly(txn.processedAt);
+                  return txnDate === targetDate;
+                })
+              : allCaptureTransactions.filter((txn) => {
+                  const txnDate = formatDateOnly(txn.processedAt);
+                  return txnDate <= targetDate;
+                });
 
         if (pointInTimeCaptureTransactions.length === 0) {
           // No captures on target date (multi) or on/before target date (normal)
