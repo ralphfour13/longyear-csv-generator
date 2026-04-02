@@ -27,6 +27,7 @@ import { enrichOrderData, type EnrichedOrderData } from './enrichment/order-enri
 import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { Cin7ProductService } from './cin7/cin7-product-service.server';
+import { fetchBalanceTransactionsByDate } from './shopify/balance-transaction-fetcher.server';
 
 /**
  * Compute a per-order summary from JE lines. Used by DR/DSR generators
@@ -143,6 +144,11 @@ export async function reconcileOrdersByDate(
     }
     const effectiveCogsDataMap = cogsDataMap || preCollectedCogsDataMap;
 
+    // PRE-FETCH REFUND SETTLEMENT DATES: For shopify_payments refunds, the order
+    // transaction processedAt is the initiation date (pending), not the settlement date.
+    // Balance transactions provide the actual settlement date.
+    const refundSettlementMap = await buildRefundSettlementMap(shop, accessToken, targetDate);
+
     // Cache enrichment data to avoid duplicate API calls when an order
     // has both captures and refunds processed separately
     const enrichmentCache = new Map<string, EnrichedOrderData | null>();
@@ -196,7 +202,7 @@ export async function reconcileOrdersByDate(
 
           if (!onFulfillmentDate) {
             // Normal pending CC auth behavior — process refunds only, skip sale
-            const refundTxns = filterRefundTransactions(order, targetDate);
+            const refundTxns = filterRefundTransactions(order, targetDate, refundSettlementMap);
             if (refundTxns.length > 0) {
               await processOrderRefunds(
                 shop, accessToken, order, refundTxns, targetDate,
@@ -223,7 +229,7 @@ export async function reconcileOrdersByDate(
 
         if (allCaptureTransactions.length === 0) {
           // No captures - check if this is a refund-only order
-          const refundTransactions = filterRefundTransactions(order, targetDate);
+          const refundTransactions = filterRefundTransactions(order, targetDate, refundSettlementMap);
           if (refundTransactions.length > 0) {
             await processOrderRefunds(
               shop,
@@ -254,7 +260,7 @@ export async function reconcileOrdersByDate(
 
         // Check for refunds on target date BEFORE deciding to skip order
         // This ensures refunds that occur on different dates than captures are still processed
-        const refundTransactions = filterRefundTransactions(order, targetDate);
+        const refundTransactions = filterRefundTransactions(order, targetDate, refundSettlementMap);
 
         // POSTING DATE: For online orders with gift card transactions, use fulfillment date
         // so all payment legs post together. For all other orders, use capture date.
@@ -263,38 +269,62 @@ export async function reconcileOrdersByDate(
         const postingOnFulfillmentDate = useFulfillmentDate && postingDate === targetDate;
 
         let captureRatio: Decimal | undefined;
-        let isMultiDateCCCapture = false;
+        let isMultiDateCapture = false;
+
+        // Detect captures spanning multiple dates (any gateway, not just CC)
+        const allCapturesByDate = groupAllCapturesByDate(allCaptureTransactions);
+        const hasMultipleDates = allCapturesByDate.size > 1;
 
         if (useFulfillmentDate) {
           // Fulfillment date available: order posts as a complete unit on that date.
-          // No need for multi-CC-capture splitting — all captures are included.
-          if (!postingOnFulfillmentDate) {
-            // Fulfillment is on a different date — check for refunds, then skip
-            if (refundTransactions.length > 0) {
-              await processOrderRefunds(
-                shop, accessToken, order, refundTransactions, targetDate,
-                journalEntries, enrichedTransactions, warnings, enrichmentCache
+          if (postingOnFulfillmentDate) {
+            // On fulfillment date: include captures on or before fulfillment date.
+            // Later captures (e.g., manual payments after fulfillment) are excluded
+            // and will post on their own date via the multi-date path below.
+          } else {
+            // Not on fulfillment date — check if there are NEW captures on targetDate
+            // that arrived after the fulfillment date (e.g., manual payment closing an old auth)
+            const targetDateCaptures = allCapturesByDate.get(targetDate) || [];
+            if (targetDateCaptures.length > 0) {
+              // New captures after fulfillment — treat as multi-date split
+              const targetDateTotal = targetDateCaptures.reduce(
+                (sum, txn) => sum.plus(txn.amount), new Decimal(0)
               );
-              processedOrderIds.add(order.id);
-              ordersProcessed++;
+              const orderEffectiveTotal = order.currentTotalPrice || order.totalPrice;
+              captureRatio = targetDateTotal.dividedBy(orderEffectiveTotal);
+              isMultiDateCapture = true;
+
+              console.log(
+                `🔀 Order ${order.name}: Post-fulfillment capture on ${targetDate} - ` +
+                `$${targetDateTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
+              );
+              // Fall through to processOrderCaptures with targetDate captures and ratio
+            } else {
+              // No captures on targetDate — check for refunds, then skip
+              if (refundTransactions.length > 0) {
+                await processOrderRefunds(
+                  shop, accessToken, order, refundTransactions, targetDate,
+                  journalEntries, enrichedTransactions, warnings, enrichmentCache
+                );
+                processedOrderIds.add(order.id);
+                ordersProcessed++;
+              }
+              continue;
             }
-            continue;
           }
         } else if (postingDate) {
-          // Fallback path (no fulfillment date): use last capture date with multi-CC-capture detection.
+          // Fallback path (no fulfillment date): use last capture date with multi-date detection.
           // This handles POS orders, unfulfilled orders, and other edge cases.
-          const ccCapturesByDate = groupCCCapturesByDate(allCaptureTransactions);
-          isMultiDateCCCapture = ccCapturesByDate.size > 1;
+          if (hasMultipleDates) {
+            isMultiDateCapture = true;
+            // Multi-date path: each date gets its own proportional entry
+            const targetDateCaptures = allCapturesByDate.get(targetDate) || [];
 
-          if (isMultiDateCCCapture) {
-            // Multi-CC-capture path: each date gets its own proportional entry
-            const targetDateCCCaptures = ccCapturesByDate.get(targetDate) || [];
-
-            if (targetDateCCCaptures.length === 0 && refundTransactions.length === 0) {
+            if (targetDateCaptures.length === 0 && refundTransactions.length === 0) {
               continue;
             }
 
-            if (targetDateCCCaptures.length === 0 && refundTransactions.length > 0) {
+            if (targetDateCaptures.length === 0 && refundTransactions.length > 0) {
               await processOrderRefunds(
                 shop, accessToken, order, refundTransactions, targetDate,
                 journalEntries, enrichedTransactions, warnings, enrichmentCache
@@ -304,16 +334,16 @@ export async function reconcileOrdersByDate(
               continue;
             }
 
-            const targetDateCCTotal = targetDateCCCaptures.reduce(
+            const targetDateTotal = targetDateCaptures.reduce(
               (sum, txn) => sum.plus(txn.amount), new Decimal(0)
             );
             const orderEffectiveTotal = order.currentTotalPrice || order.totalPrice;
-            captureRatio = targetDateCCTotal.dividedBy(orderEffectiveTotal);
+            captureRatio = targetDateTotal.dividedBy(orderEffectiveTotal);
 
             console.log(
-              `🔀 Order ${order.name}: Multi-CC-capture split - ` +
-              `${ccCapturesByDate.size} dates, targetDate ${targetDate}: ` +
-              `$${targetDateCCTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
+              `🔀 Order ${order.name}: Multi-date capture split - ` +
+              `${allCapturesByDate.size} dates, targetDate ${targetDate}: ` +
+              `$${targetDateTotal.toFixed(2)} / $${orderEffectiveTotal.toFixed(2)} = ${captureRatio.toFixed(4)}`
             );
           } else if (postingDate !== targetDate) {
             // Last capture date is on a different date — check for refunds, then skip
@@ -334,15 +364,20 @@ export async function reconcileOrdersByDate(
         }
 
         // POINT-IN-TIME FILTERING:
-        // - Fulfillment date: Use ALL capture transactions (order posts as complete unit)
-        // - Multi-CC-capture (fallback): Use only targetDate captures (proportional split)
-        // - Normal fallback: Use all captures on or before targetDate
-        const pointInTimeCaptureTransactions = postingOnFulfillmentDate
-          ? allCaptureTransactions // Fulfillment date: all captures included
-          : isMultiDateCCCapture
+        // - Fulfillment date (no multi-date): captures on or before fulfillment date
+        // - Multi-date capture: only targetDate captures (proportional split)
+        // - Normal single-date: all captures on or before targetDate
+        const fulfillmentDate = postingOnFulfillmentDate && !isMultiDateCapture
+          ? postingDate : null;
+        const pointInTimeCaptureTransactions = isMultiDateCapture
+          ? allCaptureTransactions.filter((txn) => {
+              const txnDate = formatDateOnly(txn.processedAt);
+              return txnDate === targetDate;
+            })
+          : fulfillmentDate
             ? allCaptureTransactions.filter((txn) => {
                 const txnDate = formatDateOnly(txn.processedAt);
-                return txnDate === targetDate;
+                return txnDate <= fulfillmentDate;
               })
             : allCaptureTransactions.filter((txn) => {
                 const txnDate = formatDateOnly(txn.processedAt);
@@ -351,7 +386,7 @@ export async function reconcileOrdersByDate(
 
         if (pointInTimeCaptureTransactions.length === 0) {
           // No captures on target date (multi) or on/before target date (normal)
-          console.log(`⏭️  Order ${order.name}: No captures on ${isMultiDateCCCapture ? '' : 'or before '}${targetDate}`);
+          console.log(`⏭️  Order ${order.name}: No captures on ${isMultiDateCapture ? '' : 'or before '}${targetDate}`);
           continue;
         }
 
@@ -651,6 +686,17 @@ async function processOrderCaptures(
     // The DR and DSR need values that only reflect refunds up to targetDate.
     const pointInTime = getPointInTimeAmounts(order, targetDate);
 
+    // Detect uncaptured authorizations (CC auth with no corresponding capture)
+    const uncapturedAuths = detectUncapturedAuths(order);
+    if (uncapturedAuths.length > 0) {
+      for (const auth of uncapturedAuths) {
+        warnings.push(
+          `⚠️ Order ${order.name}: Uncaptured ${auth.gateway} authorization $${auth.amount} ` +
+          `(authorized ${auth.date})`
+        );
+      }
+    }
+
     const enrichedOrder = {
       id: order.id,
       name: order.name,
@@ -667,6 +713,7 @@ async function processOrderCaptures(
       lineItems: order.lineItems,
       hasActualRefunds: hasActualRefunds(order, targetDate),
       isMultiCaptureSplit: !!captureRatio,
+      outstandingAuths: uncapturedAuths.length > 0 ? uncapturedAuths : undefined,
     };
 
     enrichedTransactions.push({
@@ -853,26 +900,46 @@ async function processOrderRefunds(
 }
 
 /**
- * Filter refund transactions by date
+ * Filter refund transactions by date.
+ *
+ * For shopify_payments refunds, uses the balance transaction settlement date
+ * (when the refund was actually processed) instead of the order transaction
+ * processedAt (when the refund was initiated/pending).
+ *
+ * @param order - Order with transactions
+ * @param targetDate - Target date (YYYY-MM-DD)
+ * @param refundSettlementMap - Map of "orderId:amount" → settlement date from balance transactions
  */
-function filterRefundTransactions(order: Order, targetDate: string): Transaction[] {
+function filterRefundTransactions(
+  order: Order,
+  targetDate: string,
+  refundSettlementMap?: Map<string, string>
+): Transaction[] {
   if (!order.transactions || order.transactions.length === 0) {
     return [];
   }
 
   return order.transactions.filter((txn) => {
-    // Only include refund transactions
-    if (txn.kind !== 'refund') {
-      return false;
+    if (txn.kind !== 'refund') return false;
+    if (txn.status !== 'success') return false;
+
+    let txnDate: string;
+
+    // For shopify_payments refunds, use the settlement date from balance transactions
+    // instead of the order transaction processedAt (which is the initiation date)
+    if (txn.gateway === 'shopify_payments' && refundSettlementMap && refundSettlementMap.size > 0) {
+      const key = `${order.id}:${txn.amount.abs().toFixed(2)}`;
+      const settlementDate = refundSettlementMap.get(key);
+      if (settlementDate) {
+        txnDate = settlementDate;
+      } else {
+        // No balance transaction found — fall back to order transaction processedAt
+        txnDate = formatDateOnly(txn.processedAt);
+      }
+    } else {
+      txnDate = formatDateOnly(txn.processedAt);
     }
 
-    // Only include successful refunds
-    if (txn.status !== 'success') {
-      return false;
-    }
-
-    // Check if processedAt date matches target date
-    const txnDate = formatDateOnly(txn.processedAt);
     return txnDate === targetDate;
   });
 }
@@ -972,17 +1039,18 @@ function isCardGateway(gateway: string): boolean {
 }
 
 /**
- * Group CC (card gateway) capture transactions by Pacific-timezone date.
- * Includes ALL CC captures regardless of date to correctly detect multi-date patterns.
+ * Group ALL capture/sale transactions by Pacific-timezone date (any gateway).
+ * Used to detect multi-date capture patterns across all payment methods
+ * (gift_card, manual, shopify_payments, etc.).
  *
  * @param transactions - All capture/sale transactions for an order
- * @returns Map of date string (YYYY-MM-DD) → CC capture transactions on that date
+ * @returns Map of date string (YYYY-MM-DD) → capture transactions on that date
  */
-function groupCCCapturesByDate(transactions: Transaction[]): Map<string, Transaction[]> {
+function groupAllCapturesByDate(transactions: Transaction[]): Map<string, Transaction[]> {
   const groups = new Map<string, Transaction[]>();
 
   for (const txn of transactions) {
-    if (!isCardGateway(txn.gateway)) continue;
+    if ((txn.kind !== 'capture' && txn.kind !== 'sale') || txn.status !== 'success') continue;
 
     const txnDate = formatDateOnly(txn.processedAt);
 
@@ -997,11 +1065,83 @@ function groupCCCapturesByDate(transactions: Transaction[]): Map<string, Transac
 
 /**
  * Scale a Decimal value by a ratio, handling undefined/null gracefully.
- * Used for proportional allocation in multi-CC-capture splits.
+ * Used for proportional allocation in multi-date capture splits.
  */
 function scaleDecimal(value: Decimal | undefined, ratio: Decimal | undefined): Decimal {
   if (!value || !ratio) return value || new Decimal(0);
   return value.times(ratio).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+}
+
+/**
+ * Detect uncaptured authorization transactions on an order.
+ * Returns auth transactions where no corresponding capture/sale exists for the same gateway.
+ */
+function detectUncapturedAuths(order: Order): Array<{ gateway: string; amount: string; date: string }> {
+  if (!order.transactions || order.transactions.length === 0) return [];
+
+  return order.transactions
+    .filter(txn => {
+      if (txn.kind !== 'authorization' || txn.status !== 'success') return false;
+      // Check if there's a capture/sale for the same gateway
+      const hasCapture = order.transactions!.some(
+        t => (t.kind === 'capture' || t.kind === 'sale') &&
+             t.status === 'success' && t.gateway === txn.gateway
+      );
+      return !hasCapture;
+    })
+    .map(txn => ({
+      gateway: txn.gateway,
+      amount: txn.amount.toFixed(2),
+      date: formatDateOnly(txn.processedAt),
+    }));
+}
+
+/**
+ * Build a map of refund settlement dates from Shopify Payments balance transactions.
+ *
+ * For shopify_payments refunds, the order transaction processedAt is the initiation date
+ * (when refund is pending), not the settlement date. The balance transaction processedAt
+ * reflects when the refund was actually settled.
+ *
+ * @param shop - Shop domain
+ * @param accessToken - Shopify access token
+ * @param targetDate - Target date (YYYY-MM-DD)
+ * @returns Map of "orderId:amount" → settlement date (YYYY-MM-DD Pacific)
+ */
+async function buildRefundSettlementMap(
+  shop: string,
+  accessToken: string,
+  targetDate: string
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+
+  try {
+    // Fetch balance transactions for payouts around targetDate.
+    // Refund deductions appear in payouts 2-4 days after settlement.
+    const payoutStart = addDays(targetDate, -2);
+    const payoutEnd = addDays(targetDate, 5);
+
+    const balanceTxns = await fetchBalanceTransactionsByDate(shop, accessToken, payoutStart, payoutEnd);
+
+    for (const bt of balanceTxns) {
+      if (bt.type === 'refund' && bt.sourceOrderId) {
+        const key = `${bt.sourceOrderId}:${bt.gross.abs().toFixed(2)}`;
+        map.set(key, formatDateOnly(bt.processedAt));
+      }
+    }
+
+    if (map.size > 0) {
+      console.log(`📋 Refund settlement map: ${map.size} entries from balance transactions`);
+    }
+  } catch (error) {
+    console.warn(
+      `⚠️ Failed to fetch balance transactions for refund settlement dates: ${
+        error instanceof Error ? error.message : String(error)
+      }. Falling back to order transaction processedAt.`
+    );
+  }
+
+  return map;
 }
 
 /**
