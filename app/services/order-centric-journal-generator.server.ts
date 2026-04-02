@@ -247,7 +247,8 @@ export async function createOrderJournalEntries(
   preCalculatedCogs?: CogsCalculation,
   captureRatio?: Decimal,
   isoTargetDate?: string,  // YYYY-MM-DD format for point-in-time filtering
-  skipCogs?: boolean  // Skip all COGS/Cin7 processing
+  skipCogs?: boolean,  // Skip all COGS/Cin7 processing
+  paymentOnlyCapture?: boolean  // Subsequent-day capture: debit payment, credit sales only (no tax/shipping)
 ): Promise<JournalEntry[]> {
   const entries: JournalEntry[] = [];
   const reference = `SO-${order.name}`;
@@ -264,6 +265,24 @@ export async function createOrderJournalEntries(
       credit: new Decimal(0),
       memo: `${breakdown.accountName} - Order ${order.name}`,
     });
+  }
+
+  // SUBSEQUENT-DAY CAPTURE: When an order has non-CC captures on multiple dates,
+  // the primary (earliest) date records full sales/tax/shipping. Subsequent dates
+  // are payment-only — just debit the payment method, credit sales revenue.
+  // No tax, shipping, or gift card product recognition on subsequent dates.
+  if (paymentOnlyCapture) {
+    const totalDebit = paymentBreakdowns.reduce((sum, b) => sum.plus(b.amount), new Decimal(0));
+    entries.push({
+      date: targetDate,
+      reference,
+      account: accountMappings.sales_revenue.accountCode,
+      accountName: accountMappings.sales_revenue.accountName,
+      debit: new Decimal(0),
+      credit: totalDebit,
+      memo: `Sales - Order ${order.name} (subsequent payment)`,
+    });
+    return entries;
   }
 
   // MULTI-CC-CAPTURE SPLIT: When captureRatio is set, this is a partial-date entry.
