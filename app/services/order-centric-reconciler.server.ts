@@ -415,6 +415,14 @@ export async function reconcileOrdersByDate(
           continue;
         }
 
+        // Detect subsequent-date captures for non-CC multi-date orders.
+        // The primary (earliest) date records full sales/tax/shipping.
+        // Subsequent dates are payment-only (just the capture, no tax/shipping).
+        const isSubsequentDayCapture = hasMultipleDates && !isMultiDateCapture && (() => {
+          const dates = [...allCapturesByDate.keys()].sort();
+          return dates[0] !== targetDate;
+        })();
+
         // Process captures (using point-in-time filtered transactions)
         await processOrderCaptures(
           shop,
@@ -429,7 +437,9 @@ export async function reconcileOrdersByDate(
           effectiveCogsDataMap,
           captureRatio,
           enrichmentCache,
-          skipCogs
+          skipCogs,
+          hasMultipleDates,
+          isSubsequentDayCapture
         );
 
         // Process refunds (if any on target date)
@@ -613,7 +623,9 @@ async function processOrderCaptures(
   cogsDataMap?: Map<string, CogsCalculation>,
   captureRatio?: Decimal,
   enrichmentCache?: Map<string, EnrichedOrderData | null>,
-  skipCogs?: boolean
+  skipCogs?: boolean,
+  hasMultipleDates?: boolean,
+  isSubsequentDayCapture?: boolean
 ): Promise<void> {
   // Analyze payment methods
   const paymentBreakdowns = await analyzeOrderPayments(
@@ -649,7 +661,8 @@ async function processOrderCaptures(
     preCalculatedCogs,
     captureRatio,
     targetDate,  // Pass YYYY-MM-DD for point-in-time filtering
-    skipCogs
+    skipCogs,
+    isSubsequentDayCapture
   );
 
   journalEntries.push(...entries);
@@ -685,9 +698,28 @@ async function processOrderCaptures(
     // For multi-CC-capture splits, scale enriched data to match this date's portion
     const captureTotal = captureTransactions.reduce((sum, txn) => sum.plus(txn.amount), new Decimal(0));
 
-    // Scale payment breakdown for split captures so payment method columns
-    // match this date's captured amount (not the full order's total captures)
-    if (captureRatio && enrichedData) {
+    // Override payment breakdown when captures span multiple dates.
+    // The enrichment API calculates from ALL order transactions, but each day's
+    // recon should only show that day's payment methods.
+    // Payment breakdown columns (gc, card, etc.) show GROSS captures only.
+    // Refunds (kind='refund') are handled separately by processOrderRefunds and
+    // flow through jeSummary into paymentTotal.
+    if (hasMultipleDates && enrichedData) {
+      const zero = new Decimal(0);
+      const dayBreakdown = { cash: zero, charge: zero, giftCard: zero, storeCredit: zero, check: zero, card: zero };
+      for (const txn of captureTransactions) {
+        const gw = txn.gateway.toLowerCase().replace(/\s+/g, '_');
+        if (gw === 'cash') dayBreakdown.cash = dayBreakdown.cash.plus(txn.amount);
+        else if (gw === 'gift_card') dayBreakdown.giftCard = dayBreakdown.giftCard.plus(txn.amount);
+        else if (gw === 'shopify_payments') dayBreakdown.card = dayBreakdown.card.plus(txn.amount);
+        else if (gw === 'shopify_store_credit' || gw === 'store_credit') dayBreakdown.storeCredit = dayBreakdown.storeCredit.plus(txn.amount);
+        else if (gw === 'check' || gw === 'cheque') dayBreakdown.check = dayBreakdown.check.plus(txn.amount);
+        else dayBreakdown.charge = dayBreakdown.charge.plus(txn.amount); // manual, charge, unknown → paymentOther
+      }
+      enrichedData = { ...enrichedData, paymentBreakdown: dayBreakdown };
+    } else if (captureRatio && enrichedData) {
+      // Scale payment breakdown for CC split captures so payment method columns
+      // match this date's captured amount (not the full order's total captures)
       enrichedData = {
         ...enrichedData,
         paymentBreakdown: {
@@ -721,18 +753,26 @@ async function processOrderCaptures(
       id: order.id,
       name: order.name,
       createdAt: order.createdAt,
-      totalPrice: captureRatio ? captureTotal : order.totalPrice,
-      subtotalPrice: captureRatio ? captureTotal : order.subtotalPrice,
-      currentTotalPrice: captureRatio ? captureTotal : (order.currentTotalPrice || order.totalPrice),
-      currentSubtotalPrice: captureRatio ? captureTotal : pointInTime.subtotal,
-      currentTotalTax: captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio) : pointInTime.tax,
-      totalTax: captureRatio ? scaleDecimal(order.totalTax, captureRatio) : order.totalTax,
-      totalShipping: captureRatio ? scaleDecimal(order.totalShipping, captureRatio) : order.totalShipping,
-      totalDiscounts: captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio) : order.totalDiscounts,
+      totalPrice: (isSubsequentDayCapture || captureRatio) ? captureTotal : order.totalPrice,
+      subtotalPrice: (isSubsequentDayCapture || captureRatio) ? captureTotal : order.subtotalPrice,
+      currentTotalPrice: (isSubsequentDayCapture || captureRatio) ? captureTotal : (order.currentTotalPrice || order.totalPrice),
+      currentSubtotalPrice: (isSubsequentDayCapture || captureRatio) ? captureTotal : pointInTime.subtotal,
+      currentTotalTax: isSubsequentDayCapture ? new Decimal(0)
+        : captureRatio ? scaleDecimal(order.currentTotalTax, captureRatio)
+        : pointInTime.tax,
+      totalTax: isSubsequentDayCapture ? new Decimal(0)
+        : captureRatio ? scaleDecimal(order.totalTax, captureRatio)
+        : order.totalTax,
+      totalShipping: isSubsequentDayCapture ? new Decimal(0)
+        : captureRatio ? scaleDecimal(order.totalShipping, captureRatio)
+        : order.totalShipping,
+      totalDiscounts: isSubsequentDayCapture ? new Decimal(0)
+        : captureRatio ? scaleDecimal(order.totalDiscounts, captureRatio)
+        : order.totalDiscounts,
       financialStatus: order.financialStatus,
       lineItems: order.lineItems,
       hasActualRefunds: hasActualRefunds(order, targetDate),
-      isMultiCaptureSplit: !!captureRatio,
+      isMultiCaptureSplit: !!captureRatio,  // NOT set for subsequent-day (no "split capture" note)
       outstandingAuths: uncapturedAuths.length > 0 ? uncapturedAuths : undefined,
     };
 
@@ -951,9 +991,17 @@ function filterRefundTransactions(
       const key = `${order.id}:${txn.amount.abs().toFixed(2)}`;
       const settlementDate = refundSettlementMap.get(key);
       if (settlementDate) {
+        console.log(
+          `📋 Order ${order.name}: Refund $${txn.amount.abs().toFixed(2)} settlement date ` +
+          `overridden from ${formatDateOnly(txn.processedAt)} → ${settlementDate}`
+        );
         txnDate = settlementDate;
       } else {
         // No balance transaction found — fall back to order transaction processedAt
+        console.log(
+          `📋 Order ${order.name}: Refund $${txn.amount.abs().toFixed(2)} - no settlement date found ` +
+          `(key=${key}, map size=${refundSettlementMap.size}). Using processedAt=${formatDateOnly(txn.processedAt)}`
+        );
         txnDate = formatDateOnly(txn.processedAt);
       }
     } else {
@@ -1143,15 +1191,29 @@ async function buildRefundSettlementMap(
 
     const balanceTxns = await fetchBalanceTransactionsByDate(shop, accessToken, payoutStart, payoutEnd);
 
+    console.log(
+      `📋 Refund settlement: Fetched ${balanceTxns.length} balance transactions ` +
+      `(payout range ${payoutStart} to ${payoutEnd} for target ${targetDate})`
+    );
+
+    let refundCount = 0;
     for (const bt of balanceTxns) {
       if (bt.type === 'refund' && bt.sourceOrderId) {
         const key = `${bt.sourceOrderId}:${bt.gross.abs().toFixed(2)}`;
-        map.set(key, formatDateOnly(bt.processedAt));
+        const settlementDate = formatDateOnly(bt.processedAt);
+        map.set(key, settlementDate);
+        refundCount++;
+        console.log(
+          `  📋 Refund settlement entry: order=${bt.sourceOrderId}, ` +
+          `amount=$${bt.gross.abs().toFixed(2)}, settlement=${settlementDate}, key=${key}`
+        );
       }
     }
 
-    if (map.size > 0) {
-      console.log(`📋 Refund settlement map: ${map.size} entries from balance transactions`);
+    if (refundCount > 0) {
+      console.log(`📋 Refund settlement map: ${map.size} entries from ${refundCount} refund balance transactions`);
+    } else {
+      console.log(`📋 Refund settlement map: No refund balance transactions found`);
     }
   } catch (error) {
     console.warn(
