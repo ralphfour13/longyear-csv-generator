@@ -201,9 +201,9 @@ export async function getShopJobs(shop: string): Promise<ExportJob[]> {
       }
     }
 
-    // Sort by created date, newest first
+    // Sort by created date, oldest first (FIFO — process jobs in the order they were queued)
     return jobs.sort((a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
   } catch {
     return [];

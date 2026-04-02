@@ -137,12 +137,12 @@ export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarPro
       <s-banner tone="info">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong style={{ fontSize: '16px' }}>Export Job</strong>
+            <strong style={{ fontSize: '16px' }}>Export for {job.startDate}</strong>
             <span style={{
               padding: '4px 12px',
               borderRadius: '12px',
-              backgroundColor: '#E3F2FD',
-              color: '#0D5EAF',
+              backgroundColor: '#FFF4E5',
+              color: '#916A00',
               fontSize: '12px',
               fontWeight: 600,
               textTransform: 'uppercase',
@@ -151,7 +151,7 @@ export function JobProgressBar({ jobId, onComplete, onError }: JobProgressBarPro
             </span>
           </div>
           <div style={{ color: '#6D7175', fontSize: '14px' }}>
-            Job is queued and waiting to be processed...
+            Queued and waiting to be processed...
           </div>
         </div>
       </s-banner>
