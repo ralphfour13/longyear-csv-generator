@@ -415,6 +415,14 @@ function generateNotes(order: any, enrichedData: any): string {
     notes.push(`split tender ${amounts[0].toFixed(2)}`);
   }
 
+  // Flag uncaptured card authorizations
+  if (order.outstandingAuths && order.outstandingAuths.length > 0) {
+    const authNote = order.outstandingAuths
+      .map((a: { gateway: string; amount: string }) => `$${a.amount} ${a.gateway}`)
+      .join(', ');
+    notes.push(`uncaptured auth: ${authNote}`);
+  }
+
   return notes.join(', ');
 }
 

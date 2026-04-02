@@ -324,6 +324,7 @@ export interface EnrichedTransaction {
     lineItems: OrderLineItem[]; // Needed for Daily Reconciliation Report notes
     hasActualRefunds?: boolean; // True if order has actual refunds (not just cancellations)
     isMultiCaptureSplit?: boolean; // True if this order's captures are split across multiple dates
+    outstandingAuths?: Array<{ gateway: string; amount: string; date: string }>; // CC auths with no capture
   };
 
   // Enriched data for Daily Sales Report

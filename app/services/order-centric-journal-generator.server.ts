@@ -415,17 +415,17 @@ export async function createOrderJournalEntries(
 
         const testSales = totalDebit.minus(usedTax).minus(usedShipping).minus(usedGiftCardSales);
         if (testSales.lt(0)) {
-          // Edge case: non-sales exceed capture → proportional fallback
+          // Edge case: non-sales exceed capture → proportional fallback for tax/GC only.
+          // Shipping is never scaled proportionally — it's always $0 or $6.50.
+          usedShipping = new Decimal(0);
+          const remaining = totalDebit.minus(usedShipping);
           const orderTotal = order.totalPrice;
           usedTax = orderTotal.isZero()
             ? new Decimal(0)
-            : totalDebit.times(taxAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+            : remaining.times(taxAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
           usedGiftCardSales = orderTotal.isZero()
             ? new Decimal(0)
-            : totalDebit.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
-          usedShipping = orderTotal.isZero()
-            ? new Decimal(0)
-            : totalDebit.times(shippingAmount).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+            : remaining.times(giftCardProductSales).dividedBy(orderTotal).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
         }
       }
     }
@@ -932,10 +932,9 @@ export async function createRefundJournalEntries(
         });
       }
 
-      // SHIPPING REFUND FALLBACK: When refund total exceeds line items + tax,
-      // the difference is likely a shipping refund not tracked via order_adjustments.
-      // This handles cases where Shopify doesn't create a separate shipping_refund adjustment
-      // but the refund amount includes shipping (e.g., #80561: $11.50 = $5.00 sales + $6.50 shipping)
+      // REFUND GAP: When refund total exceeds line items + tax + shipping adjustments,
+      // absorb the gap into the sales reversal (refundedSubtotal). Shipping refunds
+      // should only come from explicit shipping_refund order adjustments from Shopify.
       const shippingFromAdjustments = refund?.order_adjustments?.reduce((sum, adj) => {
         if (adj.kind === 'shipping_refund') {
           let adjTotal = new Decimal(adj.amount).abs();
@@ -950,21 +949,13 @@ export async function createRefundJournalEntries(
       const lineItemsPlusTaxPlusShipping = refundedSubtotal.plus(refundedTax).plus(shippingFromAdjustments);
       const refundGap = totalRefundAmount.minus(lineItemsPlusTaxPlusShipping);
 
-      if (refundGap.greaterThan(new Decimal('0.01')) && order.totalShipping.greaterThan(0)) {
-        // Gap exists and order has shipping - attribute gap to shipping refund
-        entries.push({
-          date: targetDate,
-          reference: `RF-${order.name}`,
-          account: accountMappings.shipping_revenue.accountCode,
-          accountName: accountMappings.shipping_revenue.accountName,
-          debit: refundGap,
-          credit: new Decimal(0),
-          memo: `Shipping Refund - Order ${order.name}`,
-        });
+      if (refundGap.greaterThan(new Decimal('0.01'))) {
+        // Gap absorbed into sales reversal — shipping never takes the gap
+        refundedSubtotal = refundedSubtotal.plus(refundGap);
 
         console.log(
-          `📦 Order ${order.name}: Shipping refund fallback - $${refundGap.toFixed(2)} gap ` +
-          `(refund $${totalRefundAmount.toFixed(2)} - items $${refundedSubtotal.toFixed(2)} ` +
+          `🔌 Order ${order.name}: Refund gap $${refundGap.toFixed(2)} absorbed into sales reversal ` +
+          `(refund $${totalRefundAmount.toFixed(2)} - items $${refundedSubtotal.minus(refundGap).toFixed(2)} ` +
           `- tax $${refundedTax.toFixed(2)} - adj $${shippingFromAdjustments.toFixed(2)})`
         );
       }
