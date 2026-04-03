@@ -1188,8 +1188,11 @@ async function buildRefundSettlementMap(
     // Two-step approach: fetch payouts in date range, then balance transactions per payout.
     // The Balance Transactions API does NOT support date filtering directly —
     // only payout_id. Passing date params is silently ignored.
+    // Range: -2 to +10 days. The wide forward window ensures we capture payouts
+    // that include refunds settled near targetDate (Shopify settles refunds 2-5
+    // business days after initiation, then includes them in a subsequent payout).
     const payoutStart = addDays(targetDate, -2);
-    const payoutEnd = addDays(targetDate, 5);
+    const payoutEnd = addDays(targetDate, 10);
 
     const payouts = await fetchPayouts(shop, accessToken, payoutStart, payoutEnd);
     console.log(
@@ -1197,11 +1200,11 @@ async function buildRefundSettlementMap(
       `(range ${payoutStart} to ${payoutEnd} for target ${targetDate})`
     );
 
-    const balanceTxns = [];
-    for (const payout of payouts) {
-      const txns = await fetchBalanceTransactions(shop, accessToken, payout.id);
-      balanceTxns.push(...txns);
-    }
+    // Fetch balance transactions for all payouts in parallel
+    const balanceTxnArrays = await Promise.all(
+      payouts.map(payout => fetchBalanceTransactions(shop, accessToken, payout.id))
+    );
+    const balanceTxns = balanceTxnArrays.flat();
 
     console.log(
       `📋 Refund settlement: Fetched ${balanceTxns.length} balance transactions ` +
