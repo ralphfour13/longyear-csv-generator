@@ -285,8 +285,8 @@ export async function reconcileOrdersByDate(
             // Not on fulfillment date — check if there are NEW captures on targetDate
             // that arrived after the fulfillment date (e.g., manual payment closing an old auth)
             const targetDateCaptures = allCapturesByDate.get(targetDate) || [];
-            if (targetDateCaptures.length > 0) {
-              // New captures after fulfillment — treat as multi-date split
+            if (targetDateCaptures.length > 0 && postingDate && targetDate > postingDate) {
+              // New captures AFTER fulfillment — treat as multi-date split
               const targetDateTotal = targetDateCaptures.reduce(
                 (sum, txn) => sum.plus(txn.amount), new Decimal(0)
               );
@@ -418,7 +418,7 @@ export async function reconcileOrdersByDate(
         // Detect subsequent-date captures for non-CC multi-date orders.
         // The primary (earliest) date records full sales/tax/shipping.
         // Subsequent dates are payment-only (just the capture, no tax/shipping).
-        const isSubsequentDayCapture = hasMultipleDates && !isMultiDateCapture && (() => {
+        const isSubsequentDayCapture = hasMultipleDates && !isMultiDateCapture && !postingOnFulfillmentDate && (() => {
           const dates = [...allCapturesByDate.keys()].sort();
           return dates[0] !== targetDate;
         })();
