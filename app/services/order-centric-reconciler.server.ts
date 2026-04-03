@@ -27,7 +27,8 @@ import { enrichOrderData, type EnrichedOrderData } from './enrichment/order-enri
 import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
 import { Cin7ProductService } from './cin7/cin7-product-service.server';
-import { fetchBalanceTransactionsByDate } from './shopify/balance-transaction-fetcher.server';
+import { fetchBalanceTransactions } from './shopify/balance-transaction-fetcher.server';
+import { fetchPayouts } from './shopify/payout-fetcher.server';
 
 /**
  * Compute a per-order summary from JE lines. Used by DR/DSR generators
@@ -1184,16 +1185,27 @@ async function buildRefundSettlementMap(
   const map = new Map<string, string>();
 
   try {
-    // Fetch balance transactions for payouts around targetDate.
-    // Refund deductions appear in payouts 2-4 days after settlement.
+    // Two-step approach: fetch payouts in date range, then balance transactions per payout.
+    // The Balance Transactions API does NOT support date filtering directly —
+    // only payout_id. Passing date params is silently ignored.
     const payoutStart = addDays(targetDate, -2);
     const payoutEnd = addDays(targetDate, 5);
 
-    const balanceTxns = await fetchBalanceTransactionsByDate(shop, accessToken, payoutStart, payoutEnd);
+    const payouts = await fetchPayouts(shop, accessToken, payoutStart, payoutEnd);
+    console.log(
+      `📋 Refund settlement: Found ${payouts.length} payouts ` +
+      `(range ${payoutStart} to ${payoutEnd} for target ${targetDate})`
+    );
+
+    const balanceTxns = [];
+    for (const payout of payouts) {
+      const txns = await fetchBalanceTransactions(shop, accessToken, payout.id);
+      balanceTxns.push(...txns);
+    }
 
     console.log(
       `📋 Refund settlement: Fetched ${balanceTxns.length} balance transactions ` +
-      `(payout range ${payoutStart} to ${payoutEnd} for target ${targetDate})`
+      `from ${payouts.length} payouts`
     );
 
     let refundCount = 0;
