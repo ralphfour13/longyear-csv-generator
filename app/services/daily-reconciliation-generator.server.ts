@@ -238,9 +238,18 @@ function transformToReconciliationRow(
   const netSubtotal = combinedJe ? combinedJe.netSales.abs().plus(giftCardSoldAmount) : sales;
   const taxAmount = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
   const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
-  const paymentTotal = combinedJe
+  let paymentTotal = combinedJe
     ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(giftCardSoldAmount)
     : order.totalPrice;
+
+  // Add uncaptured auth amounts so paymentTotal reflects the full order amount.
+  // The gap between paymentTotal and payment columns is the uncaptured receivable,
+  // documented by the "uncaptured auth" note in generateNotes().
+  if (order.outstandingAuths && order.outstandingAuths.length > 0) {
+    for (const auth of order.outstandingAuths) {
+      paymentTotal = paymentTotal.plus(new Decimal(auth.amount));
+    }
+  }
 
   // If refunded ON OR BEFORE this date, create negative+positive pair to show the void.
   // Use hasActualRefunds (point-in-time) instead of financialStatus (current state),
