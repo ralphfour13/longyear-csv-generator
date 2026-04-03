@@ -235,21 +235,23 @@ function transformToReconciliationRow(
   // Gift card liability (2320) is included only when positive (credit = GC product sold),
   // NOT when negative (debit = GC redeemed as payment), to avoid double-counting.
   const giftCardSoldAmount = combinedJe?.giftCardLiability.gt(0) ? combinedJe.giftCardLiability : new Decimal(0);
-  const netSubtotal = combinedJe ? combinedJe.netSales.abs().plus(giftCardSoldAmount) : sales;
-  const taxAmount = combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0));
-  const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
-  let paymentTotal = combinedJe
-    ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(giftCardSoldAmount)
-    : order.totalPrice;
 
-  // Add uncaptured auth amounts so paymentTotal reflects the full order amount.
-  // The gap between paymentTotal and payment columns is the uncaptured receivable,
-  // documented by the "uncaptured auth" note in generateNotes().
-  if (order.outstandingAuths && order.outstandingAuths.length > 0) {
-    for (const auth of order.outstandingAuths) {
-      paymentTotal = paymentTotal.plus(new Decimal(auth.amount));
-    }
-  }
+  // When an order has uncaptured auths, the JE plug method distorts tax/sales breakdown
+  // because it proportionally allocates values to the capture amount (which excludes the
+  // uncaptured auth). Use Shopify's current values directly for accurate DR display.
+  const hasUncapturedAuths = order.outstandingAuths && order.outstandingAuths.length > 0;
+  const netSubtotal = hasUncapturedAuths
+    ? (order.currentSubtotalPrice ?? (combinedJe ? combinedJe.netSales.abs().plus(giftCardSoldAmount) : sales))
+    : (combinedJe ? combinedJe.netSales.abs().plus(giftCardSoldAmount) : sales);
+  const taxAmount = hasUncapturedAuths
+    ? (order.currentTotalTax ?? (combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0))))
+    : (combinedJe ? combinedJe.tax.abs() : (order.totalTax ?? new Decimal(0)));
+  const shippingAmount = combinedJe ? combinedJe.shipping.abs() : (order.totalShipping || new Decimal(0));
+  const paymentTotal = hasUncapturedAuths
+    ? (order.currentTotalPrice ?? order.totalPrice)
+    : (combinedJe
+        ? combinedJe.netSales.abs().plus(combinedJe.tax.abs()).plus(combinedJe.shipping.abs()).plus(giftCardSoldAmount)
+        : order.totalPrice);
 
   // If refunded ON OR BEFORE this date, create negative+positive pair to show the void.
   // Use hasActualRefunds (point-in-time) instead of financialStatus (current state),
