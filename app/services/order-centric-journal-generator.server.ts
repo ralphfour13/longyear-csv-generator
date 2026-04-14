@@ -824,12 +824,43 @@ export async function createRefundJournalEntries(
           new Decimal(0)
         ) || refundAmount;
 
-      if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
+      // COMPANION LOOKUP: When a refund has transactions but no refund_line_items
+      // (cancel-then-refund pattern), search for a companion cancel-type refund on the
+      // same order that has line items but no transactions, with matching totals.
+      // Example: Order #80598 — Shopify creates a cancel refund (items + tax, no money)
+      // then a separate actual refund (money returned, no items). We link them.
+      let effectiveRefundLineItems = refund?.refund_line_items;
+      if ((!effectiveRefundLineItems || effectiveRefundLineItems.length === 0) && order.refunds) {
+        const companion = order.refunds.find(r => {
+          if (r.id === refund?.id) return false; // Skip self
+          if (!r.refund_line_items || r.refund_line_items.length === 0) return false;
+          if (r.transactions && r.transactions.length > 0) return false; // Must be cancel-type (no money moved)
+          // Check if line item totals match the refund transaction amount
+          const companionSubtotal = r.refund_line_items.reduce(
+            (sum, item) => sum.plus(item.subtotal), new Decimal(0)
+          );
+          const companionTax = r.refund_line_items.reduce(
+            (sum, item) => sum.plus(item.total_tax), new Decimal(0)
+          );
+          const companionTotal = companionSubtotal.plus(companionTax);
+          return companionTotal.minus(totalRefundAmount).abs().lessThanOrEqualTo(new Decimal('0.02'));
+        });
+
+        if (companion) {
+          effectiveRefundLineItems = companion.refund_line_items;
+          console.log(
+            `🔗 Order ${order.name}: Linked companion cancel refund (ID: ${companion.id}) ` +
+            `with ${companion.refund_line_items.length} line items to actual refund $${totalRefundAmount.toFixed(2)}`
+          );
+        }
+      }
+
+      if (effectiveRefundLineItems && effectiveRefundLineItems.length > 0) {
         // PREFERRED METHOD: Calculate actual subtotal and tax from refund line items
-        refundedSubtotal = refund.refund_line_items.reduce(
+        refundedSubtotal = effectiveRefundLineItems.reduce(
           (sum, item) => sum.plus(item.subtotal), new Decimal(0)
         );
-        refundedTax = refund.refund_line_items.reduce(
+        refundedTax = effectiveRefundLineItems.reduce(
           (sum, item) => sum.plus(item.total_tax), new Decimal(0)
         );
 
@@ -899,9 +930,9 @@ export async function createRefundJournalEntries(
       let giftCardRefundSubtotal = new Decimal(0);
       let regularRefundSubtotal = refundedSubtotal;
 
-      if (refund?.refund_line_items && refund.refund_line_items.length > 0) {
+      if (effectiveRefundLineItems && effectiveRefundLineItems.length > 0) {
         // Check each refunded item to see if it's a gift card
-        for (const refundItem of refund.refund_line_items) {
+        for (const refundItem of effectiveRefundLineItems) {
           const isGiftCard = refundItem.line_item?.title?.toLowerCase().includes('gift card');
           if (isGiftCard) {
             const itemSubtotal = new Decimal(refundItem.subtotal);
