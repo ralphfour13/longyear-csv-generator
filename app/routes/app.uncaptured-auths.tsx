@@ -1,11 +1,39 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useActionData, useNavigation, Form } from 'react-router';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { authenticate } from '../shopify.server';
-import {
-  generateUncapturedAuthReport,
-  reportToCsv,
-  type UncapturedAuthReport,
-} from '../services/uncaptured-auth-report.server';
+
+interface UncapturedAuthOrder {
+  name: string;
+  id: string;
+  createdAt: string;
+  orderTotal: string;
+  uncapturedAmount: string;
+  capturedAmount: string;
+  gateway: string;
+  financialStatus: string;
+  paymentMethods: string;
+  adminUrl: string;
+}
+
+interface UncapturedAuthReport {
+  orders: UncapturedAuthOrder[];
+  totalUncaptured: string;
+  totalCaptured: string;
+  orderCount: number;
+  sinceDate: string;
+  totalOrdersScanned: number;
+  splitTenderCandidates: number;
+}
+
+function reportToCsv(report: UncapturedAuthReport): string {
+  const header = 'Order,Date,Order Total,Captured,Uncaptured,Gateway,Status,Payment Methods,Admin URL';
+  const rows = report.orders.map(o =>
+    `${o.name},${o.createdAt.split('T')[0]},${o.orderTotal},${o.capturedAmount},${o.uncapturedAmount},${o.gateway},${o.financialStatus},"${o.paymentMethods}",${o.adminUrl}`
+  );
+  const summary = `\nTotal Uncaptured:,$${report.totalUncaptured}\nAffected Orders:,${report.orderCount}\nOrders Scanned:,${report.totalOrdersScanned}\nSplit-Tender Candidates:,${report.splitTenderCandidates}`;
+  return [header, ...rows, summary].join('\n');
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -15,44 +43,144 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
-  const accessToken = session.accessToken || '';
 
   const formData = await request.formData();
   const intent = formData.get('intent');
   const sinceDate = (formData.get('sinceDate') as string) || '2026-01-01';
 
   if (intent === 'generate') {
-    const report = await generateUncapturedAuthReport(shop, accessToken, sinceDate);
-    return { report, csv: null };
+    try {
+      const { createUncapturedAuthJob } = await import('../services/background-jobs.server');
+      const { processPendingJobs } = await import('../services/job-processor.server');
+
+      const jobId = await createUncapturedAuthJob(shop, sinceDate);
+
+      const accessToken = session.accessToken || '';
+      processPendingJobs(shop, accessToken).catch((error) => {
+        console.error('[UncapturedAuth] Background job processing error:', error);
+      });
+
+      return { jobId, error: null };
+    } catch (error) {
+      console.error('Uncaptured auth report error:', error);
+      return {
+        jobId: null,
+        error: `Report failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
 
-  if (intent === 'download') {
-    const reportJson = formData.get('reportData') as string;
-    if (!reportJson) return { report: null, csv: null };
-    const report: UncapturedAuthReport = JSON.parse(reportJson);
-    const csv = reportToCsv(report);
-    return { report, csv };
-  }
-
-  return { report: null, csv: null };
+  return { jobId: null, error: null };
 };
+
+interface JobProgressData {
+  id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error?: string;
+  startedAt?: string;
+  progress?: {
+    phaseLabel?: string;
+    overallPercentage?: number;
+    currentActivity?: string;
+    ordersFound?: number;
+    ordersProcessed?: number;
+    estimatedSecondsRemaining?: number;
+  };
+  result?: UncapturedAuthReport;
+}
 
 export default function UncapturedAuths() {
   useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  const isLoading = navigation.state === 'submitting';
+  const isSubmitting = navigation.state === 'submitting';
 
-  const report = actionData?.report as UncapturedAuthReport | null;
-  const csv = actionData?.csv as string | null;
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobData, setJobData] = useState<JobProgressData | null>(null);
+  const [report, setReport] = useState<UncapturedAuthReport | null>(null);
+  const [elapsed, setElapsed] = useState('');
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Trigger CSV download when csv data is available
-  if (csv) {
+  // When action returns a jobId, start polling
+  useEffect(() => {
+    if (actionData?.jobId) {
+      setJobId(actionData.jobId);
+      setReport(null);
+      setJobData(null);
+    }
+  }, [actionData?.jobId]);
+
+  const fetchProgress = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/job-progress/${id}`);
+      if (!response.ok) return;
+      const data: JobProgressData = await response.json();
+      setJobData(data);
+
+      if (data.status === 'completed' || data.status === 'failed') {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        if (data.status === 'completed' && data.result) {
+          setReport(data.result);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching job progress:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    // Initial fetch
+    fetchProgress(jobId);
+
+    // Poll every 10 seconds
+    pollingRef.current = setInterval(() => fetchProgress(jobId), 10000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [jobId, fetchProgress]);
+
+  // Live elapsed timer
+  const jobStartedAt = jobData?.startedAt;
+  const jobStatus = jobData?.status;
+  useEffect(() => {
+    if (jobStatus !== 'processing' || !jobStartedAt) {
+      setElapsed('');
+      return;
+    }
+
+    function updateElapsed() {
+      const start = new Date(jobStartedAt!).getTime();
+      const durationMs = Date.now() - start;
+      setElapsed(formatDuration(Math.floor(durationMs / 1000)));
+    }
+
+    updateElapsed();
+    const timer = setInterval(updateElapsed, 1000);
+    return () => clearInterval(timer);
+  }, [jobStatus, jobStartedAt]);
+
+  const isProcessing = jobData && (jobData.status === 'pending' || jobData.status === 'processing');
+  const progress = jobData?.progress;
+  const percentage = progress?.overallPercentage || 0;
+
+  // CSV download handler
+  function downloadCsv() {
+    if (!report) return;
+    const csv = reportToCsv(report);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `uncaptured-auths-${report?.sinceDate || 'report'}.csv`;
+    a.download = `uncaptured-auths-${report.sinceDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -92,26 +220,101 @@ export default function UncapturedAuths() {
               <s-button
                 variant="primary"
                 type="submit"
+                disabled={isSubmitting || isProcessing ? true : undefined}
               >
-                {isLoading ? 'Scanning orders...' : 'Generate Report'}
+                {isSubmitting ? 'Starting...' : 'Generate Report'}
               </s-button>
             </div>
           </Form>
         </div>
       </s-section>
 
-      {isLoading && (
+      {actionData?.error && (
+        <s-banner tone="critical">
+          <s-text>{actionData.error}</s-text>
+        </s-banner>
+      )}
+
+      {jobData?.status === 'failed' && (
+        <s-banner tone="critical">
+          <s-text>Report failed: {jobData.error || 'An unknown error occurred'}</s-text>
+        </s-banner>
+      )}
+
+      {isProcessing && (
         <s-section>
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <s-spinner size="large" />
-            <div style={{ marginTop: '12px' }}>
-              <s-text>Scanning orders for uncaptured authorizations... This may take a minute.</s-text>
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: '16px' }}>Scanning Orders</strong>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {elapsed && (
+                  <span style={{ fontSize: '13px', color: '#6D7175', fontVariantNumeric: 'tabular-nums' }}>
+                    {elapsed}
+                  </span>
+                )}
+                <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  backgroundColor: '#E3F2FD',
+                  color: '#0D5EAF',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                }}>
+                  {jobData.status === 'pending' ? 'Queued' : 'Processing'}
+                </span>
+              </div>
             </div>
+
+            {/* Progress bar */}
+            <div style={{
+              width: '100%',
+              height: '8px',
+              backgroundColor: '#E1E3E5',
+              borderRadius: '4px',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${percentage}%`,
+                height: '100%',
+                backgroundColor: '#008060',
+                transition: 'width 0.3s ease',
+              }} />
+            </div>
+
+            {progress && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: '#202223' }}>
+                  {progress.phaseLabel || 'Processing...'}
+                </span>
+                <span style={{ fontSize: '14px', color: '#6D7175' }}>
+                  {percentage}%
+                </span>
+              </div>
+            )}
+
+            {progress?.currentActivity && (
+              <div style={{ fontSize: '14px', color: '#6D7175' }}>
+                {progress.currentActivity}
+              </div>
+            )}
+
+            {progress?.ordersFound && progress.ordersProcessed !== undefined && (
+              <div style={{ fontSize: '13px', color: '#6D7175' }}>
+                Checked {progress.ordersProcessed} / {progress.ordersFound} candidates
+              </div>
+            )}
+
+            {progress?.estimatedSecondsRemaining !== undefined && progress.estimatedSecondsRemaining > 0 && (
+              <div style={{ fontSize: '13px', color: '#6D7175' }}>
+                Est. {formatDuration(progress.estimatedSecondsRemaining)} remaining
+              </div>
+            )}
           </div>
         </s-section>
       )}
 
-      {report && !isLoading && (
+      {report && !isProcessing && (
         <>
           <s-section>
             <div style={{
@@ -181,14 +384,9 @@ export default function UncapturedAuths() {
           {report.orders.length > 0 && (
             <s-section>
               <div style={{ marginBottom: '12px' }}>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="download" />
-                  <input type="hidden" name="reportData" value={JSON.stringify(report)} />
-                  <input type="hidden" name="sinceDate" value={report.sinceDate} />
-                  <s-button type="submit">
-                    Download CSV
-                  </s-button>
-                </Form>
+                <s-button onClick={downloadCsv}>
+                  Download CSV
+                </s-button>
               </div>
 
               <div style={{
@@ -260,4 +458,18 @@ export default function UncapturedAuths() {
       )}
     </s-page>
   );
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) {
+    return `${Math.round(seconds)}s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  if (minutes < 60) {
+    return `${minutes}m ${secs}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
 }

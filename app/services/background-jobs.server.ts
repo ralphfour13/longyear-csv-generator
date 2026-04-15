@@ -9,7 +9,7 @@ export interface ExportJob {
   id: string;
   shop: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  jobType?: 'export' | 'sales-tax'; // Defaults to 'export' for backwards compatibility
+  jobType?: 'export' | 'sales-tax' | 'uncaptured-auth'; // Defaults to 'export' for backwards compatibility
   startDate: string;
   endDate?: string;
   fileOptions: FileGenerationOptions;
@@ -18,6 +18,9 @@ export interface ExportJob {
     year: number;
     month?: number;
     quarter?: number;
+  };
+  uncapturedAuthRequest?: {
+    sinceDate: string;
   };
   createdAt: string;
   startedAt?: string;
@@ -129,6 +132,38 @@ export async function createSalesTaxJob(
   console.log(
     `[Job] Created sales tax job ${jobId} for shop ${shop}`,
     `\n  Period: ${periodLabel}`,
+  );
+
+  return jobId;
+}
+
+/**
+ * Create a new uncaptured authorization report job
+ */
+export async function createUncapturedAuthJob(
+  shop: string,
+  sinceDate: string,
+): Promise<string> {
+  await ensureJobsDir();
+
+  const jobId = `uncapturedauth_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const job: ExportJob = {
+    id: jobId,
+    shop,
+    status: 'pending',
+    jobType: 'uncaptured-auth',
+    startDate: sinceDate,
+    fileOptions: {}, // Not used for uncaptured-auth jobs
+    uncapturedAuthRequest: { sinceDate },
+    createdAt: new Date().toISOString(),
+  };
+
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
+
+  console.log(
+    `[Job] Created uncaptured auth job ${jobId} for shop ${shop}`,
+    `\n  Since: ${sinceDate}`,
   );
 
   return jobId;

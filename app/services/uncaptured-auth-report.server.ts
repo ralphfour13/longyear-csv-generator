@@ -197,19 +197,32 @@ function calculateCapturedAmount(transactions: TransactionData[]): Decimal {
     .reduce((sum, t) => sum.plus(new Decimal(t.amount)), new Decimal(0));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ProgressCallback = (progress: Record<string, any>) => Promise<void>;
+
 /**
  * Generate the uncaptured authorization report
  */
 export async function generateUncapturedAuthReport(
   shop: string,
   accessToken: string,
-  sinceDate: string
+  sinceDate: string,
+  onProgress?: ProgressCallback,
 ): Promise<UncapturedAuthReport> {
   console.log(`[UncapturedAuth] Fetching orders since ${sinceDate}...`);
 
   // Step 1: Fetch all orders (lightweight, no transactions)
   const allOrders = await fetchOrdersSince(shop, accessToken, sinceDate);
   console.log(`[UncapturedAuth] Found ${allOrders.length} total orders since ${sinceDate}`);
+
+  if (onProgress) {
+    await onProgress({
+      phase: 'fetching',
+      phaseLabel: 'Filtering orders',
+      currentActivity: `Found ${allOrders.length} orders. Filtering split-tender candidates...`,
+      overallPercentage: 45,
+    });
+  }
 
   // Step 2: Pre-filter to split-tender candidates
   // Orders with multiple payment gateways are candidates for uncaptured auths
@@ -221,6 +234,17 @@ export async function generateUncapturedAuthReport(
   });
   console.log(`[UncapturedAuth] ${candidates.length} split-tender candidates to check`);
 
+  if (onProgress) {
+    await onProgress({
+      phase: 'reconciling',
+      phaseLabel: 'Analyzing transactions',
+      currentActivity: `Checking ${candidates.length} split-tender candidates...`,
+      ordersFound: candidates.length,
+      ordersProcessed: 0,
+      overallPercentage: 50,
+    });
+  }
+
   // Step 3: Fetch transactions for candidates and check for uncaptured auths
   const results: UncapturedAuthOrder[] = [];
   let totalUncaptured = new Decimal(0);
@@ -231,6 +255,18 @@ export async function generateUncapturedAuthReport(
 
     if (i > 0 && i % 50 === 0) {
       console.log(`[UncapturedAuth] Checked ${i}/${candidates.length} candidates, found ${results.length} so far`);
+    }
+
+    if (onProgress) {
+      const pct = 50 + Math.round((i / candidates.length) * 49);
+      await onProgress({
+        phase: 'reconciling',
+        phaseLabel: 'Analyzing transactions',
+        currentActivity: `Checking candidate ${i + 1} of ${candidates.length}...`,
+        ordersFound: candidates.length,
+        ordersProcessed: i,
+        overallPercentage: pct,
+      });
     }
 
     const transactions = await fetchTransactions(shop, accessToken, order.id);
