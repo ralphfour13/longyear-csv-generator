@@ -68,6 +68,7 @@ export default function UncapturedAuths() {
 
         <div style={{ marginTop: '16px' }}>
           <Form method="post">
+            <input type="hidden" name="intent" value="generate" />
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
               <div>
                 <label htmlFor="sinceDate">
@@ -90,8 +91,7 @@ export default function UncapturedAuths() {
               </div>
               <s-button
                 variant="primary"
-                name="intent"
-                value="generate"
+                type="submit"
               >
                 {isLoading ? 'Scanning orders...' : 'Generate Report'}
               </s-button>
@@ -182,9 +182,10 @@ export default function UncapturedAuths() {
             <s-section>
               <div style={{ marginBottom: '12px' }}>
                 <Form method="post">
+                  <input type="hidden" name="intent" value="download" />
                   <input type="hidden" name="reportData" value={JSON.stringify(report)} />
                   <input type="hidden" name="sinceDate" value={report.sinceDate} />
-                  <s-button name="intent" value="download">
+                  <s-button type="submit">
                     Download CSV
                   </s-button>
                 </Form>
