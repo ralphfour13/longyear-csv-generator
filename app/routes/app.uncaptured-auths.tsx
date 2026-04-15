@@ -8,8 +8,8 @@ import {
 } from '../services/uncaptured-auth-report.server';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
-  return { shop: session.shop };
+  await authenticate.admin(request);
+  return {};
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -59,20 +59,21 @@ export default function UncapturedAuths() {
 
   return (
     <s-page heading="Orders with Uncaptured Authorizations">
-      <s-link slot="backAction" href="/app">Back</s-link>
 
-      <s-box padding="400">
-        <s-text variant="bodyMd">
+      <s-section>
+        <s-text>
           Find orders where a credit card authorization was never captured.
           These are typically split-tender orders (gift card + credit card) where the CC portion was authorized but never collected.
         </s-text>
 
-        <s-box paddingBlockStart="400">
+        <div style={{ marginTop: '16px' }}>
           <Form method="post">
-            <s-inline-stack gap="300" blockAlign="end">
-              <s-box>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
+              <div>
                 <label htmlFor="sinceDate">
-                  <s-text variant="bodySm" fontWeight="semibold">Orders since</s-text>
+                  <span style={{ fontSize: '13px', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                    Orders since
+                  </span>
                 </label>
                 <input
                   type="date"
@@ -84,64 +85,102 @@ export default function UncapturedAuths() {
                     border: '1px solid #c9cccf',
                     borderRadius: '8px',
                     fontSize: '14px',
-                    marginTop: '4px',
                   }}
                 />
-              </s-box>
+              </div>
               <s-button
                 variant="primary"
                 name="intent"
                 value="generate"
-                disabled={isLoading}
               >
                 {isLoading ? 'Scanning orders...' : 'Generate Report'}
               </s-button>
-            </s-inline-stack>
+            </div>
           </Form>
-        </s-box>
-      </s-box>
+        </div>
+      </s-section>
 
       {isLoading && (
-        <s-box padding="800">
-          <s-inline-stack align="center">
+        <s-section>
+          <div style={{ textAlign: 'center', padding: '40px' }}>
             <s-spinner size="large" />
-            <s-text variant="bodyMd">
-              Scanning orders for uncaptured authorizations... This may take a minute.
-            </s-text>
-          </s-inline-stack>
-        </s-box>
+            <div style={{ marginTop: '12px' }}>
+              <s-text>Scanning orders for uncaptured authorizations... This may take a minute.</s-text>
+            </div>
+          </div>
+        </s-section>
       )}
 
       {report && !isLoading && (
         <>
-          <s-box padding="400" paddingBlockStart="600">
-            <s-card>
-              <s-box padding="400">
-                <s-inline-stack gap="800">
-                  <s-box>
-                    <s-text variant="headingLg">{report.orderCount}</s-text>
-                    <s-text variant="bodySm" tone="subdued">Affected Orders</s-text>
-                  </s-box>
-                  <s-box>
-                    <s-text variant="headingLg" tone="critical">${report.totalUncaptured}</s-text>
-                    <s-text variant="bodySm" tone="subdued">Total Uncaptured</s-text>
-                  </s-box>
-                  <s-box>
-                    <s-text variant="headingLg">${report.totalCaptured}</s-text>
-                    <s-text variant="bodySm" tone="subdued">Total Captured (other methods)</s-text>
-                  </s-box>
-                  <s-box>
-                    <s-text variant="bodyMd">{report.totalOrdersScanned} scanned / {report.splitTenderCandidates} split-tender</s-text>
-                    <s-text variant="bodySm" tone="subdued">Orders checked</s-text>
-                  </s-box>
-                </s-inline-stack>
-              </s-box>
-            </s-card>
-          </s-box>
+          <s-section>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '20px',
+            }}>
+              <div style={{
+                padding: '20px',
+                backgroundColor: '#F6F6F7',
+                borderRadius: '12px',
+                border: '1px solid #E1E3E5',
+              }}>
+                <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>
+                  Affected Orders
+                </span>
+                <span style={{ fontSize: '24px', fontWeight: 700 }}>
+                  {report.orderCount}
+                </span>
+              </div>
+
+              <div style={{
+                padding: '20px',
+                backgroundColor: '#FFF4F4',
+                borderRadius: '12px',
+                border: '1px solid #E1E3E5',
+              }}>
+                <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>
+                  Total Uncaptured
+                </span>
+                <span style={{ fontSize: '24px', fontWeight: 700, color: '#D72C0D' }}>
+                  ${report.totalUncaptured}
+                </span>
+              </div>
+
+              <div style={{
+                padding: '20px',
+                backgroundColor: '#F6F6F7',
+                borderRadius: '12px',
+                border: '1px solid #E1E3E5',
+              }}>
+                <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>
+                  Total Captured (other methods)
+                </span>
+                <span style={{ fontSize: '24px', fontWeight: 700 }}>
+                  ${report.totalCaptured}
+                </span>
+              </div>
+
+              <div style={{
+                padding: '20px',
+                backgroundColor: '#F6F6F7',
+                borderRadius: '12px',
+                border: '1px solid #E1E3E5',
+              }}>
+                <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>
+                  Orders Scanned
+                </span>
+                <span style={{ fontSize: '14px' }}>
+                  {report.totalOrdersScanned} total / {report.splitTenderCandidates} split-tender
+                </span>
+              </div>
+            </div>
+          </s-section>
 
           {report.orders.length > 0 && (
-            <s-box padding="400">
-              <s-box paddingBlockEnd="300">
+            <s-section>
+              <div style={{ marginBottom: '12px' }}>
                 <Form method="post">
                   <input type="hidden" name="reportData" value={JSON.stringify(report)} />
                   <input type="hidden" name="sinceDate" value={report.sinceDate} />
@@ -149,25 +188,29 @@ export default function UncapturedAuths() {
                     Download CSV
                   </s-button>
                 </Form>
-              </s-box>
+              </div>
 
-              <s-card>
+              <div style={{
+                border: '1px solid #E1E3E5',
+                borderRadius: '12px',
+                overflow: 'hidden',
+              }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #e1e3e5', textAlign: 'left' }}>
-                      <th style={{ padding: '8px 12px' }}>Order</th>
-                      <th style={{ padding: '8px 12px' }}>Date</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Order Total</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Captured</th>
-                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>Uncaptured</th>
-                      <th style={{ padding: '8px 12px' }}>Gateway</th>
-                      <th style={{ padding: '8px 12px' }}>Status</th>
+                    <tr style={{ borderBottom: '1px solid #e1e3e5', textAlign: 'left', backgroundColor: '#F6F6F7' }}>
+                      <th style={{ padding: '10px 12px' }}>Order</th>
+                      <th style={{ padding: '10px 12px' }}>Date</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Order Total</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Captured</th>
+                      <th style={{ padding: '10px 12px', textAlign: 'right' }}>Uncaptured</th>
+                      <th style={{ padding: '10px 12px' }}>Gateway</th>
+                      <th style={{ padding: '10px 12px' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {report.orders.map((order) => (
                       <tr key={order.id} style={{ borderBottom: '1px solid #f1f2f3' }}>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '10px 12px' }}>
                           <a
                             href={order.adminUrl}
                             target="_blank"
@@ -177,42 +220,40 @@ export default function UncapturedAuths() {
                             {order.name}
                           </a>
                         </td>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '10px 12px' }}>
                           {order.createdAt.split('T')[0]}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                           ${order.orderTotal}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                           ${order.capturedAmount}
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', color: '#d72c0d', fontWeight: 600 }}>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#D72C0D', fontWeight: 600 }}>
                           ${order.uncapturedAmount}
                         </td>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '10px 12px' }}>
                           {order.gateway}
                         </td>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '10px 12px' }}>
                           {order.financialStatus}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </s-card>
-            </s-box>
+              </div>
+            </s-section>
           )}
 
           {report.orders.length === 0 && (
-            <s-box padding="400">
-              <s-card>
-                <s-box padding="800">
-                  <s-text variant="bodyMd" alignment="center">
-                    No orders with uncaptured authorizations found since {report.sinceDate}.
-                  </s-text>
-                </s-box>
-              </s-card>
-            </s-box>
+            <s-section>
+              <div style={{ textAlign: 'center', padding: '40px' }}>
+                <s-text>
+                  No orders with uncaptured authorizations found since {report.sinceDate}.
+                </s-text>
+              </div>
+            </s-section>
           )}
         </>
       )}
