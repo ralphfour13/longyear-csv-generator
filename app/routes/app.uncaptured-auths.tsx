@@ -38,7 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function UncapturedAuths() {
-  const { shop } = useLoaderData<typeof loader>();
+  useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const isLoading = navigation.state === 'submitting';
