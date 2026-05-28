@@ -25,7 +25,9 @@ api_version = "2026-01"
 # - read_shopify_payments_payouts: Access payout data (what hit the bank)
 # - read_shopify_payments_accounts: Access payment account and balance transactions
 # - read_all_orders: Access ALL order details (no 60-day limit) for reconciliation and archived orders
-scopes = "read_shopify_payments_payouts,read_shopify_payments_accounts,read_all_orders"
+# - read_products: Enumerate product variants + SKUs to sync COGS from Cin7
+# - read_inventory / write_inventory: Read + update InventoryItem cost (Cost per item) with Cin7 COGS
+scopes = "read_shopify_payments_payouts,read_shopify_payments_accounts,read_all_orders,read_products,read_inventory,write_inventory"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 

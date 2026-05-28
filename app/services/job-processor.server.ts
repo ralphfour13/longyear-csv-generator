@@ -2,6 +2,7 @@ import { getJobStatus, updateJobStatus, cleanupOldJobs, getShopJobs } from './ba
 import { processExport } from './batch-processor.server';
 import { processSalesTaxReport } from './sales-tax-processor.server';
 import { processUncapturedAuthReport } from './uncaptured-auth-processor.server';
+import { processCogsPush } from './shopify/cogs-push-processor.server';
 
 // Track processing state per shop to prevent concurrent processing of the same shop's jobs
 // Key: shop domain, Value: true if currently processing
@@ -89,6 +90,26 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
         `\n  Orders scanned: ${result.totalOrdersScanned}`,
         `\n  Affected orders: ${result.orderCount}`,
         `\n  Total uncaptured: $${result.totalUncaptured}`,
+      );
+    } else if (job.jobType === 'cogs-push') {
+      console.log(`[Job ${jobId}] Starting COGS push for ${shop}`);
+
+      const result = await processCogsPush(shop, accessToken, jobId);
+
+      await updateJobStatus(jobId, {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        progress: undefined,
+        result,
+      });
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(
+        `[Job ${jobId}] ✓ COGS push completed in ${duration}s`,
+        `\n  Variants: ${result.totalVariants}`,
+        `\n  Updated: ${result.updatedCount}`,
+        `\n  Skipped: ${result.skippedCount}`,
+        `\n  Failed: ${result.failedCount}`,
       );
     } else {
       // Default: standard export job

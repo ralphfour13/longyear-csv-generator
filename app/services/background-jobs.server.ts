@@ -9,7 +9,7 @@ export interface ExportJob {
   id: string;
   shop: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
-  jobType?: 'export' | 'sales-tax' | 'uncaptured-auth'; // Defaults to 'export' for backwards compatibility
+  jobType?: 'export' | 'sales-tax' | 'uncaptured-auth' | 'cogs-push'; // Defaults to 'export' for backwards compatibility
   startDate: string;
   endDate?: string;
   fileOptions: FileGenerationOptions;
@@ -165,6 +165,35 @@ export async function createUncapturedAuthJob(
     `[Job] Created uncaptured auth job ${jobId} for shop ${shop}`,
     `\n  Since: ${sinceDate}`,
   );
+
+  return jobId;
+}
+
+/**
+ * Create a new COGS push job
+ *
+ * Pulls COGS from Cin7 and writes them into the Shopify product "Cost per item"
+ * field for all active products. Scope is fixed (all active products), so there
+ * is no request payload.
+ */
+export async function createCogsPushJob(shop: string): Promise<string> {
+  await ensureJobsDir();
+
+  const jobId = `cogspush_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const job: ExportJob = {
+    id: jobId,
+    shop,
+    status: 'pending',
+    jobType: 'cogs-push',
+    startDate: '', // Not used for cogs-push jobs
+    fileOptions: {}, // Not used for cogs-push jobs
+    createdAt: new Date().toISOString(),
+  };
+
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
+
+  console.log(`[Job] Created COGS push job ${jobId} for shop ${shop}`);
 
   return jobId;
 }

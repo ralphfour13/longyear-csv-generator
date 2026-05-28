@@ -46,6 +46,7 @@ export default function App() {
         <s-link href="/app/jobs">Job Queue</s-link>
         <s-link href="/app/settings">Settings</s-link>
         <s-link href="/app/mappings">Account Mappings</s-link>
+        <s-link href="/app/cogs-sync">COGS Sync</s-link>
         <s-link href="/app/uncaptured-auths">Uncaptured Auths</s-link>
       </s-app-nav>
       <Outlet />
