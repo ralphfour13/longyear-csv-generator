@@ -184,6 +184,70 @@ export class Cin7Client {
   }
 
   /**
+   * Diagnostic probe for a single SKU.
+   *
+   * Performs the same request as getProduct but never throws and reports the raw
+   * outcome (HTTP status, how many products came back, the first returned SKU,
+   * and a short body snippet). Used to explain WHY lookups return empty — distinguishing
+   * a 404 / wrong endpoint, an empty Products array (SKU not found / prefix mismatch),
+   * and auth failures, which getProduct otherwise collapses into a single null.
+   */
+  async probeProduct(sku: string): Promise<{
+    sku: string;
+    url: string;
+    status: number | null;
+    matchedCount: number | null;
+    firstReturnedSku: string | null;
+    firstAverageCost: number | null;
+    bodySnippet: string;
+    error: string | null;
+  }> {
+    const url = `${this.baseUrl}/product?sku=${encodeURIComponent(sku)}`;
+    try {
+      await this.rateLimiter.wait();
+      const response = await fetch(url, {
+        headers: {
+          'api-auth-accountid': this.accountId,
+          'api-auth-applicationkey': this.apiKey,
+        },
+      });
+
+      const text = await response.text();
+      let products: unknown[] | null = null;
+      try {
+        const json = JSON.parse(text);
+        products = Array.isArray(json?.Products) ? json.Products : null;
+      } catch {
+        // non-JSON body
+      }
+
+      const first = products && products.length > 0 ? (products[0] as Cin7Product) : null;
+
+      return {
+        sku,
+        url,
+        status: response.status,
+        matchedCount: products ? products.length : null,
+        firstReturnedSku: first?.SKU ?? null,
+        firstAverageCost: first?.AverageCost ?? null,
+        bodySnippet: text.slice(0, 300),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        sku,
+        url,
+        status: null,
+        matchedCount: null,
+        firstReturnedSku: null,
+        firstAverageCost: null,
+        bodySnippet: '',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
    * Test connection to Cin7 API
    *
    * @returns True if connection successful

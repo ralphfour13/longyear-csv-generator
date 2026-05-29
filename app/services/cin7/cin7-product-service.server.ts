@@ -162,6 +162,33 @@ export class Cin7ProductService {
     return this.batchGet(skus, (sku) => this.getRawProductCost(sku));
   }
 
+  /**
+   * Run a diagnostic probe for a few SKUs, reporting the raw Cin7 outcome.
+   * Returns a config-level note if Cin7 is disabled / not configured (the case
+   * getRawProductCost silently turns into null for every SKU).
+   */
+  async probeSkus(skus: string[]): Promise<{
+    configNote: string | null;
+    probes: Array<Awaited<ReturnType<import('./cin7-client.server').Cin7Client['probeProduct']>>>;
+  }> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    if (!this.config?.enabled) {
+      return { configNote: 'Cin7 integration is DISABLED for this shop (Settings → enable Cin7).', probes: [] };
+    }
+    if (!this.client) {
+      return { configNote: 'Cin7 is enabled but the client is not configured (missing credentials).', probes: [] };
+    }
+
+    const probes = [];
+    for (const sku of skus) {
+      probes.push(await this.client.probeProduct(sku));
+    }
+    return { configNote: null, probes };
+  }
+
   private async batchGet(
     skus: string[],
     lookup: (sku: string) => Promise<Decimal | null>,

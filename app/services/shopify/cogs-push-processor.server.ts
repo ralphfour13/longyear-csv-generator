@@ -31,6 +31,17 @@ export interface CogsPushFailed {
   error: string;
 }
 
+export interface CogsProbe {
+  sku: string;
+  url: string;
+  status: number | null;
+  matchedCount: number | null;
+  firstReturnedSku: string | null;
+  firstAverageCost: number | null;
+  bodySnippet: string;
+  error: string | null;
+}
+
 export interface CogsPushResult {
   success: boolean;
   message: string;
@@ -41,6 +52,15 @@ export interface CogsPushResult {
   skipped: CogsPushSkipped[];
   failed: CogsPushFailed[];
   ranAt: string;
+  /**
+   * Optional diagnostics, populated when a run matched zero Cin7 costs. Explains
+   * WHY (disabled integration, 404/wrong endpoint, empty result, auth) instead of
+   * leaving the user with a wall of identical "no Cin7 match" rows.
+   */
+  diagnostics?: {
+    configNote: string | null;
+    probes: CogsProbe[];
+  };
 }
 
 // Number of concurrent Shopify cost-update mutations in flight. Conservative to
@@ -274,6 +294,14 @@ export async function pullCogsForSkus(
     }
   }
 
+  // If nothing matched a Cin7 cost, probe a few SKUs so we can explain WHY
+  // (disabled / 404 / empty result / auth) rather than just "no Cin7 match".
+  let diagnostics: CogsPushResult['diagnostics'] | undefined;
+  if (updatedCount === 0) {
+    const sampleSkus = skus.slice(0, 3);
+    diagnostics = await cin7.probeSkus(sampleSkus);
+  }
+
   return {
     success: true,
     message: `Updated ${updatedCount} of ${skus.length} requested SKUs (${skipped.length} skipped, ${failed.length} failed)`,
@@ -281,6 +309,7 @@ export async function pullCogsForSkus(
     skippedCount: skipped.length,
     failedCount: failed.length,
     totalVariants: skus.length,
+    diagnostics,
     skipped,
     failed,
     ranAt: new Date().toISOString(),

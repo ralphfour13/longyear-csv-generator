@@ -15,6 +15,17 @@ interface CogsPushFailed {
   error: string;
 }
 
+interface CogsProbe {
+  sku: string;
+  url: string;
+  status: number | null;
+  matchedCount: number | null;
+  firstReturnedSku: string | null;
+  firstAverageCost: number | null;
+  bodySnippet: string;
+  error: string | null;
+}
+
 interface CogsPushResult {
   updatedCount: number;
   skippedCount: number;
@@ -23,6 +34,10 @@ interface CogsPushResult {
   skipped: CogsPushSkipped[];
   failed: CogsPushFailed[];
   ranAt: string;
+  diagnostics?: {
+    configNote: string | null;
+    probes: CogsProbe[];
+  };
 }
 
 function reportToCsv(report: CogsPushResult): string {
@@ -391,6 +406,45 @@ export default function CogsSync() {
                 list below. Skipped items had no matching Cin7 cost, a zero cost, no SKU, or no matching Shopify
                 product, and their Shopify cost was left unchanged.
               </s-text>
+            </s-banner>
+          )}
+
+          {displayReport.diagnostics && (
+            <s-banner tone="critical">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <strong>Nothing matched Cin7 — diagnostics</strong>
+                {displayReport.diagnostics.configNote && (
+                  <div>{displayReport.diagnostics.configNote}</div>
+                )}
+                {displayReport.diagnostics.probes.map((p) => (
+                  <div
+                    key={p.sku}
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '12px',
+                      background: '#FFF4F4',
+                      border: '1px solid #E1E3E5',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    SKU {`"${p.sku}"`} → HTTP {p.status ?? 'ERR'}
+                    {p.error ? ` | error: ${p.error}` : ''}
+                    {p.matchedCount !== null ? ` | matched: ${p.matchedCount}` : ''}
+                    {p.firstReturnedSku ? ` | firstReturnedSku: ${p.firstReturnedSku}` : ''}
+                    {p.firstAverageCost !== null ? ` | AverageCost: ${p.firstAverageCost}` : ''}
+                    {p.bodySnippet ? `\nbody: ${p.bodySnippet}` : ''}
+                  </div>
+                ))}
+                <div style={{ fontSize: '12px' }}>
+                  Read: <code>HTTP 404</code> or empty body → wrong endpoint/SKU format.
+                  <code> matched: 0</code> → SKU not found in Cin7 (or prefix mismatch).
+                  <code> matched: ≥1 but AverageCost empty</code> → cost not set in Cin7.
+                  Config note → Cin7 disabled/credentials.
+                </div>
+              </div>
             </s-banner>
           )}
 
