@@ -108,15 +108,16 @@ export class Cin7ProductService {
   }
 
   /**
-   * Get the ACTUAL Cin7 cost for a SKU, never substituting a fallback.
+   * Get the ACTUAL Cin7 cost for a SKU, live, with no caching or fallback.
    *
-   * Unlike getProductCost, this returns null whenever Cin7 has no cost for the
-   * SKU (or the lookup errors), regardless of the configured fallback. Use this
-   * when a missing cost must be surfaced rather than silently filled — e.g. the
+   * Always queries Cin7 in real time (never reads or writes cin7Cache) and
+   * returns null whenever Cin7 has no cost for the SKU (or the lookup errors),
+   * regardless of the configured fallback. Use this when costs must be current
+   * and a missing cost must be surfaced rather than silently filled — e.g. the
    * COGS push, which must leave the Shopify cost unchanged and flag the SKU.
    *
    * @param sku - Product SKU
-   * @returns The Cin7 AverageCost, or null if not found / on error
+   * @returns The live Cin7 AverageCost, or null if not found / on error
    */
   async getRawProductCost(sku: string): Promise<Decimal | null> {
     if (!this.initialized) {
@@ -127,22 +128,11 @@ export class Cin7ProductService {
       return null;
     }
 
-    if (this.config.cacheEnabled) {
-      const cachedCost = cin7Cache.get(this.shop, sku);
-      if (cachedCost !== null) {
-        return cachedCost;
-      }
-    }
-
     try {
       const product = await this.client.getProduct(sku);
 
       if (product && product.AverageCost !== undefined) {
-        const cost = new Decimal(product.AverageCost);
-        if (this.config.cacheEnabled) {
-          cin7Cache.set(this.shop, sku, cost, this.config.cacheDurationHours);
-        }
-        return cost;
+        return new Decimal(product.AverageCost);
       }
 
       return null;

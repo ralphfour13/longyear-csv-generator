@@ -60,17 +60,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.error('[CogsSync] Background job processing error:', error);
       });
 
-      return { jobId, error: null };
+      return { jobId, error: null, oneOff: null };
     } catch (error) {
       console.error('COGS sync error:', error);
       return {
         jobId: null,
+        oneOff: null,
         error: `COGS sync failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
 
-  return { jobId: null, error: null };
+  if (intent === 'pull-skus') {
+    try {
+      const { parseSkuList, pullCogsForSkus, MAX_ONE_OFF_SKUS } = await import(
+        '../services/shopify/cogs-push-processor.server'
+      );
+
+      const skus = parseSkuList((formData.get('skus') as string) || '');
+      if (skus.length === 0) {
+        return { jobId: null, oneOff: null, error: 'Please enter at least one SKU.' };
+      }
+      if (skus.length > MAX_ONE_OFF_SKUS) {
+        return {
+          jobId: null,
+          oneOff: null,
+          error: `Too many SKUs for a one-off pull (${skus.length}). The one-off pull runs live and is capped at ${MAX_ONE_OFF_SKUS}. Use "Pull COGS from Cin7" for the full catalog.`,
+        };
+      }
+
+      const accessToken = session.accessToken || '';
+      const oneOff = await pullCogsForSkus(shop, accessToken, skus);
+
+      return { jobId: null, oneOff, error: null };
+    } catch (error) {
+      console.error('COGS one-off pull error:', error);
+      return {
+        jobId: null,
+        oneOff: null,
+        error: `One-off pull failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  return { jobId: null, error: null, oneOff: null };
 };
 
 interface JobProgressData {
@@ -167,22 +200,26 @@ export default function CogsSync() {
   const progress = jobData?.progress;
   const percentage = progress?.overallPercentage || 0;
 
+  // Result shown on the page comes from either the background full-sync job or
+  // the inline one-off SKU pull (returned directly by the action).
+  const displayReport: CogsPushResult | null = report ?? actionData?.oneOff ?? null;
+
   function downloadCsv() {
-    if (!report) return;
-    const csv = reportToCsv(report);
+    if (!displayReport) return;
+    const csv = reportToCsv(displayReport);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cogs-sync-${report.ranAt.split('T')[0]}.csv`;
+    a.download = `cogs-sync-${displayReport.ranAt.split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  const flaggedRows = report
+  const flaggedRows = displayReport
     ? [
-        ...report.skipped.map((s) => ({ kind: 'Skipped', sku: s.sku, title: s.productTitle, detail: s.reason })),
-        ...report.failed.map((f) => ({ kind: 'Failed', sku: f.sku, title: f.productTitle, detail: f.error })),
+        ...displayReport.skipped.map((s) => ({ kind: 'Skipped', sku: s.sku, title: s.productTitle, detail: s.reason })),
+        ...displayReport.failed.map((f) => ({ kind: 'Failed', sku: f.sku, title: f.productTitle, detail: f.error })),
       ]
     : [];
 
@@ -190,9 +227,9 @@ export default function CogsSync() {
     <s-page heading="COGS Sync — Cin7 → Shopify">
       <s-section>
         <s-text>
-          Pull the cost of goods (COGS) for every active product from Cin7 and write it into the
-          Shopify &quot;Cost per item&quot; field. Products whose SKU is not found in Cin7 (or whose Cin7
-          cost is zero) are left unchanged and flagged below. You can run this any time.
+          Pull the cost of goods (COGS) for every active product live from Cin7 (no caching) and write
+          it into the Shopify &quot;Cost per item&quot; field. Products whose SKU is not found in Cin7 (or
+          whose Cin7 cost is zero) are left unchanged and flagged below. You can run this any time.
         </s-text>
 
         <div style={{ marginTop: '16px' }}>
@@ -205,6 +242,42 @@ export default function CogsSync() {
             >
               {isSubmitting ? 'Starting...' : 'Pull COGS from Cin7'}
             </s-button>
+          </Form>
+        </div>
+      </s-section>
+
+      <s-section heading="One-off pull (specific SKUs)">
+        <s-text>
+          Grab live Cin7 COGS for just these SKUs and write them to the matching Shopify variants.
+          Runs immediately. Paste up to 50 SKUs separated by commas or new lines.
+        </s-text>
+
+        <div style={{ marginTop: '16px' }}>
+          <Form method="post">
+            <input type="hidden" name="intent" value="pull-skus" />
+            <textarea
+              name="skus"
+              rows={4}
+              placeholder={'SKU-001\nSKU-002, SKU-003'}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #c9cccf',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                resize: 'vertical',
+              }}
+            />
+            <div style={{ marginTop: '12px' }}>
+              <s-button
+                variant="primary"
+                type="submit"
+                disabled={isSubmitting || isProcessing ? true : undefined}
+              >
+                {isSubmitting ? 'Pulling...' : 'Grab these COGS'}
+              </s-button>
+            </div>
           </Form>
         </div>
       </s-section>
@@ -283,7 +356,7 @@ export default function CogsSync() {
         </s-section>
       )}
 
-      {report && !isProcessing && (
+      {displayReport && !isProcessing && (
         <>
           <s-section>
             <div style={{
@@ -294,29 +367,29 @@ export default function CogsSync() {
             }}>
               <div style={{ padding: '20px', backgroundColor: '#F1F8F5', borderRadius: '12px', border: '1px solid #E1E3E5' }}>
                 <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>Costs Updated</span>
-                <span style={{ fontSize: '24px', fontWeight: 700, color: '#008060' }}>{report.updatedCount}</span>
+                <span style={{ fontSize: '24px', fontWeight: 700, color: '#008060' }}>{displayReport.updatedCount}</span>
               </div>
-              <div style={{ padding: '20px', backgroundColor: report.skippedCount > 0 ? '#FFF8E1' : '#F6F6F7', borderRadius: '12px', border: '1px solid #E1E3E5' }}>
+              <div style={{ padding: '20px', backgroundColor: displayReport.skippedCount > 0 ? '#FFF8E1' : '#F6F6F7', borderRadius: '12px', border: '1px solid #E1E3E5' }}>
                 <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>Skipped</span>
-                <span style={{ fontSize: '24px', fontWeight: 700, color: report.skippedCount > 0 ? '#B98900' : '#202223' }}>{report.skippedCount}</span>
+                <span style={{ fontSize: '24px', fontWeight: 700, color: displayReport.skippedCount > 0 ? '#B98900' : '#202223' }}>{displayReport.skippedCount}</span>
               </div>
-              <div style={{ padding: '20px', backgroundColor: report.failedCount > 0 ? '#FFF4F4' : '#F6F6F7', borderRadius: '12px', border: '1px solid #E1E3E5' }}>
+              <div style={{ padding: '20px', backgroundColor: displayReport.failedCount > 0 ? '#FFF4F4' : '#F6F6F7', borderRadius: '12px', border: '1px solid #E1E3E5' }}>
                 <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>Failed</span>
-                <span style={{ fontSize: '24px', fontWeight: 700, color: report.failedCount > 0 ? '#D72C0D' : '#202223' }}>{report.failedCount}</span>
+                <span style={{ fontSize: '24px', fontWeight: 700, color: displayReport.failedCount > 0 ? '#D72C0D' : '#202223' }}>{displayReport.failedCount}</span>
               </div>
               <div style={{ padding: '20px', backgroundColor: '#F6F6F7', borderRadius: '12px', border: '1px solid #E1E3E5' }}>
-                <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>Total Variants</span>
-                <span style={{ fontSize: '24px', fontWeight: 700 }}>{report.totalVariants}</span>
+                <span style={{ color: '#6D7175', fontSize: '13px', display: 'block' }}>Total</span>
+                <span style={{ fontSize: '24px', fontWeight: 700 }}>{displayReport.totalVariants}</span>
               </div>
             </div>
           </s-section>
 
-          {(report.skippedCount > 0 || report.failedCount > 0) && (
+          {(displayReport.skippedCount > 0 || displayReport.failedCount > 0) && (
             <s-banner tone="warning">
               <s-text>
-                {report.skippedCount} variant(s) were skipped and {report.failedCount} failed — review the list
-                below. Skipped variants had no matching Cin7 cost, a zero cost, or no SKU, and their Shopify
-                cost was left unchanged.
+                {displayReport.skippedCount} item(s) were skipped and {displayReport.failedCount} failed — review the
+                list below. Skipped items had no matching Cin7 cost, a zero cost, no SKU, or no matching Shopify
+                product, and their Shopify cost was left unchanged.
               </s-text>
             </s-banner>
           )}
@@ -361,7 +434,7 @@ export default function CogsSync() {
           {flaggedRows.length === 0 && (
             <s-section>
               <div style={{ textAlign: 'center', padding: '40px' }}>
-                <s-text>All {report.updatedCount} active variants were updated successfully. 🎉</s-text>
+                <s-text>All {displayReport.updatedCount} item(s) were updated successfully. 🎉</s-text>
               </div>
             </s-section>
           )}

@@ -650,22 +650,28 @@ function logProgress(jobId: string, progress: ExportJob['progress']): void {
     : 'calculating...';
 
   let details = '';
-  switch (progress.phase) {
-    case 'fetching':
-      details = `Orders: ${progress.transactionsFetched || 0}/${progress.ordersFound || '?'}`;
-      break;
-    case 'reconciling':
-      details = `Matched: ${progress.ordersProcessed || 0} orders with captures`;
-      break;
-    case 'cogs':
-      details = `COGS: ${progress.ordersProcessed || 0}/${progress.ordersFound || '?'} orders`;
-      break;
-    case 'generating':
-      details = `Files: ${progress.filesGenerated || 0}/${progress.filesTotalCount || '?'}`;
-      break;
-    case 'validating':
-      details = 'Running quality checks...';
-      break;
+  // Jobs that set an explicit currentActivity (e.g. COGS push) describe their own
+  // progress; prefer it over the export-centric phase wording below.
+  if (progress.currentActivity) {
+    details = progress.currentActivity;
+  } else {
+    switch (progress.phase) {
+      case 'fetching':
+        details = `Orders: ${progress.transactionsFetched || 0}/${progress.ordersFound || '?'}`;
+        break;
+      case 'reconciling':
+        details = `Matched: ${progress.ordersProcessed || 0} orders with captures`;
+        break;
+      case 'cogs':
+        details = `COGS: ${progress.ordersProcessed || 0}/${progress.ordersFound || '?'} orders`;
+        break;
+      case 'generating':
+        details = `Files: ${progress.filesGenerated || 0}/${progress.filesTotalCount || '?'}`;
+        break;
+      case 'validating':
+        details = 'Running quality checks...';
+        break;
+    }
   }
 
   console.log(

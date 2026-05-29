@@ -149,6 +149,89 @@ export async function fetchActiveVariants(
   return variants;
 }
 
+const VARIANTS_BY_SKU_QUERY = `
+query VariantsBySku($query: String!, $cursor: String) {
+  productVariants(first: 100, query: $query, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      sku
+      inventoryItem { id unitCost { amount } }
+      product { status title }
+    }
+  }
+}`;
+
+/**
+ * Build a Shopify search term that matches a single exact SKU.
+ *
+ * Wraps the value in single quotes (phrase query) and escapes backslashes and
+ * single quotes. Asterisks are escaped too so a SKU containing `*` can't act as a
+ * wildcard and broaden the match. The query is only used to FETCH candidate
+ * variants — the authoritative exact (case-insensitive) match happens in
+ * pullCogsForSkus — but neutralizing `*` keeps the candidate set small.
+ */
+function escapeSkuTerm(sku: string): string {
+  const escaped = sku
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\*/g, '\\*');
+  return `sku:'${escaped}'`;
+}
+
+/**
+ * Fetch variants for a specific set of SKUs (no full-catalog scan).
+ *
+ * Used by the one-off COGS pull. Unlike fetchActiveVariants this does NOT filter
+ * by product status — a targeted pull should update whatever variant matches the
+ * SKU. Returns one ShopifyVariant per matching variant; SKUs with no match simply
+ * won't appear (the caller reports those as "not found in Shopify").
+ */
+export async function fetchVariantsBySkus(
+  shop: string,
+  accessToken: string,
+  skus: string[],
+): Promise<ShopifyVariant[]> {
+  const variants: ShopifyVariant[] = [];
+
+  // Shopify search query length is bounded; query SKUs in modest chunks.
+  const CHUNK = 25;
+  for (let i = 0; i < skus.length; i += CHUNK) {
+    const chunk = skus.slice(i, i + CHUNK);
+    const query = chunk.map(escapeSkuTerm).join(' OR ');
+
+    let cursor: string | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const data: VariantsQueryData = await shopifyGraphQL<VariantsQueryData>(
+        shop,
+        accessToken,
+        VARIANTS_BY_SKU_QUERY,
+        { query, cursor },
+        'Fetch product variants by SKU',
+      );
+
+      for (const node of data.productVariants.nodes) {
+        if (!node.inventoryItem) {
+          continue;
+        }
+        variants.push({
+          sku: node.sku && node.sku.trim() !== '' ? node.sku.trim() : null,
+          inventoryItemId: node.inventoryItem.id,
+          currentCost: node.inventoryItem.unitCost?.amount ?? null,
+          productTitle: node.product?.title ?? '(untitled)',
+          productStatus: node.product?.status ?? 'UNKNOWN',
+        });
+      }
+
+      hasNextPage = data.productVariants.pageInfo.hasNextPage;
+      cursor = data.productVariants.pageInfo.endCursor;
+    }
+  }
+
+  return variants;
+}
+
 const UPDATE_COST_MUTATION = `
 mutation SetCost($id: ID!, $input: InventoryItemInput!) {
   inventoryItemUpdate(id: $id, input: $input) {
