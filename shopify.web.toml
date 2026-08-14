@@ -4,4 +4,8 @@ webhooks_path = "/webhooks/app/uninstalled"
 
 [commands]
 predev = "npx prisma generate"
-dev = "npx prisma migrate deploy && npm exec react-router dev"
+# Use `db push` (not `migrate deploy`): the committed migration is SQLite DDL and fails
+# against the PostgreSQL (Neon) datasource, leaving a failed migration that blocks deploys
+# (P3009). `db push` syncs schema.prisma straight to the DB with correct Postgres DDL and
+# ignores migration history. Matches the `setup` script (`prisma generate && prisma db push`).
+dev = "npx prisma db push && npm exec react-router dev"

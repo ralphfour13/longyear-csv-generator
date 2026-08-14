@@ -1,0 +1,490 @@
+Customer ID,Customer Name,Invoice No.,Date,Due Date,Item ID,Description,Quantity,Unit Price,Amount,G/L Account,Sales Tax,Tax Type,Discount Amount,Tax Rate
+9570888581317,"Virginia Stevens, C.S.",234516,06/15/2026,06/15/2026,,Ongoing Fundraising,1,100.00,100.00,,0.00,,0.00,
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,235411,06/15/2026,06/15/2026,BOOK-900-905,Building of The Mother Church,1,18.00,18.00,Proceeds from Store Sales - 4401-606-00-1,1.80,MA Tax,0.00,0.0625
+9570888548549,Benjamin Woodworth,234512,06/15/2026,06/15/2026,,Historic House Appeal,1,75.00,75.00,,0.00,,0.00,
+9570888384709,Celia Heathcote,235351,06/15/2026,06/15/2026,GIFT-900-105,Peace Ornament,2,18.00,36.00,Proceeds from Store Sales - 4401-606-00-1,2.25,MA Tax,0.00,0.0625
+9570888384709,Celia Heathcote,234509,06/15/2026,06/15/2026,BDCA8D4-SpringBalance,Mary Baker Eddy's New England Tour Balance (Spring 2026),1,1400.00,1400.00,Deferred Revenue - 2300-000-00-1,0.00,,0.00,
+9570888319173,Wallace and Nancy Wethe,234508,06/15/2026,06/15/2026,,Historic House Appeal,1,25.00,25.00,,0.00,,0.00,
+9570888220869,Carole May,234506,06/15/2026,06/15/2026,,Historic House Appeal,1,25.00,25.00,,0.00,,0.00,
+9570888122565,Marla Dailey,234505,06/15/2026,06/15/2026,,Ongoing Fundraising,1,500.00,500.00,,0.00,,0.00,
+9570888057029,Jenna Schabes,234503,06/15/2026,06/15/2026,BOOK-400-317,Violet Hay by Peter J. Hodgson,1,12.00,12.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570888057029,Jenna Schabes,234503,06/15/2026,06/15/2026,,Longyear Fund,1,10.00,10.00,,0.00,,0.00,
+9570887893189,Shannon and Taylor Horst,234499,06/15/2026,06/15/2026,,Giving Tuesday,1,50.00,50.00,,0.00,,0.00,
+9570887893189,Shannon and Taylor Horst,234499,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.75,1.75,,0.00,,0.00,
+9570887860421,"Valerie Elliott, C.S.",234494,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570887729349,John and Karen Ostler,234477,06/15/2026,06/15/2026,,Longyear Fund,1,30.00,30.00,,0.00,,0.00,
+9570887729349,John and Karen Ostler,234477,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.17,1.17,,0.00,,0.00,
+9570632859845,Mark and Whitney Wyndham,235157,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570632859845,Mark and Whitney Wyndham,234490,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570887499973,Marilyn Switzer,234464,06/15/2026,06/15/2026,HH-GIFT-100-003-CH,HH - Wallpaper Mugs - CHESTNUT HILL,1,14.40,14.40,Proceeds from Store Sales - 4401-606-00-1,2.81,MA Tax,0.00,0.0625
+9570887499973,Marilyn Switzer,234464,06/15/2026,06/15/2026,HH-GIFT-500-009CH,HH - Chestnut Hill Magnetic Notepads - CHESTNUT HILL,1,19.80,19.80,,2.81,MA Tax,0.00,0.0625
+9570887499973,Marilyn Switzer,234464,06/15/2026,06/15/2026,HH-STA-200-501-CH,HH - Wallpaper Pen - CHESTNUT HILL,1,7.20,7.20,Proceeds from Store Sales - 4401-606-00-1,2.81,MA Tax,0.00,0.0625
+9570887499973,Marilyn Switzer,234464,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,2.81,MA Tax,0.00,0.0625
+9570887499973,Marilyn Switzer,234464,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,2.81,MA Tax,0.00,0.0625
+9570887499973,Marilyn Switzer,234464,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,2.81,MA Tax,0.00,0.0625
+9570887499973,Marilyn Switzer,234464,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,2.81,MA Tax,0.00,0.0625
+9570887631045,Joy Reges,234475,06/15/2026,06/15/2026,,Longyear Fund,1,25.00,25.00,,0.00,,0.00,
+9570887467205,"Armin Henneberger, Jr.",234463,06/15/2026,06/15/2026,,Historic House Appeal,1,5000.00,5000.00,,0.00,,0.00,
+9570887401669,Esther Haney,234448,06/15/2026,06/15/2026,,Historic House Appeal,1,100.00,100.00,,0.00,,0.00,
+9570887270597,Rita Rathburn,234445,06/15/2026,06/15/2026,,Ongoing Fundraising,1,100.00,100.00,,0.00,,0.00,
+9570887139525,Nancy Colbentson,234442,06/15/2026,06/15/2026,,Longyear Fund,1,100.00,100.00,,0.00,,0.00,
+9570887139525,Nancy Colbentson,234442,06/15/2026,06/15/2026,,Donor Cover Cost,1,10.52,10.52,,0.00,,0.00,
+9570887106757,Peace Haven Association,234441,06/15/2026,06/15/2026,AUD-500-534,Paths of Pioneer Christian Scientists by Christopher L. Tyner - Audiobook Digital Download,1,15.00,15.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570886910149,Jamie and Tristin Sullivan,234435,06/15/2026,06/15/2026,PH-300-471,Daniel in the Lions' Den,1,45.00,45.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570886910149,Jamie and Tristin Sullivan,234435,06/15/2026,06/15/2026,PH-300-473,Daniel's Answer to the King,1,45.00,45.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570886910149,Jamie and Tristin Sullivan,234435,06/15/2026,06/15/2026,PH-300-475,Christ in the Temple,1,45.00,45.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570887073989,Nancy Chapman,234440,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570886746309,Helen Jennings,234431,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570886746309,Helen Jennings,234431,06/15/2026,06/15/2026,,Membership,1,60.00,60.00,,0.00,,0.00,
+9570886516933,Deborah Thompson McNeil and Kevin McNeil,234424,06/15/2026,06/15/2026,,Giving Tuesday,1,100.00,100.00,,0.00,,0.00,
+9570886516933,Deborah Thompson McNeil and Kevin McNeil,234424,06/15/2026,06/15/2026,,Donor Cover Cost,1,3.19,3.19,,0.00,,0.00,
+9570886451397,Yvonne McGookin,234405,06/15/2026,06/15/2026,BOOK-400-000,Life at 400 Beacon Street by Heather Vogel Frederick,3,40.00,120.00,Proceeds from Store Sales - 4401-606-00-1,7.50,MA Tax,0.00,0.0625
+9570886385861,Marcia Kent,234397,06/15/2026,06/15/2026,,Annual Appeal,1,500.00,500.00,,0.00,,0.00,
+9570886320325,"Mary Lou MacKenzie, C.S.",234396,06/15/2026,06/15/2026,,Ongoing Fundraising,1,100.00,100.00,,0.00,,0.00,
+9570886254789,Eleesa and Francisco Perez,234394,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570886254789,Eleesa and Francisco Perez,234393,06/15/2026,06/15/2026,,Ongoing Fundraising,1,1000.00,1000.00,,0.00,,0.00,
+9570886058181,Andrew Wycislak,234391,06/15/2026,06/15/2026,,Ongoing Fundraising,1,20.00,20.00,,0.00,,0.00,
+9570885992645,Wendy Dorval,234381,06/15/2026,06/15/2026,JEWEL-100-090,Cross and Crown Pendants - Becky Thatcher,1,125.00,125.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570885992645,Wendy Dorval,234381,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,38.44,38.44,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570885894341,Leslie Freeman,234347,06/15/2026,06/15/2026,BOOK-900-905,Building of The Mother Church,1,20.00,20.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570885828805,Jo Carol Sanborn,234339,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570885730501,Candace Jung,234336,06/15/2026,06/15/2026,,Longyear Fund,1,50.00,50.00,,0.00,,0.00,
+9570885730501,Candace Jung,234336,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.75,1.75,,0.00,,0.00,
+9570885501125,Donald and Christina Koch,234330,06/15/2026,06/15/2026,BOOK-500-002,Peter Henniker-Heaton: Man of Joy by Kim M. Schuette,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570885402821,Richard and Joy Albins,234327,06/15/2026,06/15/2026,STA-100-199,Watercolor Historic House Notecard Sets,2,30.00,60.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570885173445,Melissa Scruggs,234316,06/15/2026,06/15/2026,GIFT-600-108,Musical Lamb,1,44.00,44.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570636234949,Craig and Dianne Barrows,234312,06/15/2026,06/15/2026,,Historic House Appeal,1,25.00,25.00,,0.00,,0.00,
+9570885107909,Linda Distel,234304,06/15/2026,06/15/2026,,Annual Appeal,1,50000.00,50000.00,,0.00,,0.00,
+9570885042373,Larry Charlston,234299,06/15/2026,06/15/2026,BOOK-500-006,"A Home for Spike, by Heather Vogel Frederick",1,37.00,37.00,Proceeds from Store Sales - 4401-606-00-1,2.31,MA Tax,0.00,0.0625
+9570885042373,Larry Charlston,234296,06/15/2026,06/15/2026,GIFT-600-108,Musical Lamb,1,55.00,55.00,Proceeds from Store Sales - 4401-606-00-1,3.44,MA Tax,0.00,0.0625
+9570884976837,Mary Kephart,235300,06/15/2026,06/15/2026,GIFT-700-968,All Natural Goat Milk Soap,1,6.40,6.40,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570884976837,Mary Kephart,235300,06/15/2026,06/15/2026,GIFT-700-968,All Natural Goat Milk Soap,1,6.40,6.40,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570884976837,Mary Kephart,235300,06/15/2026,06/15/2026,GIFT-700-968,All Natural Goat Milk Soap,1,6.40,6.40,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570884976837,Mary Kephart,235300,06/15/2026,06/15/2026,GIFT-500-009,Chestnut Hill Magnetic Floral Notepads,1,9.60,9.60,,0.00,,0.00,
+9570884976837,Mary Kephart,235300,06/15/2026,06/15/2026,GIFT-500-004,Chestnut Hill Mini Notebooks,1,9.60,9.60,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570884976837,Mary Kephart,235300,06/15/2026,06/15/2026,GIFT-300-928,Kitchen Towels,2,14.40,28.80,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570884976837,Mary Kephart,235300,06/15/2026,06/15/2026,JEWEL-100-801,Cross and Crown Brooch Pin,1,16.00,16.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570885009605,Graham and Mary Bothwell,234289,06/15/2026,06/15/2026,,Ongoing Fundraising,1,5000.00,5000.00,,0.00,,0.00,
+9570884354245,Colette Kenville,235469,06/15/2026,06/15/2026,,Giving Tuesday,1,25.00,25.00,,0.00,,0.00,
+9570884354245,Colette Kenville,234285,06/15/2026,06/15/2026,,Giving Tuesday,1,25.00,25.00,,0.00,,0.00,
+9570884190405,Kathryn Eisman,234283,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570884190405,Kathryn Eisman,235467,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570884092101,Marilyn Needham,235465,06/15/2026,06/15/2026,,Ongoing Fundraising,1,25.00,25.00,,0.00,,0.00,
+9570884092101,Marilyn Needham,234281,06/15/2026,06/15/2026,,Ongoing Fundraising,1,25.00,25.00,,0.00,,0.00,
+9570883764421,Cheryl Moneyhun,234280,06/15/2026,06/15/2026,,Ongoing Fundraising,1,25.00,25.00,,0.00,,0.00,
+9570883764421,Cheryl Moneyhun,235464,06/15/2026,06/15/2026,,Ongoing Fundraising,1,25.00,25.00,,0.00,,0.00,
+9570883666117,"Ragnar Sundstrom, Jr.",235463,06/15/2026,06/15/2026,,Annual Appeal,1,125.00,125.00,,0.00,,0.00,
+9570883666117,"Ragnar Sundstrom, Jr.",234279,06/15/2026,06/15/2026,,Annual Appeal,1,125.00,125.00,,0.00,,0.00,
+9570883469509,Michael and Nancy Shays,235462,06/15/2026,06/15/2026,,Ongoing Fundraising,1,20.00,20.00,,0.00,,0.00,
+9570883469509,Michael and Nancy Shays,234278,06/15/2026,06/15/2026,,Ongoing Fundraising,1,20.00,20.00,,0.00,,0.00,
+9570883272901,Sandra Houston,234230,06/15/2026,06/15/2026,GIFT-100-345A,Wrapped with Love Blanket,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,5.20,MA Tax,0.00,0.0625
+9570883272901,Sandra Houston,234230,06/15/2026,06/15/2026,GIFT-400-730,Little Children's Prayer by Mary Baker Eddy,1,21.60,21.60,Proceeds from Store Sales - 4401-606-00-1,5.20,MA Tax,0.00,0.0625
+9570883272901,Sandra Houston,234230,06/15/2026,06/15/2026,GIFT-400-731,Big Children's Prayer by Mary Baker Eddy,1,21.60,21.60,Proceeds from Store Sales - 4401-606-00-1,5.20,MA Tax,0.00,0.0625
+9570883272901,Sandra Houston,234495,06/15/2026,06/15/2026,,General Donation,1,500.00,500.00,,0.00,,0.00,
+9570883141829,Barbara and Karl Taglier,234221,06/15/2026,06/15/2026,STA-100-199,Watercolor Historic House Notecard Sets,1,24.00,24.00,Proceeds from Store Sales - 4401-606-00-1,1.50,MA Tax,0.00,0.0625
+9570882781381,Helen Harper,234219,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570882355397,Kristen Gulbran,234218,06/15/2026,06/15/2026,,Ongoing Fundraising,1,500.00,500.00,,0.00,,0.00,
+9570882027717,Mark and Polly Lestikow,235323,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,392.00,392.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570882027717,Mark and Polly Lestikow,235323,06/15/2026,06/15/2026,,Longyear Fund,1,100.00,100.00,,0.00,,0.00,
+9570882027717,Mark and Polly Lestikow,234209,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,392.00,392.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570882027717,Mark and Polly Lestikow,234209,06/15/2026,06/15/2026,,Longyear Fund,1,100.00,100.00,,0.00,,0.00,
+9570881732805,"Beverly Ness, C.S.B.",234207,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570881601733,Susan Jackson,234202,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570881568965,Susan DeCou,234199,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570881568965,Susan DeCou,234199,06/15/2026,06/15/2026,,Membership,1,25.00,25.00,,0.00,,0.00,
+9570881470661,Donald and Judith Bell,234196,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570881470661,Donald and Judith Bell,234196,06/15/2026,06/15/2026,,Membership,1,25.00,25.00,,0.00,,0.00,
+9570881405125,"First Church of Christ, Scientist",234195,06/15/2026,06/15/2026,,Annual Appeal,1,200.00,200.00,,0.00,,0.00,
+9570881274053,Sandra and John Hedlund,234194,06/15/2026,06/15/2026,,Ongoing Fundraising,1,500.00,500.00,,0.00,,0.00,
+9570881011909,Wendy DuBois,235298,06/15/2026,06/15/2026,,Historic House Fund,1,25.00,25.00,,0.00,,0.00,
+9570881011909,Wendy DuBois,234192,06/15/2026,06/15/2026,,Historic House Fund,1,25.00,25.00,,0.00,,0.00,
+9570880913605,Lesley Mascall,234191,06/15/2026,06/15/2026,AUD-500-532,Life at 400 Beacon Street – Digital Audiobook Download,1,28.00,28.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570880848069,Zandrea Kaye-Duchesneau,234181,06/15/2026,06/15/2026,GIFT-300-001,Women's Fleece Vest,1,36.80,36.80,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570880716997,Tenacre Foundation,234180,06/15/2026,06/15/2026,,Ongoing Fundraising,1,227.08,227.08,,0.00,,0.00,
+9570880684229,Connie Keefe,234177,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570880651461,Jan Little,234173,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570880651461,Jan Little,234173,06/15/2026,06/15/2026,,Membership,1,25.00,25.00,,0.00,,0.00,
+9570880585925,Lesleah De Frisco,234169,06/15/2026,06/15/2026,HH-GIFT-900-105-CH,HH - Peace Ornament - CH,1,20.00,20.00,Proceeds from Store Sales - 4401-606-00-1,2.50,MA Tax,0.00,0.0625
+9570880585925,Lesleah De Frisco,234169,06/15/2026,06/15/2026,HH-GIFT-900-105-CH,HH - Peace Ornament - CH,1,20.00,20.00,Proceeds from Store Sales - 4401-606-00-1,2.50,MA Tax,0.00,0.0625
+9570880585925,Lesleah De Frisco,234275,06/15/2026,06/15/2026,,Longyear Fund,1,300.00,300.00,,0.00,,0.00,
+9570880422085,Justin and Laura Long,234153,06/15/2026,06/15/2026,GIFT-500-001,Chestnut Hill Coasters,1,12.80,12.80,Proceeds from Store Sales - 4401-606-00-1,4.60,MA Tax,0.00,0.0625
+9570880422085,Justin and Laura Long,234153,06/15/2026,06/15/2026,GIFT-100-007,Carpet Coasters,2,12.00,24.00,Proceeds from Store Sales - 4401-606-00-1,4.60,MA Tax,0.00,0.0625
+9570880422085,Justin and Laura Long,234153,06/15/2026,06/15/2026,GIFT-500-001,Chestnut Hill Coasters,1,12.80,12.80,Proceeds from Store Sales - 4401-606-00-1,4.60,MA Tax,0.00,0.0625
+9570880422085,Justin and Laura Long,234153,06/15/2026,06/15/2026,STA-100-199,Watercolor Historic House Notecard Sets,1,24.00,24.00,Proceeds from Store Sales - 4401-606-00-1,4.60,MA Tax,0.00,0.0625
+9570880422085,Justin and Laura Long,234491,06/15/2026,06/15/2026,,Giving Tuesday,1,25.00,25.00,,0.00,,0.00,
+9570880422085,Justin and Laura Long,234491,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.02,1.02,,0.00,,0.00,
+9570635186373,Deborah Corpus,234150,06/15/2026,06/15/2026,BOOK-400-318,Paths of Pioneer Christian Scientists by Christopher L. Tyner,1,24.00,24.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570635186373,Deborah Corpus,234150,06/15/2026,06/15/2026,,Giving Tuesday,1,10.00,10.00,,0.00,,0.00,
+9570635022533,Ann McCurties,234145,06/15/2026,06/15/2026,,Giving Tuesday,1,10.00,10.00,,0.00,,0.00,
+9570635120837,Joan and Frank Jordan,234148,06/15/2026,06/15/2026,,Giving Tuesday,1,50.00,50.00,,0.00,,0.00,
+9570635120837,Joan and Frank Jordan,234148,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570635120837,Joan and Frank Jordan,234148,06/15/2026,06/15/2026,,Donor Cover Cost,1,3.06,3.06,,0.00,,0.00,
+9570880291013,Helen Hankins,234144,06/15/2026,06/15/2026,,Historic House Fund,1,50.00,50.00,,0.00,,0.00,
+9570880291013,Helen Hankins,234144,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.75,1.75,,0.00,,0.00,
+9570634760389,Bruce and Irene Morgan,234141,06/15/2026,06/15/2026,,Historic House Fund,1,50.00,50.00,,0.00,,0.00,
+9570634760389,Bruce and Irene Morgan,234141,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.75,1.75,,0.00,,0.00,
+9570634203333,Lois Nichols,234135,06/15/2026,06/15/2026,,Giving Tuesday,1,50.00,50.00,,0.00,,0.00,
+9570633580741,"Melissa Hayden, C.S.",234128,06/15/2026,06/15/2026,,Giving Tuesday,1,10.00,10.00,,0.00,,0.00,
+9570633842885,Daphne Lunge,234130,06/15/2026,06/15/2026,,Giving Tuesday,1,10.00,10.00,,0.00,,0.00,
+9570633842885,Daphne Lunge,234130,06/15/2026,06/15/2026,,Donor Cover Cost,1,0.59,0.59,,0.00,,0.00,
+9570634006725,Mary and Greg Lyzenga,234133,06/15/2026,06/15/2026,,Giving Tuesday,1,10.00,10.00,,0.00,,0.00,
+9570634236101,Kate and Douglas Pagett,234136,06/15/2026,06/15/2026,,Giving Tuesday,1,10.00,10.00,,0.00,,0.00,
+9570880159941,Marcia Cummings,234127,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570633515205,Garrick Bradley,234121,06/15/2026,06/15/2026,,Giving Tuesday,1,25.00,25.00,,0.00,,0.00,
+9570633515205,Garrick Bradley,234121,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.02,1.02,,0.00,,0.00,
+9570879996101,Galen and Evelyn Stevens-White,234119,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570879832261,Clara Dee Thiesmeyer,234118,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570879701189,Janet Martin,234284,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570879701189,Janet Martin,235468,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570879701189,Janet Martin,234117,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570879635653,Betsy Morris and Clark Snodgrass,234116,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570879471813,Lester and Nancy Forest,234115,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570879373509,Debie Worley,234112,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,103.50,103.50,Proceeds from Store Sales - 4401-606-00-1,6.47,MA Tax,0.00,0.0625
+9570879340741,Jeanine Kirkland,234109,06/15/2026,06/15/2026,BOOK-500-911,The Greatest Thing in the World by Henry Drummond,1,14.40,14.40,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570879307973,"Jane Hicks, C.S.",234083,06/15/2026,06/15/2026,GIFT-600-108,Musical Lamb,1,49.50,49.50,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570879275205,Heather Frederick Brown,234075,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570879275205,Heather Frederick Brown,234075,06/15/2026,06/15/2026,,Membership,1,10.00,10.00,,0.00,,0.00,
+9570879242437,"First Church of Christ, Scientist",234072,06/15/2026,06/15/2026,,Ongoing Fundraising,1,500.00,500.00,,0.00,,0.00,
+9570879078597,Jim and Karen Hertlein,234066,06/15/2026,06/15/2026,BOOK-400-645,My Life Model by Carol Norton,8,8.10,64.80,Proceeds from Store Sales - 4401-606-00-1,4.05,MA Tax,0.00,0.0625
+9570630107333,John and Eleanor Hill,235013,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570630107333,John and Eleanor Hill,234065,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570878619845,Nancy Hagan,234059,06/15/2026,06/15/2026,BOOK-400-103,A Precious Legacy: Christian Science Comes to Japan by Emi Abiko,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570878521541,Mark Geis,234046,06/15/2026,06/15/2026,AUD-500-530,Follow and Rejoice -- Mary Baker Eddy: The Chestnut Hill Years,1,25.00,25.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570878357701,Ronald Fontana,234040,06/15/2026,06/15/2026,,Historic House Appeal,1,300.00,300.00,,0.00,,0.00,
+9570629681349,Lynn Weydert,234038,06/15/2026,06/15/2026,,Longyear Legacy Endowment Fund,1,15.00,15.00,,0.00,,0.00,
+9570629714117,David Stafford-Parkin,234039,06/15/2026,06/15/2026,,Longyear Fund,1,60.00,60.00,,0.00,,0.00,
+9570604187845,Judy and Eric Huenneke,234389,06/15/2026,06/15/2026,,Annual Appeal,1,62.50,62.50,,0.00,,0.00,
+9570604187845,Judy and Eric Huenneke,234037,06/15/2026,06/15/2026,,Annual Appeal,1,62.50,62.50,,0.00,,0.00,
+9570628862149,Susan Johnston,234028,06/15/2026,06/15/2026,,Longyear Fund,1,10.00,10.00,,0.00,,0.00,
+9570628862149,Susan Johnston,234028,06/15/2026,06/15/2026,,Donor Cover Cost,1,2.81,2.81,,0.00,,0.00,
+9570628436165,Sylvia Sirota,234027,06/15/2026,06/15/2026,,Longyear Fund,1,30.00,30.00,,0.00,,0.00,
+9570628305093,"Margit Hammerstrom, C.S.",234018,06/15/2026,06/15/2026,,Longyear Fund,1,50.00,50.00,,0.00,,0.00,
+9570628305093,"Margit Hammerstrom, C.S.",234018,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570628305093,"Margit Hammerstrom, C.S.",234018,06/15/2026,06/15/2026,,Donor Cover Cost,1,14.18,14.18,,0.00,,0.00,
+9570628239557,Robyn Edgerton,234017,06/15/2026,06/15/2026,,Longyear Fund,1,10.00,10.00,,0.00,,0.00,
+9570628239557,Robyn Edgerton,234017,06/15/2026,06/15/2026,,Donor Cover Cost,1,2.81,2.81,,0.00,,0.00,
+9570878292165,Amber Ellwood,234010,06/15/2026,06/15/2026,BOOK-500-002,Peter Henniker-Heaton: Man of Joy by Kim M. Schuette,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570878292165,Amber Ellwood,234010,06/15/2026,06/15/2026,,Longyear Fund,1,50.00,50.00,,0.00,,0.00,
+9570878292165,Amber Ellwood,234069,06/15/2026,06/15/2026,BOOK-500-002,Peter Henniker-Heaton: Man of Joy by Kim M. Schuette,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570628370629,"Marilyn Armbruster, C.S.",234024,06/15/2026,06/15/2026,,Longyear Fund,1,30.00,30.00,,0.00,,0.00,
+9570878226629,Larry Bush,234007,06/15/2026,06/15/2026,,Historic House Appeal,1,1000.00,1000.00,,0.00,,0.00,
+9570878128325,"Pamela McKnight, C.S.",234006,06/15/2026,06/15/2026,,Ongoing Fundraising,1,5000.00,5000.00,,0.00,,0.00,
+9570878062789,Richard Lipsey,234005,06/15/2026,06/15/2026,,General Donation,1,750.00,750.00,,0.00,,0.00,
+9570629648581,Marilyn Roccoforte,233999,06/15/2026,06/15/2026,BOOK-400-103,A Precious Legacy: Christian Science Comes to Japan by Emi Abiko,2,10.00,20.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570629648581,Marilyn Roccoforte,233996,06/15/2026,06/15/2026,,Longyear Fund,1,50.00,50.00,,0.00,,0.00,
+9570629648581,Marilyn Roccoforte,233996,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.75,1.75,,0.00,,0.00,
+9570877964485,Chris and Wendy Rankin,233985,06/15/2026,06/15/2026,GIFT-400-109,Cross and Crown Stained-glass Suncatcher,1,48.00,48.00,Proceeds from Store Sales - 4401-606-00-1,3.00,MA Tax,0.00,0.0625
+9570625454277,Amanda Weitman,233966,06/15/2026,06/15/2026,BOOK-400-104,Christian Science In Germany by Frances Thurber Seal,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570625454277,Amanda Weitman,233966,06/15/2026,06/15/2026,,Longyear Fund,1,100.00,100.00,,0.00,,0.00,
+9570877833413,Suzette Perkins,233961,06/15/2026,06/15/2026,BOOK-400-317,Violet Hay by Peter J. Hodgson,2,12.00,24.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877767877,Nancy and Donald Challenger,233955,06/15/2026,06/15/2026,BOOK-500-079,On the Way There by Katherine M. Yates,1,19.00,19.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877669573,Donna Speer,233914,06/15/2026,06/15/2026,BOOK-900-904,Subject Guide to Bible Stories,1,27.00,27.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877669573,Donna Speer,233914,06/15/2026,06/15/2026,BOOK-500-006,"A Home for Spike, by Heather Vogel Frederick",1,37.00,37.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877669573,Donna Speer,233914,06/15/2026,06/15/2026,BOOK-400-080,"Genesis of a Poem: Rosa Maud Turner's ""O Dreamer, Leave Thy Dreams for Joyful Waking"" by Peter J. Hodgson",1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877669573,Donna Speer,233914,06/15/2026,06/15/2026,BOOK-400-645,My Life Model by Carol Norton,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877669573,Donna Speer,233914,06/15/2026,06/15/2026,BOOK-500-079,On the Way There by Katherine M. Yates,1,19.00,19.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877669573,Donna Speer,233914,06/15/2026,06/15/2026,BOOK-500-911,The Greatest Thing in the World by Henry Drummond,1,16.00,16.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877669573,Donna Speer,233914,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,105.00,105.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877735109,Nancy Honey,233939,06/15/2026,06/15/2026,HH-PH-300-100-CH,HH - Rathvon Framed Quote - CHESTNUT HILL,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,0.56,MA Tax,0.00,0.0625
+9570626502853,Erika Parrish-Wilcox,233938,06/15/2026,06/15/2026,HH-JEWEL-100-800CH,HH - Cross and Crown Stained Glass Lapel Pin - Chestnut Hill,1,6.30,6.30,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877604037,Kristen and Connor Hichens,233900,06/15/2026,06/15/2026,PH-300-027,Sunset at Pleasant View,1,3.20,3.20,Proceeds from Store Sales - 4401-606-00-1,3.20,MA Tax,0.00,0.0625
+9570877604037,Kristen and Connor Hichens,233900,06/15/2026,06/15/2026,GIFT-400-109,Cross and Crown Stained-glass Suncatcher,1,48.00,48.00,Proceeds from Store Sales - 4401-606-00-1,3.20,MA Tax,0.00,0.0625
+9570877604037,Kristen and Connor Hichens,235314,06/15/2026,06/15/2026,GIFT-500-009,Chestnut Hill Magnetic Floral Notepads,1,9.60,9.60,,1.23,MA Tax,0.00,0.0625
+9570877604037,Kristen and Connor Hichens,235314,06/15/2026,06/15/2026,STA-200-501,Wallpaper Pen,1,6.40,6.40,Proceeds from Store Sales - 4401-606-00-1,1.23,MA Tax,0.00,0.0625
+9570877604037,Kristen and Connor Hichens,235314,06/15/2026,06/15/2026,,The Mother Church Impressionist Painting Notecard,1,3.60,3.60,,1.23,MA Tax,0.00,0.0625
+9570877604037,Kristen and Connor Hichens,234459,06/15/2026,06/15/2026,GIFT-400-109,Cross and Crown Stained-glass Suncatcher,1,48.00,48.00,Proceeds from Store Sales - 4401-606-00-1,6.00,MA Tax,0.00,0.0625
+9570877604037,Kristen and Connor Hichens,234459,06/15/2026,06/15/2026,GIFT-400-109,Cross and Crown Stained-glass Suncatcher,1,48.00,48.00,Proceeds from Store Sales - 4401-606-00-1,6.00,MA Tax,0.00,0.0625
+9570877472965,"Patricia Duke, C.S.",233893,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570877374661,Cheryl Brooks,233889,06/15/2026,06/15/2026,PH-300-108,Rathvon Framed Quote,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,2.50,MA Tax,0.00,0.0625
+9570877374661,Cheryl Brooks,233889,06/15/2026,06/15/2026,STA-300-905,Artwork of 400 Beacon Street Notecards,1,30.00,30.00,Proceeds from Store Sales - 4401-606-00-1,2.50,MA Tax,0.00,0.0625
+9570877341893,Victoria Brademan,233883,06/15/2026,06/15/2026,BOOK-300-725,"Christian Science Military Ministry, 1917-2004 by Kim M. Schuette",1,37.60,37.60,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877341893,Victoria Brademan,234313,06/15/2026,06/15/2026,BOOK-300-725,"Christian Science Military Ministry, 1917-2004 by Kim M. Schuette",1,37.60,37.60,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877309125,Martha Delaney-Hotz,233877,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,32.32,32.32,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877309125,Martha Delaney-Hotz,233877,06/15/2026,06/15/2026,JEWEL-100-341,Six-sided Cross and Crown Pendants,1,825.00,825.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877309125,Martha Delaney-Hotz,233877,06/15/2026,06/15/2026,JEWEL-100-089,14k Gold Box Chain Necklaces,1,480.00,480.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877309125,Martha Delaney-Hotz,233877,06/15/2026,06/15/2026,JEWEL-100-341,Six-sided Cross and Crown Pendants,1,195.00,195.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877309125,Martha Delaney-Hotz,234078,06/15/2026,06/15/2026,JEWEL-100-089,14k Gold Box Chain Necklaces,1,530.00,530.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877309125,Martha Delaney-Hotz,234078,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,37.00,37.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877309125,Martha Delaney-Hotz,234078,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,38.44,38.44,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877243589,Kent Wadsworth,233874,06/15/2026,06/15/2026,BOOK-400-103,A Precious Legacy: Christian Science Comes to Japan by Emi Abiko,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877046981,Liesl Ehmke,233870,06/15/2026,06/15/2026,PH-100-702,God is Love Framed Cross-Stitch,1,200.00,200.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570877046981,Liesl Ehmke,233867,06/15/2026,06/15/2026,PH-100-702,God is Love Framed Cross-Stitch,1,200.00,200.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570876817605,Linda Dinardo,233863,06/15/2026,06/15/2026,BOOK-400-103,A Precious Legacy: Christian Science Comes to Japan by Emi Abiko,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570876817605,Linda Dinardo,233863,06/15/2026,06/15/2026,CHARGE-200-100,Gift Wrap,1,5.00,5.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570876719301,Madeline Cassidy,233904,06/15/2026,06/15/2026,GIFT-100-345A,Wrapped with Love Blanket,1,50.00,50.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570876719301,Madeline Cassidy,233981,06/15/2026,06/15/2026,BOOK-400-103,A Precious Legacy: Christian Science Comes to Japan by Emi Abiko,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570876719301,Madeline Cassidy,233859,06/15/2026,06/15/2026,GIFT-100-102,Framed “Brother Birds” Prints,1,36.00,36.00,Proceeds from Store Sales - 4401-606-00-1,2.25,MA Tax,0.00,0.0625
+9570876719301,Madeline Cassidy,233859,06/15/2026,06/15/2026,CHARGE-200-100,Gift Wrap,1,5.00,5.00,Proceeds from Store Sales - 4401-606-00-1,2.25,MA Tax,0.00,0.0625
+9570876588229,Peter and Sally Gladden,233852,06/15/2026,06/15/2026,BOOK-400-000,Life at 400 Beacon Street by Heather Vogel Frederick,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,2.50,MA Tax,0.00,0.0625
+9570621358277,Heather Blair,234599,06/15/2026,06/15/2026,,Historic House Appeal,1,50.00,50.00,,0.00,,0.00,
+9570621358277,Heather Blair,233850,06/15/2026,06/15/2026,,Historic House Appeal,1,50.00,50.00,,0.00,,0.00,
+9570876391621,Donanne and Frederic Hunter,233928,06/15/2026,06/15/2026,,Giving Tuesday,1,50.00,50.00,,0.00,,0.00,
+9570876391621,Donanne and Frederic Hunter,233928,06/15/2026,06/15/2026,CHARGE-200-100,Gift Wrap,1,5.00,5.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570876391621,Donanne and Frederic Hunter,233928,06/15/2026,06/15/2026,GIFT-600-108,Musical Lamb,1,52.00,52.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570876391621,Donanne and Frederic Hunter,233928,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.75,1.75,,0.00,,0.00,
+9570875769029,Elisabeth Dearborn,234215,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570875769029,Elisabeth Dearborn,234215,06/15/2026,06/15/2026,,Membership,1,500.00,500.00,,0.00,,0.00,
+9570873966789,Julie Kugel,234446,06/15/2026,06/15/2026,,Ongoing Fundraising,1,100.00,100.00,,0.00,,0.00,
+9570872983749,Melford Roe,234594,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,105.00,105.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570872983749,Melford Roe,234594,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,32.32,32.32,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570872983749,Melford Roe,234594,06/15/2026,06/15/2026,CHARGE-200-100,Gift Wrap,1,5.00,5.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570592653509,Doug Reed,234563,06/15/2026,06/15/2026,BOOK-900-904,Subject Guide to Bible Stories,1,24.30,24.30,Proceeds from Store Sales - 4401-606-00-1,6.24,MA Tax,0.00,0.0625
+9570592653509,Doug Reed,234563,06/15/2026,06/15/2026,PH-100-965,Love - Matted Perforated Embroidery,1,18.00,18.00,Proceeds from Store Sales - 4401-606-00-1,6.24,MA Tax,0.00,0.0625
+9570592653509,Doug Reed,234563,06/15/2026,06/15/2026,BOOK-100-364,King James Bible - Study Edition,1,21.60,21.60,Proceeds from Store Sales - 4401-606-00-1,6.24,MA Tax,0.00,0.0625
+9570592653509,Doug Reed,234563,06/15/2026,06/15/2026,GIFT-400-734,Do Right and Fear Not Plaque,1,36.00,36.00,Proceeds from Store Sales - 4401-606-00-1,6.24,MA Tax,0.00,0.0625
+,,234550,06/15/2026,06/15/2026,HH-GIFT-600-005-CH,"HH-""Spike"" the Squirrel - Chestnut Hill",1,18.00,18.00,Proceeds from Store Sales - 4401-606-00-1,5.23,MA Tax,0.00,0.0625
+,,234550,06/15/2026,06/15/2026,HH-BOOK-300-145-CH,HH - Twelve Years with Mary Baker Eddy - Gently Used - Chestnut Hill,1,10.80,10.80,Proceeds from Store Sales - 4401-606-00-1,5.23,MA Tax,0.00,0.0625
+,,234550,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,5.23,MA Tax,0.00,0.0625
+,,234550,06/15/2026,06/15/2026,PH-300-108,Rathvon Framed Quote,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,5.23,MA Tax,0.00,0.0625
+,,234550,06/15/2026,06/15/2026,HH-STA-300-905CH,HH - Artwork of 400 Beacon Street Notecards - Chestnut Hill,1,27.00,27.00,Proceeds from Store Sales - 4401-606-00-1,5.23,MA Tax,0.00,0.0625
+,,234550,06/15/2026,06/15/2026,HH-GIFT-400-732-CH,HH- Home Plaque - Chestnut Hill,1,18.00,18.00,,5.23,MA Tax,0.00,0.0625
+9570592817349,Lilli-Mari Andresen,234590,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570592817349,Lilli-Mari Andresen,234590,06/15/2026,06/15/2026,,Longyear Fund,1,100.00,100.00,,0.00,,0.00,
+9570592817349,Lilli-Mari Andresen,234590,06/15/2026,06/15/2026,,Donor Cover Cost,1,4.35,4.35,,0.00,,0.00,
+9570592719045,Tom Bailey,234588,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570872918213,Heather Sugioka,234543,06/15/2026,06/15/2026,BOOK-400-317,Violet Hay by Peter J. Hodgson,1,12.00,12.00,Proceeds from Store Sales - 4401-606-00-1,0.75,MA Tax,0.00,0.0625
+9570592653509,Doug Reed,234549,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,JEWEL-100-793,Cross and Crown Beaded Ring Pendants - Melissa Shipley,1,113.00,113.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,AUD-500-527,Who Shall Be Called? - The Pleasant View Household: Working and Watching,1,25.00,25.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,AUD-500-528,"The House on Broad Street: Finding A Faithful Few, The Years in Lynn",1,25.00,25.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,GIFT-900-104,Cross and Crown Acrylic Magnet,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,GIFT-700-975,Longyear Candles,3,8.00,24.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,GIFT-500-009,Chestnut Hill Magnetic Floral Notepads,1,12.00,12.00,,0.00,,0.00,
+9570592620741,Barda Grant,234409,06/15/2026,06/15/2026,GIFT-800-611,Artisanal Bookmarks,1,14.00,14.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570872885445,Luke Greenman,234419,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,32.32,32.32,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570872885445,Luke Greenman,234419,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,37.00,37.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570872885445,Luke Greenman,234419,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,115.00,115.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570621948101,Christopher Hronek,234525,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,105.00,105.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570621948101,Christopher Hronek,234525,06/15/2026,06/15/2026,JEWEL-100-992,Sterling Silver Box Chain Necklaces,1,32.32,32.32,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+,,234400,06/15/2026,06/15/2026,HH-GIFT-800-611-CO,HH - Artisan Bookmark - Concord House Sales Only,1,14.00,14.00,,0.00,,0.00,
+,,234400,06/15/2026,06/15/2026,HH-GIFT-800-611-CO,HH - Artisan Bookmark - Concord House Sales Only,2,14.00,28.00,,0.00,,0.00,
+9570872787141,The Christian Science Association C.S.B.,234392,06/15/2026,06/15/2026,,Ongoing Fundraising,1,700.00,700.00,,0.00,,0.00,
+,,234380,06/15/2026,06/15/2026,TOUR-100-607,Concord Tours,1,10.00,10.00,Programs & Tours - 4350-000-00-1,0.00,,0.00,
+,,234379,06/15/2026,06/15/2026,TOUR-100-607,Concord Tours,3,10.00,30.00,Programs & Tours - 4350-000-00-1,0.00,,0.00,
+9570872721605,Joy Fowler,234333,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,115.00,115.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570872656069,Chardelle Hull,234323,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+,,234292,06/15/2026,06/15/2026,STA-100-323,Spike Notecard,1,4.50,4.50,Proceeds from Store Sales - 4401-606-00-1,0.66,MA Tax,0.00,0.0625
+,,234292,06/15/2026,06/15/2026,STA-100-098,Sheep Notecards,1,6.00,6.00,Proceeds from Store Sales - 4401-606-00-1,0.66,MA Tax,0.00,0.0625
+9570872524997,Suzanne Salvatore,234214,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,JEWEL-100-100,Cross and Crown Seal Pendants - Nikki Paulk,1,530.10,530.10,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,JEWEL-100-089,14k Gold Box Chain Necklaces,1,477.00,477.00,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-101-306,Chestnut Hill Photo Notecards,1,4.50,4.50,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-101-306,Chestnut Hill Photo Notecards,1,4.50,4.50,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-101-306,Chestnut Hill Photo Notecards,1,4.50,4.50,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,STA-300-420,Postcard,1,0.90,0.90,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570592489669,Janet Pilkington,234350,06/15/2026,06/15/2026,GIFT-300-928,Kitchen Towels,1,16.20,16.20,Proceeds from Store Sales - 4401-606-00-1,65.53,MA Tax,0.00,0.0625
+9570872459461,Jennylyn Sterling,234210,06/15/2026,06/15/2026,BOOK-500-002,Peter Henniker-Heaton: Man of Joy by Kim M. Schuette,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+,,234162,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,1.00,1.00,Proceeds from Store Sales - 4401-606-00-1,0.31,MA Tax,0.00,0.0625
+,,234162,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,1.00,1.00,Proceeds from Store Sales - 4401-606-00-1,0.31,MA Tax,0.00,0.0625
+,,234162,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,1.00,1.00,Proceeds from Store Sales - 4401-606-00-1,0.31,MA Tax,0.00,0.0625
+,,234162,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,1.00,1.00,Proceeds from Store Sales - 4401-606-00-1,0.31,MA Tax,0.00,0.0625
+,,234162,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,1.00,1.00,Proceeds from Store Sales - 4401-606-00-1,0.31,MA Tax,0.00,0.0625
+9570592456901,Stephen Pilkington,234371,06/15/2026,06/15/2026,AUD-100-414,Christian Science in Germany - Audiobook,1,19.80,19.80,Proceeds from Store Sales - 4401-606-00-1,1.24,MA Tax,0.00,0.0625
+9570592522437,David and Consuela Sand,234087,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570592489669,Janet Pilkington,234055,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570592456901,Stephen Pilkington,234054,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570872295621,PAUL BYRD,234050,06/15/2026,06/15/2026,BOOK-300-104,Christian Science in East Germany: The Church that Came in from the Cold by Gregory Sandford,1,15.00,15.00,Proceeds from Store Sales - 4401-606-00-1,1.38,MA Tax,0.00,0.0625
+9570872295621,PAUL BYRD,234050,06/15/2026,06/15/2026,JEWEL-100-800,Cross and Crown Stained Glass Lapel Pin,1,7.00,7.00,Proceeds from Store Sales - 4401-606-00-1,1.38,MA Tax,0.00,0.0625
+9570592424133,David Mueller,234042,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570872197317,David Hawes,234033,06/15/2026,06/15/2026,HH-PH-300-100-CH,HH - Rathvon Framed Quote - CHESTNUT HILL,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,0.63,MA Tax,0.00,0.0625
+9570872099013,Gokhan Kaya,234029,06/15/2026,06/15/2026,HH-GIFT-900-104CH,HH - Cross and Crown Acrylic Magnet - Chestnut Hill,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,1.06,MA Tax,0.00,0.0625
+9570872099013,Gokhan Kaya,234029,06/15/2026,06/15/2026,HH-JEWEL-100-800CH,HH - Cross and Crown Stained Glass Lapel Pin - Chestnut Hill,1,7.00,7.00,Proceeds from Store Sales - 4401-606-00-1,1.06,MA Tax,0.00,0.0625
+9570872066245,Kelsey Shields,233958,06/15/2026,06/15/2026,BOOK-400-104,Christian Science In Germany by Frances Thurber Seal,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570872000709,Walt Hartig,233942,06/15/2026,06/15/2026,GIFT-900-103,Cross and Crown Ornament,1,20.00,20.00,Proceeds from Store Sales - 4401-606-00-1,2.50,MA Tax,0.00,0.0625
+9570872000709,Walt Hartig,233942,06/15/2026,06/15/2026,GIFT-400-111,Cross and Crown Trinket Dish,1,20.00,20.00,Proceeds from Store Sales - 4401-606-00-1,2.50,MA Tax,0.00,0.0625
+,,233934,06/15/2026,06/15/2026,HH-BOOK-500-435CH,HH-A World More Bright: The Life of Mary Baker Eddy by Isabel Ferguson and Heather Vogel Frederick - Chestnut Hill,1,30.00,30.00,,1.94,MA Tax,0.00,0.0625
+,,233934,06/15/2026,06/15/2026,STA-300-420,Postcard,1,1.00,1.00,Proceeds from Store Sales - 4401-606-00-1,1.94,MA Tax,0.00,0.0625
+9570871935173,Ruchama Rubinger,233931,06/15/2026,06/15/2026,AUD-500-527,Who Shall Be Called? - The Pleasant View Household: Working and Watching,1,25.00,25.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+,,233923,06/15/2026,06/15/2026,HH-BOOK-500-435CH,HH-A World More Bright: The Life of Mary Baker Eddy by Isabel Ferguson and Heather Vogel Frederick - Chestnut Hill,1,30.00,30.00,,1.94,MA Tax,0.00,0.0625
+,,233923,06/15/2026,06/15/2026,HH-STA-300-420CH,HH - Postcard - Chestnut Hill,1,1.00,1.00,Proceeds from Store Sales - 4401-606-00-1,1.94,MA Tax,0.00,0.0625
+,,233923,06/15/2026,06/15/2026,,400B Visitor Donations,1,7.06,7.06,,1.94,MA Tax,0.00,0.0625
+9570592293061,Joan Miller,234450,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570592063685,Anna Lisa Kronman,234074,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570870067397,Jacqueline Newland,234176,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570870001861,Lynne Lawson,234086,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570869936325,Kathi Riley,234303,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570869936325,Kathi Riley,234004,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10.00,10.00,,0.00,,0.00,
+9570869641413,Samuel Castleman,233949,06/15/2026,06/15/2026,BOOK-300-956,The History of Christianity by John C. Abbott,1,50.00,50.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570869641413,Samuel Castleman,233949,06/15/2026,06/15/2026,BOOK-100-954,Notes on the Miracles of Our Lord by Richard Chenevix Trench,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570869641413,Samuel Castleman,233949,06/15/2026,06/15/2026,BOOK-100-955,Notes on the Parables of Our Lord by Richard Chenevix Trench,1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570869641413,Samuel Castleman,233949,06/15/2026,06/15/2026,,Longyear Fund,1,50.00,50.00,,0.00,,0.00,
+9570591178949,Kimberly Thorndike,234585,06/15/2026,06/15/2026,JEWEL-100-350,Cross and Crown Wreath Pendants,1,445.50,445.50,Proceeds from Store Sales - 4401-606-00-1,28.66,MA Tax,0.00,0.0625
+9570591178949,Kimberly Thorndike,234585,06/15/2026,06/15/2026,PH-300-108,Rathvon Framed Quote,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,28.66,MA Tax,0.00,0.0625
+9570591178949,Kimberly Thorndike,234585,06/15/2026,06/15/2026,STA-100-323,Spike Notecard,1,4.05,4.05,Proceeds from Store Sales - 4401-606-00-1,28.66,MA Tax,0.00,0.0625
+9570591178949,Kimberly Thorndike,234585,06/15/2026,06/15/2026,Gift-100-100,Gift Certificate - Redeem,1,-300.00,-300.00,Gift Certificate Issued - 2301-000-00-1,28.66,MA Tax,0.00,0.0625
+9570591178949,Kimberly Thorndike,234585,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,28.66,MA Tax,0.00,0.0625
+9570591408325,Gabriela Mejia,234390,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570869051589,"Daystar, Inc.",233856,06/15/2026,06/15/2026,BDCA8D4-SpringBalance,Mary Baker Eddy's New England Tour Balance (Spring 2026),1,1400.00,1400.00,Deferred Revenue - 2300-000-00-1,0.00,,0.00,
+9570869051589,"Daystar, Inc.",233856,06/15/2026,06/15/2026,BDCA8D4-SpringBalance,Mary Baker Eddy's New England Tour Balance (Spring 2026),1,1400.00,1400.00,Deferred Revenue - 2300-000-00-1,0.00,,0.00,
+9570868953285,Lynda Spencer,234322,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570590982341,Barbara Denisi,234584,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570868822213,Diana Cornthwaite,233992,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570868822213,Diana Cornthwaite,233992,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570632597701,Carol Raner,234319,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570632597701,Carol Raner,234319,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570868428997,Nancy Kilborn,234451,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570868134085,Wisconsin Historical Society Acquisitions,234208,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570589802693,Virginia Harkness,234502,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570589606085,Kate Williamson,234488,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570867970245,Glenn Wattley,234003,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570867839173,Susan De Wulf,234041,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570867773637,Laurie and David Matthews,234094,06/15/2026,06/15/2026,GIFT-900-104,Cross and Crown Acrylic Magnet,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,3.19,MA Tax,0.00,0.0625
+9570867773637,Laurie and David Matthews,234094,06/15/2026,06/15/2026,GIFT-900-104,Cross and Crown Acrylic Magnet,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,3.19,MA Tax,0.00,0.0625
+9570867773637,Laurie and David Matthews,234094,06/15/2026,06/15/2026,JEWEL-100-800,Cross and Crown Stained Glass Lapel Pin,1,7.00,7.00,Proceeds from Store Sales - 4401-606-00-1,3.19,MA Tax,0.00,0.0625
+9570867773637,Laurie and David Matthews,234094,06/15/2026,06/15/2026,JEWEL-100-800,Cross and Crown Stained Glass Lapel Pin,1,7.00,7.00,Proceeds from Store Sales - 4401-606-00-1,3.19,MA Tax,0.00,0.0625
+9570867773637,Laurie and David Matthews,234094,06/15/2026,06/15/2026,GIFT-900-104,Cross and Crown Acrylic Magnet,1,10.00,10.00,Proceeds from Store Sales - 4401-606-00-1,3.19,MA Tax,0.00,0.0625
+9570867773637,Laurie and David Matthews,234094,06/15/2026,06/15/2026,JEWEL-100-800,Cross and Crown Stained Glass Lapel Pin,1,7.00,7.00,Proceeds from Store Sales - 4401-606-00-1,3.19,MA Tax,0.00,0.0625
+9570867773637,Laurie and David Matthews,234094,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,3.19,MA Tax,0.00,0.0625
+9570867642565,Ginger Sanford,234484,06/15/2026,06/15/2026,BOOK-400-104,Christian Science In Germany by Frances Thurber Seal,1,8.10,8.10,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570867642565,Ginger Sanford,234484,06/15/2026,06/15/2026,BOOK-300-104,Christian Science in East Germany: The Church that Came in from the Cold by Gregory Sandford,1,13.50,13.50,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570636824773,Judy Piercy,234374,06/15/2026,06/15/2026,PH-300-471,Daniel in the Lions' Den,1,45.00,45.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570636824773,Judy Piercy,234374,06/15/2026,06/15/2026,GIFT-600-110,Baby lamb,4,14.00,56.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570636824773,Judy Piercy,234374,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570867478725,Sheida Hodge,234518,06/15/2026,06/15/2026,,Historic House Appeal,1,25.00,25.00,,0.00,,0.00,
+9570867413189,Robert and Maggie Drake,234519,06/15/2026,06/15/2026,,Ongoing Fundraising,1,500.00,500.00,,0.00,,0.00,
+9570867314885,William Halacy,234504,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570589343941,Stephen and Nikki Paulk,234137,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570589311173,Sandra Clarke,234540,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570589311173,Sandra Clarke,234540,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570867183813,Stacy Green,234093,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570589016261,Diana Blanchard,234089,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570589016261,Diana Blanchard,234089,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570867052741,Greg Palmer,233967,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570866987205,Kay Colvin,234452,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570866921669,Kathy Dean,234309,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570866921669,Kathy Dean,234309,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570866790597,Keith Connor,233886,06/15/2026,06/15/2026,,Longyear Fund,1,250.00,250.00,,0.00,,0.00,
+9570866790597,Keith Connor,233886,06/15/2026,06/15/2026,,Donor Cover Cost,1,7.53,7.53,,0.00,,0.00,
+9570588721349,Kelly and Robert Michaels,234572,06/15/2026,06/15/2026,HH-PH-300-100-CH,HH - Rathvon Framed Quote - CHESTNUT HILL,1,9.00,9.00,Proceeds from Store Sales - 4401-606-00-1,2.53,MA Tax,0.00,0.0625
+9570588721349,Kelly and Robert Michaels,234572,06/15/2026,06/15/2026,STA-101-306,Chestnut Hill Photo Notecards,1,4.50,4.50,Proceeds from Store Sales - 4401-606-00-1,2.53,MA Tax,0.00,0.0625
+9570588721349,Kelly and Robert Michaels,234572,06/15/2026,06/15/2026,HH-STA-300-905CH,HH - Artwork of 400 Beacon Street Notecards - Chestnut Hill,1,27.00,27.00,Proceeds from Store Sales - 4401-606-00-1,2.53,MA Tax,0.00,0.0625
+9570588721349,Kelly and Robert Michaels,234572,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,2.53,MA Tax,0.00,0.0625
+9570866626757,John Lerias,234056,06/15/2026,06/15/2026,BOOK-500-079,On the Way There by Katherine M. Yates,2,17.10,34.20,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570866626757,John Lerias,234036,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570588197061,Terri Cole,233946,06/15/2026,06/15/2026,GIFT-900-102,Glass Cross & Crown Paperweight,2,23.40,46.80,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570588262597,Peggy Gautschi,234532,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570588197061,Terri Cole,233995,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570866331845,Teri Ann Rogers,233984,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570621849797,April and Howard Williams,234014,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570621849797,April and Howard Williams,234014,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570866168005,Wendy Jones,234190,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570587508933,"Dan and Nicole Virgil, C.S.",234385,06/15/2026,06/15/2026,BOOK-400-000,Life at 400 Beacon Street by Heather Vogel Frederick,1,36.00,36.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570587508933,"Dan and Nicole Virgil, C.S.",234385,06/15/2026,06/15/2026,BOOK-300-159,"We Knew Mary Baker Eddy, Expanded Edition, Volume II",1,31.50,31.50,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570587508933,"Dan and Nicole Virgil, C.S.",234341,06/15/2026,06/15/2026,,Longyear Fund,1,194.09,194.09,,0.00,,0.00,
+9570587508933,"Dan and Nicole Virgil, C.S.",234341,06/15/2026,06/15/2026,,Donor Cover Cost,1,5.91,5.91,,0.00,,0.00,
+9570587508933,"Dan and Nicole Virgil, C.S.",234340,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570587508933,"Dan and Nicole Virgil, C.S.",234340,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570587443397,Nancy Blake,234580,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570587443397,Nancy Blake,234580,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570587771077,Levi Kline,234152,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570865414341,Natalie Mozzer,234489,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570586951877,Candace Frank,234049,06/15/2026,06/15/2026,,General Donation,1,2200.00,2200.00,,0.00,,0.00,
+9570586591429,"Cynda Nethero, C.S.",233964,06/15/2026,06/15/2026,BOOK-500-005,"A Home for Spike, by Heather Vogel Frederick",1,40.00,40.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570586591429,"Cynda Nethero, C.S.",233964,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570586493125,"Edward and Susan Breuer, C.S.B.",233894,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570864726213,Robin Owen,235426,06/15/2026,06/15/2026,GIFT-800-601,Longyear Magnets,1,2.70,2.70,Proceeds from Store Sales - 4401-606-00-1,0.45,MA Tax,0.00,0.0625
+9570864726213,Robin Owen,235426,06/15/2026,06/15/2026,GIFT-800-600,Longyear Magnetic Flashlight Keychain,1,4.50,4.50,Proceeds from Store Sales - 4401-606-00-1,0.45,MA Tax,0.00,0.0625
+9570621194437,Jane Thompson,234496,06/15/2026,06/15/2026,,Longyear Fund,1,25.00,25.00,,0.00,,0.00,
+9570621194437,Jane Thompson,234496,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.02,1.02,,0.00,,0.00,
+9570621259973,Mrs. Virginia Horner Mr. Charles Horner,234587,06/15/2026,06/15/2026,,Historic House Fund,1,75.00,75.00,,0.00,,0.00,
+9570621194437,Jane Thompson,234586,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570586394821,Wendy Read,234023,06/15/2026,06/15/2026,,Longyear Fund,1,75.00,75.00,,0.00,,0.00,
+9570586394821,Wendy Read,234023,06/15/2026,06/15/2026,,Donor Cover Cost,1,10.87,10.87,,0.00,,0.00,
+9570864726213,Robin Owen,234427,06/15/2026,06/15/2026,BDCA8D4-SpringBalance,Mary Baker Eddy's New England Tour Balance (Spring 2026),1,2200.00,2200.00,Deferred Revenue - 2300-000-00-1,0.00,,0.00,
+9570585936069,Lori Slaber,234140,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570586394821,Wendy Read,234138,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570864234693,Anne Wold,234002,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570585313477,Pat Pieratte,233965,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570584789189,Beth Yost,234182,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570584330437,Cynthia and Andrew Love,233851,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570585444549,Carolyn Cristin,234510,06/15/2026,06/15/2026,,Historic House Appeal,1,500.00,500.00,,0.00,,0.00,
+9570864201925,Stuart and Ann Kneeland,234204,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570864201925,Stuart and Ann Kneeland,234204,06/15/2026,06/15/2026,,Membership,1,175.00,175.00,,0.00,,0.00,
+9570863939781,Kat and Rod Booth,233988,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570863939781,Kat and Rod Booth,233988,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570863874245,"Graham Phaup, C.S.",234043,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570863874245,"Graham Phaup, C.S.",234043,06/15/2026,06/15/2026,,Membership,1,10.00,10.00,,0.00,,0.00,
+9570863743173,Patty Langton,233907,06/15/2026,06/15/2026,GIFT-900-103,Cross and Crown Ornament,1,18.00,18.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570863743173,Patty Langton,233907,06/15/2026,06/15/2026,GIFT-900-100,Blest Christmas Morn Ornament,2,18.00,36.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570863743173,Patty Langton,233907,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570863743173,Patty Langton,233907,06/15/2026,06/15/2026,GIFT-100-002,Longyear Museum Tumbler,1,40.50,40.50,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570863743173,Patty Langton,233907,06/15/2026,06/15/2026,GIFT-900-104,Cross and Crown Acrylic Magnet,3,9.00,27.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570583183557,Anita Jo and Malcolm Baker,234120,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570863677637,Richard Grier,234104,06/15/2026,06/15/2026,GIFT-800-600,Longyear Magnetic Flashlight Keychain,3,4.50,13.50,Proceeds from Store Sales - 4401-606-00-1,1.69,MA Tax,0.00,0.0625
+9570863677637,Richard Grier,234104,06/15/2026,06/15/2026,STA-200-501,Wallpaper Pen,1,7.20,7.20,Proceeds from Store Sales - 4401-606-00-1,1.69,MA Tax,0.00,0.0625
+9570863677637,Richard Grier,234104,06/15/2026,06/15/2026,JEWEL-100-800,Cross and Crown Stained Glass Lapel Pin,1,6.30,6.30,Proceeds from Store Sales - 4401-606-00-1,1.69,MA Tax,0.00,0.0625
+9570863677637,Richard Grier,234529,06/15/2026,06/15/2026,PH-300-101,Vintage Swan Photo with Bible Verse - Matted,2,10.80,21.60,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570863677637,Richard Grier,234159,06/15/2026,06/15/2026,GIFT-600-108,Musical Lamb,1,49.50,49.50,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570863612101,Gaye Berge-Sprout,234302,06/15/2026,06/15/2026,GIFT-600-108,Musical Lamb,1,46.80,46.80,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570863612101,Gaye Berge-Sprout,234302,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570582003909,Debra McCook,234547,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570581479621,Mildred Wisusik,234193,06/15/2026,06/15/2026,,Planned Giving,1,4121.10,4121.10,,0.00,,0.00,
+9570581086405,Joy Anderson,234282,06/15/2026,06/15/2026,,Historic House Appeal,1,25.00,25.00,,0.00,,0.00,
+9570580889797,Jill Adler,234589,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570581086405,Joy Anderson,235466,06/15/2026,06/15/2026,,Historic House Appeal,1,25.00,25.00,,0.00,,0.00,
+9570581217477,Joanne Fernbach,234447,06/15/2026,06/15/2026,,Ongoing Fundraising,1,10000.00,10000.00,,0.00,,0.00,
+9570580562117,Sally Horntvedt,234663,06/15/2026,06/15/2026,,Ongoing Fundraising,1,500.00,500.00,,0.00,,0.00,
+9570863349957,Isabel Foundation,234395,06/15/2026,06/15/2026,,Ongoing Fundraising,1,15000.00,15000.00,,0.00,,0.00,
+9570863349957,Isabel Foundation,234395,06/15/2026,06/15/2026,,Ongoing Fundraising,1,5000.00,5000.00,,0.00,,0.00,
+9570863186117,Rose Mary Mets,234134,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570863186117,Rose Mary Mets,234134,06/15/2026,06/15/2026,,Longyear Fund,1,20.00,20.00,,0.00,,0.00,
+9570579644613,Sharon Cott,234511,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570863186117,Rose Mary Mets,234062,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570863186117,Rose Mary Mets,234062,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570580103365,Heather Vaseff,234088,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570580103365,Heather Vaseff,234662,06/15/2026,06/15/2026,,Ongoing Fundraising,1,200.00,200.00,,0.00,,0.00,
+9570579939525,Carl Davis,234661,06/15/2026,06/15/2026,,Ongoing Fundraising,1,1000.00,1000.00,,0.00,,0.00,
+9570579415237,Susan and Dale Henn,234582,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570579087557,James and Susan Clough,234124,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570579087557,James and Susan Clough,234124,06/15/2026,06/15/2026,,Donor Cover Cost,1,2.47,2.47,,0.00,,0.00,
+9570863022277,Keevin and Kathleen Schier,234324,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570863022277,Keevin and Kathleen Schier,234324,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.46,1.46,,0.00,,0.00,
+9570627256517,Jon Yarrington,234220,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570862956741,Valarie Kinkade,234434,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570578464965,Bonita Rea,234569,06/15/2026,06/15/2026,JEWEL-100-350,Cross and Crown Wreath Pendants,1,810.00,810.00,Proceeds from Store Sales - 4401-606-00-1,0.00,,0.00,
+9570862858437,Barbara Jones,234213,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570862792901,Melody Gulow,234291,06/15/2026,06/15/2026,,Membership,1,120.00,120.00,,0.00,,0.00,
+9570578268357,Diane Warneck,234481,06/15/2026,06/15/2026,,Giving Tuesday,1,30.00,30.00,,0.00,,0.00,
+9570578268357,Diane Warneck,234481,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.17,1.17,,0.00,,0.00,
+9570862465221,"Anne Kidder, C.S.",234449,06/15/2026,06/15/2026,,Ongoing Fundraising,1,500.00,500.00,,0.00,,0.00,
+9570862268613,"Judy Wilt, C.S.",234507,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570861973701,Diana Gomez,234346,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570861842629,Wesley Ketz,234513,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570861842629,Wesley Ketz,234513,06/15/2026,06/15/2026,,Membership,1,10.00,10.00,,0.00,,0.00,
+9570578104517,Jonathan Mattson,234473,06/15/2026,06/15/2026,GIFT-600-108,Musical Lamb,1,46.80,46.80,Proceeds from Store Sales - 4401-606-00-1,2.92,MA Tax,0.00,0.0625
+9570578104517,Jonathan Mattson,234473,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,2.92,MA Tax,0.00,0.0625
+9570578104517,Jonathan Mattson,234474,06/15/2026,06/15/2026,,Historic House Fund,1,25.00,25.00,,0.00,,0.00,
+9570578104517,Jonathan Mattson,234474,06/15/2026,06/15/2026,,Donor Cover Cost,1,1.02,1.02,,0.00,,0.00,
+9570621128901,Carolyn Orta,234577,06/15/2026,06/15/2026,,Historic House Fund,1,250.00,250.00,,0.00,,0.00,
+9570621128901,Carolyn Orta,234577,06/15/2026,06/15/2026,,Donor Cover Cost,1,7.53,7.53,,0.00,,0.00,
+9570577940677,Sara Hunter,234576,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570577809605,Martha Krasovec,234129,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,
+9570578038981,Carol and Darrel Dorr,234428,06/15/2026,06/15/2026,,Membership,1,75.00,75.00,,0.00,,0.00,
+9570578038981,Carol and Darrel Dorr,234428,06/15/2026,06/15/2026,,Membership,1,25.00,25.00,,0.00,,0.00,
+9570242396357,Manya Kaseroff-Smith,233896,06/15/2026,06/15/2026,TOUR-100-604,"FRIDAY, MAY 31, 2024: 400 Beacon Street Special Annual Meeting Tour",1,0.00,0.00,Programs & Tours - 4350-000-00-1,0.00,,0.00,
+9570242396357,Manya Kaseroff-Smith,233896,06/15/2026,06/15/2026,,Membership,1,40.00,40.00,,0.00,,0.00,

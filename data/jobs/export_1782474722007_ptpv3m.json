@@ -1,0 +1,62 @@
+{
+  "id": "export_1782474722007_ptpv3m",
+  "shop": "ahut2z-i6.myshopify.com",
+  "status": "completed",
+  "startDate": "2026-06-15",
+  "fileOptions": {
+    "generateDailySales": false,
+    "generatePayoutsOrders": true,
+    "generateJournalDetails": false,
+    "generateJournalSummary": true,
+    "generateCogsDetails": false,
+    "generateReconciliation": false
+  },
+  "createdAt": "2026-06-26T11:52:02.007Z",
+  "startedAt": "2026-06-26T11:52:02.089Z",
+  "completedAt": "2026-06-26T11:55:46.392Z",
+  "result": {
+    "success": true,
+    "message": "Export completed for 2026-06-15",
+    "filename": "journal-entry_2026-06-15.csv",
+    "files": [
+      {
+        "type": "payouts-orders",
+        "filename": "Income-import_2026-06-15.csv",
+        "downloadUrl": "/api/download-csv?shop=ahut2z-i6.myshopify.com&filename=Income-import_2026-06-15.csv",
+        "rowCount": 489
+      },
+      {
+        "type": "products-orders",
+        "filename": "Store-import_2026-06-15.csv",
+        "downloadUrl": "/api/download-csv?shop=ahut2z-i6.myshopify.com&filename=Store-import_2026-06-15.csv",
+        "rowCount": 96
+      },
+      {
+        "type": "receipts",
+        "filename": "Receipts-import_2026-06-15.csv",
+        "downloadUrl": "/api/download-csv?shop=ahut2z-i6.myshopify.com&filename=Receipts-import_2026-06-15.csv",
+        "rowCount": 297
+      },
+      {
+        "type": "journal-entry-summary",
+        "filename": "journal-entry_2026-06-15.csv",
+        "downloadUrl": "/api/download-csv?shop=ahut2z-i6.myshopify.com&filename=journal-entry_2026-06-15.csv",
+        "rowCount": 4
+      },
+      {
+        "type": "journal-entry-summary",
+        "filename": "journal-entry_2026-06-15.txt",
+        "downloadUrl": "/api/download-csv?shop=ahut2z-i6.myshopify.com&filename=journal-entry_2026-06-15.txt",
+        "rowCount": 4
+      },
+      {
+        "type": "order-json",
+        "filename": "order-data_2026-06-15.json",
+        "downloadUrl": "/api/download-csv?shop=ahut2z-i6.myshopify.com&filename=order-data_2026-06-15.json",
+        "rowCount": 297
+      }
+    ],
+    "entryCount": 688,
+    "balanced": true
+  }
+}

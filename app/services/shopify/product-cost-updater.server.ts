@@ -232,6 +232,184 @@ export async function fetchVariantsBySkus(
   return variants;
 }
 
+/**
+ * Richer per-variant detail for the inventory/item export (Products with Orders).
+ * Distinct from ShopifyVariant (used by the COGS push) because it also needs
+ * price, weight, and on-hand inventory.
+ */
+export interface ShopifyVariantDetail {
+  sku: string | null;
+  productTitle: string;
+  price: string | null;            // variant.price
+  weight: number | null;           // inventoryItem.measurement.weight.value
+  weightUnit: string | null;       // e.g. "POUNDS", "GRAMS"
+  inventoryAvailable: number | null; // variant.inventoryQuantity (sum across locations)
+  unitCost: string | null;         // Shopify "Cost per item" (inventoryItem.unitCost)
+}
+
+const VARIANT_DETAILS_BY_SKU_QUERY = `
+query VariantDetailsBySku($query: String!, $cursor: String) {
+  productVariants(first: 100, query: $query, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      sku
+      price
+      inventoryQuantity
+      inventoryItem {
+        unitCost { amount }
+        measurement { weight { value unit } }
+      }
+      product { title }
+    }
+  }
+}`;
+
+interface VariantDetailsQueryData {
+  productVariants: {
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    nodes: Array<{
+      sku: string | null;
+      price: string | null;
+      inventoryQuantity: number | null;
+      inventoryItem: {
+        unitCost: { amount: string } | null;
+        measurement: { weight: { value: number; unit: string } | null } | null;
+      } | null;
+      product: { title: string } | null;
+    }>;
+  };
+}
+
+/**
+ * Fetch price / weight / on-hand inventory / Shopify unit cost for a set of SKUs.
+ *
+ * Returns a Map keyed by lower-cased SKU for case-insensitive lookup. SKUs with no
+ * matching variant simply won't appear in the map (caller treats as blanks/0).
+ */
+export async function fetchVariantDetailsBySkus(
+  shop: string,
+  accessToken: string,
+  skus: string[],
+): Promise<Map<string, ShopifyVariantDetail>> {
+  const bySku = new Map<string, ShopifyVariantDetail>();
+
+  // Shopify search query length is bounded; query SKUs in modest chunks.
+  const CHUNK = 25;
+  for (let i = 0; i < skus.length; i += CHUNK) {
+    const chunk = skus.slice(i, i + CHUNK);
+    const query = chunk.map(escapeSkuTerm).join(' OR ');
+
+    let cursor: string | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const data: VariantDetailsQueryData = await shopifyGraphQL<VariantDetailsQueryData>(
+        shop,
+        accessToken,
+        VARIANT_DETAILS_BY_SKU_QUERY,
+        { query, cursor },
+        'Fetch variant details by SKU',
+      );
+
+      for (const node of data.productVariants.nodes) {
+        const sku = node.sku && node.sku.trim() !== '' ? node.sku.trim() : null;
+        if (!sku) {
+          continue;
+        }
+        bySku.set(sku.toLowerCase(), {
+          sku,
+          productTitle: node.product?.title ?? '',
+          price: node.price ?? null,
+          weight: node.inventoryItem?.measurement?.weight?.value ?? null,
+          weightUnit: node.inventoryItem?.measurement?.weight?.unit ?? null,
+          inventoryAvailable: node.inventoryQuantity ?? null,
+          unitCost: node.inventoryItem?.unitCost?.amount ?? null,
+        });
+      }
+
+      hasNextPage = data.productVariants.pageInfo.hasNextPage;
+      cursor = data.productVariants.pageInfo.endCursor;
+    }
+  }
+
+  return bySku;
+}
+
+const PRODUCT_METAFIELD_BY_SKU_QUERY = `
+query ProductMetafieldBySku($query: String!, $cursor: String, $namespace: String!, $key: String!) {
+  productVariants(first: 100, query: $query, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      sku
+      product {
+        metafield(namespace: $namespace, key: $key) { value }
+      }
+    }
+  }
+}`;
+
+interface ProductMetafieldQueryData {
+  productVariants: {
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
+    nodes: Array<{
+      sku: string | null;
+      product: { metafield: { value: string } | null } | null;
+    }>;
+  };
+}
+
+/**
+ * Fetch a single PRODUCT metafield value for a set of variant SKUs.
+ *
+ * Used to surface the DonorPerfect "G/L Account" product metafield
+ * (namespace `donorperfect`, key `gl_account`) on the order exports.
+ *
+ * Returns a Map keyed by lower-cased SKU → metafield value. SKUs whose product
+ * has no such metafield (or no matching variant) simply won't appear in the map.
+ */
+export async function fetchProductMetafieldBySkus(
+  shop: string,
+  accessToken: string,
+  skus: string[],
+  namespace: string,
+  key: string,
+): Promise<Map<string, string>> {
+  const bySku = new Map<string, string>();
+
+  // Shopify search query length is bounded; query SKUs in modest chunks.
+  const CHUNK = 25;
+  for (let i = 0; i < skus.length; i += CHUNK) {
+    const chunk = skus.slice(i, i + CHUNK);
+    const query = chunk.map(escapeSkuTerm).join(' OR ');
+
+    let cursor: string | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const data: ProductMetafieldQueryData = await shopifyGraphQL<ProductMetafieldQueryData>(
+        shop,
+        accessToken,
+        PRODUCT_METAFIELD_BY_SKU_QUERY,
+        { query, cursor, namespace, key },
+        'Fetch product metafield by SKU',
+      );
+
+      for (const node of data.productVariants.nodes) {
+        const sku = node.sku && node.sku.trim() !== '' ? node.sku.trim() : null;
+        const value = node.product?.metafield?.value;
+        if (sku && value != null && value !== '') {
+          bySku.set(sku.toLowerCase(), value);
+        }
+      }
+
+      hasNextPage = data.productVariants.pageInfo.hasNextPage;
+      cursor = data.productVariants.pageInfo.endCursor;
+    }
+  }
+
+  return bySku;
+}
+
 const UPDATE_COST_MUTATION = `
 mutation SetCost($id: ID!, $input: InventoryItemInput!) {
   inventoryItemUpdate(id: $id, input: $input) {

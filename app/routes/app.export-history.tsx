@@ -75,9 +75,11 @@ export default function ExportHistory() {
   const [sortField, setSortField] = useState<'filename' | 'reportType' | 'reportDate' | 'created' | 'size'>('created');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  // Download handler
+  // Download handler.
+  // Use the app's own origin (the deployment serving this page) instead of a hardcoded
+  // host, so downloads work on any deployment/store (e.g. Longyear), not just one.
   const handleDownload = (filename: string) => {
-    const url = `https://sage50-sync.four13.dev/api/download-csv?shop=${shop}&filename=${filename}`;
+    const url = `${window.location.origin}/api/download-csv?shop=${encodeURIComponent(shop)}&filename=${encodeURIComponent(filename)}`;
     window.open(url, '_blank');
   };
 

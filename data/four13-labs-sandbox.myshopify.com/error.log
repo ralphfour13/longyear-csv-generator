@@ -1,0 +1,7 @@
+{"timestamp":"2026-06-10T09:27:47.508Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-09"}
+{"timestamp":"2026-06-10T09:27:47.530Z","level":"info","context":"Export","message":"Reconciling orders by capture date: 2026-06-09..."}
+{"timestamp":"2026-06-10T09:27:48.811Z","level":"info","context":"Export","message":"Reconciled 0 orders with 0 captures"}
+{"timestamp":"2026-06-10T09:27:48.823Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-10T09:27:48.829Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-10T09:27:48.840Z","level":"error","context":"Export","message":"No journal entries generated"}
+{"timestamp":"2026-06-10T09:27:48.854Z","level":"error","context":"Export","message":"No journal entries generated","stack":"Error: No journal entries generated\n    at processExport (C:/Work/sage50-journal-entry-sync/app/services/batch-processor.server.ts:127:13)\n    at processJob (C:/Work/sage50-journal-entry-sync/app/services/job-processor.server.ts:114:22)\n    at processPendingJobs (C:/Work/sage50-journal-entry-sync/app/services/job-processor.server.ts:175:9)"}

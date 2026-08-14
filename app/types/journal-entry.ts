@@ -143,7 +143,17 @@ export interface Order {
   financialStatus: string; // "paid", "pending", "refunded", etc.
   closedAt?: string; // ISO timestamp when order was closed (fully paid + fulfilled)
   fulfilledAt?: string; // ISO timestamp of last fulfillment (actual ship date)
-  sourceName?: string; // "pos", "web", "shopify_draft_order", etc.
+  sourceName?: string; // "pos", "web", "shopify_draft_order", etc. (used as Channel)
+  customerName?: string; // Customer display name ("First Last")
+  customerId?: string; // Shopify customer id
+  customerFirstName?: string; // Customer first name
+  customerLastName?: string; // Customer last name
+  paymentTerms?: string; // Payment terms name (e.g. "Net 30"), if any
+  taxLines?: Array<{ title: string; rate: number; price: Decimal }>; // Order-level tax lines
+  tags?: string; // Comma-separated order tags
+  fulfillmentStatus?: string; // "fulfilled", "partial", "unfulfilled", etc.
+  deliveryStatus?: string; // Latest fulfillment shipment_status (often empty)
+  deliveryMethod?: string; // Shipping line title ("Standard", "Shipping not required", etc.)
   lineItems: OrderLineItem[];
   transactions?: Transaction[]; // Payment transactions
   refunds?: Refund[]; // Refund details (for proper tax splitting)
@@ -259,7 +269,7 @@ export interface ExportHistoryEntry {
  * Metadata for a single generated file in multi-file export
  */
 export interface GeneratedFile {
-  type: 'daily-sales' | 'payouts-orders' | 'journal-entries-details' | 'journal-entry-summary' | 'daily-reconciliation' | 'error-report' | 'cogs-details' | 'order-json' | 'error-orders-json';
+  type: 'daily-sales' | 'payouts-orders' | 'products-orders' | 'receipts' | 'journal-entries-details' | 'journal-entry-summary' | 'daily-reconciliation' | 'error-report' | 'cogs-details' | 'order-json' | 'error-orders-json';
   filename: string;
   downloadUrl: string;
   rowCount: number;
@@ -325,6 +335,18 @@ export interface EnrichedTransaction {
     hasActualRefunds?: boolean; // True if order has actual refunds (not just cancellations)
     isMultiCaptureSplit?: boolean; // True if this order's captures are split across multiple dates
     outstandingAuths?: Array<{ gateway: string; amount: string; date: string }>; // CC auths with no capture
+    // Order-view fields (used by Products/Payouts-with-Orders order summary)
+    customerName?: string; // Customer display name ("First Last")
+    customerId?: string; // Shopify customer id
+    customerFirstName?: string; // Customer first name
+    customerLastName?: string; // Customer last name
+    paymentTerms?: string; // Payment terms name (e.g. "Net 30"), if any
+    taxLines?: Array<{ title: string; rate: number; price: Decimal }>; // Order-level tax lines
+    tags?: string; // Comma-separated order tags
+    sourceName?: string; // Sales channel / source ("web", "pos", ...)
+    fulfillmentStatus?: string; // "fulfilled", "partial", "unfulfilled", etc.
+    deliveryStatus?: string; // Latest fulfillment shipment_status (often empty)
+    deliveryMethod?: string; // Shipping line title
   };
 
   // Enriched data for Daily Sales Report

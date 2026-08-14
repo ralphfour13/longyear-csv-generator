@@ -41,8 +41,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const zip = new AdmZip();
     let filesAdded = 0;
 
+    // The zip should contain ONLY the two order-level reports.
+    const ZIP_FILE_TYPES = new Set(['payouts-orders', 'products-orders', 'receipts']);
+
     for (const file of job.result.files) {
       const filename = file.filename;
+
+      // Only bundle the allowed report types into the zip.
+      if (!ZIP_FILE_TYPES.has(file.type)) {
+        console.log(`Excluding from zip (type=${file.type}): ${filename}`);
+        continue;
+      }
 
       // Validate filename
       const validExtensions = ['.csv', '.txt', '.json'];

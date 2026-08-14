@@ -1,0 +1,410 @@
+{"timestamp":"2026-06-23T12:03:45.427Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-22"}
+{"timestamp":"2026-06-23T12:03:45.469Z","level":"info","context":"Export","message":"Reconciling orders by capture date: 2026-06-22..."}
+{"timestamp":"2026-06-23T12:24:59.114Z","level":"info","context":"Export","message":"Reconciled 0 orders with 0 captures"}
+{"timestamp":"2026-06-23T12:24:59.134Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-23T12:28:23.933Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-23T12:28:23.936Z","level":"error","context":"Export","message":"No journal entries generated"}
+{"timestamp":"2026-06-23T12:28:23.945Z","level":"error","context":"Export","message":"No journal entries generated","stack":"Error: No journal entries generated\n    at processExport (C:/Work/sage50-journal-entry-sync/app/services/batch-processor.server.ts:127:13)\n    at processJob (C:/Work/sage50-journal-entry-sync/app/services/job-processor.server.ts:114:22)\n    at processPendingJobs (C:/Work/sage50-journal-entry-sync/app/services/job-processor.server.ts:175:9)"}
+{"timestamp":"2026-06-23T12:28:23.981Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-14"}
+{"timestamp":"2026-06-23T12:28:23.987Z","level":"info","context":"Export","message":"Reconciling orders by capture date: 2026-06-14..."}
+{"timestamp":"2026-06-23T12:32:32.413Z","level":"info","context":"Export","message":"Starting order-centric export (by order date) for 2026-06-14"}
+{"timestamp":"2026-06-23T12:32:32.434Z","level":"info","context":"Export","message":"Reconciling orders by order date: 2026-06-14..."}
+{"timestamp":"2026-06-23T12:50:29.206Z","level":"info","context":"Export","message":"Starting order-centric export (by order date) for 2026-06-14"}
+{"timestamp":"2026-06-23T12:50:29.226Z","level":"info","context":"Export","message":"Reconciling orders by order date: 2026-06-14..."}
+{"timestamp":"2026-06-23T12:50:41.178Z","level":"info","context":"Export","message":"Reconciled 1454 orders with 1454 captures"}
+{"timestamp":"2026-06-23T12:50:41.194Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-23T12:52:15.428Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-23T12:52:15.463Z","level":"info","context":"Export","message":"Generated 3056 journal entries"}
+{"timestamp":"2026-06-23T12:52:15.476Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-23T12:52:15.488Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-23T12:52:15.512Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-23T12:52:15.527Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$235561.88, Credits=$235561.88"}
+{"timestamp":"2026-06-23T12:52:15.534Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-23T12:52:16.201Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1454 clean / 1454 total orders)"}
+{"timestamp":"2026-06-23T12:52:21.327Z","level":"warning","context":"Metrics","message":"Failed to save metrics: \nInvalid `prisma.reconciliationMetric.upsert()` invocation:\n\n\nCan't reach database server at `ep-still-star-ao7l3sx6-pooler.c-2.ap-southeast-1.aws.neon.tech:5432`\n\nPlease make sure your database server is running at `ep-still-star-ao7l3sx6-pooler.c-2.ap-southeast-1.aws.neon.tech:5432`."}
+{"timestamp":"2026-06-23T12:52:21.330Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-23T12:52:21.360Z","level":"info","context":"Export","message":"Generating Detailed Sales Report..."}
+{"timestamp":"2026-06-23T12:52:21.388Z","level":"info","context":"Export","message":"Detailed Sales Report saved: detailed-sales-report_2026-06-14.csv"}
+{"timestamp":"2026-06-23T12:52:21.419Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-23T12:52:21.462Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-23T12:52:21.520Z","level":"info","context":"Export","message":"Generating Journal Entry Details..."}
+{"timestamp":"2026-06-23T12:52:21.591Z","level":"info","context":"Export","message":"Journal Entry Details saved: journal-entry-details_2026-06-14.csv"}
+{"timestamp":"2026-06-23T12:52:21.614Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-23T12:52:21.676Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-23T12:52:21.689Z","level":"info","context":"Export","message":"Generating Daily Reconciliation Report..."}
+{"timestamp":"2026-06-23T12:52:21.777Z","level":"info","context":"Export","message":"Daily Reconciliation Report saved: daily-reconciliation_2026-06-14.csv"}
+{"timestamp":"2026-06-23T12:52:21.817Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-23T12:52:21.893Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1454 orders)"}
+{"timestamp":"2026-06-23T12:52:21.912Z","level":"info","context":"Export","message":"Export complete: 7 files generated","details":{"entryCount":3056,"balanced":true,"targetDate":"2026-06-14","files":["detailed-sales-report_2026-06-14.csv","payouts-with-orders_2026-06-14.csv","journal-entry-details_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","daily-reconciliation_2026-06-14.csv","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-23T12:52:21.922Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-23T12:55:38.464Z","level":"info","context":"State Tracking","message":"Saved 1454 order snapshots"}
+{"timestamp":"2026-06-23T13:02:57.094Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-14"}
+{"timestamp":"2026-06-23T13:02:57.122Z","level":"info","context":"Export","message":"Reconciling orders by capture date: 2026-06-14..."}
+{"timestamp":"2026-06-23T13:09:24.253Z","level":"info","context":"Export","message":"Reconciled 1452 orders with 1452 captures"}
+{"timestamp":"2026-06-23T13:09:24.256Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-23T13:12:53.320Z","level":"warning","context":"State Tracking","message":"1454 orders have changed since last export (1454 need re-export)"}
+{"timestamp":"2026-06-23T13:12:53.353Z","level":"info","context":"Export","message":"Generated 3050 journal entries"}
+{"timestamp":"2026-06-23T13:12:53.378Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-23T13:12:53.389Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-23T13:12:53.425Z","level":"error","context":"Validation","message":"Entry validation failed","details":["Journal entries do not balance: Total amount = 0.06 (should be 0.00)"]}
+{"timestamp":"2026-06-23T13:12:53.447Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-23T13:12:53.477Z","level":"error","context":"Journal Balance","message":"⚠️ Journal entries are IMBALANCED: Debits=$235141.93, Credits=$235141.87, Difference=$0.06"}
+{"timestamp":"2026-06-23T13:12:53.493Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-23T13:12:56.521Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1807 clean / 1807 total orders)"}
+{"timestamp":"2026-06-23T13:12:57.621Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-23T13:12:57.630Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-23T13:12:57.643Z","level":"info","context":"Export","message":"Generating Detailed Sales Report..."}
+{"timestamp":"2026-06-23T13:12:57.716Z","level":"info","context":"Export","message":"Detailed Sales Report saved: detailed-sales-report_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:12:57.727Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-23T13:12:57.775Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:12:57.781Z","level":"info","context":"Export","message":"Generating Journal Entry Details..."}
+{"timestamp":"2026-06-23T13:12:57.809Z","level":"info","context":"Export","message":"Journal Entry Details saved: journal-entry-details_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:12:57.820Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-23T13:12:57.867Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-23T13:12:57.874Z","level":"info","context":"Export","message":"Generating Daily Reconciliation Report..."}
+{"timestamp":"2026-06-23T13:12:57.953Z","level":"info","context":"Export","message":"Daily Reconciliation Report saved: daily-reconciliation_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:12:57.990Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-23T13:12:58.089Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1807 orders)"}
+{"timestamp":"2026-06-23T13:12:58.115Z","level":"info","context":"Export","message":"Export complete: 7 files generated","details":{"entryCount":3050,"balanced":false,"targetDate":"2026-06-14","files":["detailed-sales-report_2026-06-14.csv","payouts-with-orders_2026-06-14.csv","journal-entry-details_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","daily-reconciliation_2026-06-14.csv","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-23T13:12:58.124Z","level":"error","context":"Export","message":"Export completed with errors","details":["Payment total mismatch for order 234831: Payments=87.44, OrderTotal=87.42, Diff=0.02","Failed to process order 234831: Journal entry validation failed for SO-234831: Reference SO-234831 does not balance: Debits=87.44, Credits=87.42, Diff=0.02","Payment total mismatch for order 235354: Payments=332.67, OrderTotal=332.65, Diff=0.02","Failed to process order 235354: Journal entry validation failed for SO-235354: Reference SO-235354 does not balance: Debits=332.67, Credits=332.65, Diff=0.02","Payment total mismatch for order 235180: Payments=117.97, OrderTotal=117.91, Diff=0.06","Journal entries do not balance. Difference: 0.06 (Debit: 235141.93, Credit: 235141.87)","Journal entries do not balance: Total amount = 0.06 (should be 0.00)","⚠️ Journal entries are IMBALANCED: Debits=$235141.93, Credits=$235141.87, Difference=$0.06"]}
+{"timestamp":"2026-06-23T13:12:58.139Z","level":"warning","context":"Export","message":"Export completed with warnings","details":["⚠️ Order 235472 (6658146140357) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234288 (6658146107589) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235471 (6658145976517) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234287 (6658145943749) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235470 (6658145845445) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234286 (6658145812677) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235192 (6658142175429) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234139 (6658142142661) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234723 (6658139652293) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234263 (6658139521221) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 233968 (6658139488453) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235245 (6658139455685) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235126 (6658139422917) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235130 (6658139390149) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235032 (6658139324613) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234305 (6658139259077) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234186 (6658139226309) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234179 (6658139160773) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 233897 (6658138734789) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234237 (6658138702021) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235246 (6658138669253) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235249 (6658138636485) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234178 (6658138603717) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234184 (6658134474949) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234185 (6658134409413) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234183 (6658134376645) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234203 (6658128511173) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 900 (6657908408517) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 897 (6657908342981) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 796 (6657904705733) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 795 (6657904640197) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 797 (6657904607429) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 794 (6657904574661) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 793 (6657904541893) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 792 (6657904509125) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 791 (6657904476357) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 674 (6657899004101) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 672 (6657898938565) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 661 (6657898741957) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 657 (6657898512581) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 544 (6657894744261) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 543 (6657894678725) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 508 (6657893433541) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 509 (6657893368005) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 493 (6657892876485) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 483 (6657892483269) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 457 (6657891664069) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 456 (6657891565765) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 455 (6657891532997) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 413 (6657889927365) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 265 (6657882554565) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 262 (6657882423493) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 182 (6657879507141) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 174 (6657879343301) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 103 (6657877049541) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 96 (6657876754629) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00"]}
+{"timestamp":"2026-06-23T13:12:58.157Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-23T13:13:40.259Z","level":"info","context":"Export","message":"Reconciled 1452 orders with 1452 captures"}
+{"timestamp":"2026-06-23T13:13:40.267Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-23T13:15:58.025Z","level":"warning","context":"State Tracking","message":"1411 orders have changed since last export (1411 need re-export)"}
+{"timestamp":"2026-06-23T13:15:58.045Z","level":"info","context":"Export","message":"Generated 3050 journal entries"}
+{"timestamp":"2026-06-23T13:15:58.051Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-23T13:15:58.065Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-23T13:15:58.079Z","level":"error","context":"Validation","message":"Entry validation failed","details":["Journal entries do not balance: Total amount = 0.06 (should be 0.00)"]}
+{"timestamp":"2026-06-23T13:15:58.089Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-23T13:15:58.100Z","level":"error","context":"Journal Balance","message":"⚠️ Journal entries are IMBALANCED: Debits=$235141.93, Credits=$235141.87, Difference=$0.06"}
+{"timestamp":"2026-06-23T13:15:58.108Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-23T13:16:00.600Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1807 clean / 1807 total orders)"}
+{"timestamp":"2026-06-23T13:16:00.847Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-23T13:16:00.881Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-23T13:16:00.949Z","level":"info","context":"Export","message":"Generating Detailed Sales Report..."}
+{"timestamp":"2026-06-23T13:16:01.018Z","level":"info","context":"Export","message":"Detailed Sales Report saved: detailed-sales-report_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:16:01.026Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-23T13:16:01.061Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:16:01.072Z","level":"info","context":"Export","message":"Generating Journal Entry Details..."}
+{"timestamp":"2026-06-23T13:16:01.099Z","level":"info","context":"Export","message":"Journal Entry Details saved: journal-entry-details_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:16:01.114Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-23T13:16:01.148Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-23T13:16:01.156Z","level":"info","context":"Export","message":"Generating Daily Reconciliation Report..."}
+{"timestamp":"2026-06-23T13:16:01.221Z","level":"info","context":"Export","message":"Daily Reconciliation Report saved: daily-reconciliation_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:16:01.231Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-23T13:16:01.309Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1807 orders)"}
+{"timestamp":"2026-06-23T13:16:01.332Z","level":"info","context":"Export","message":"Export complete: 7 files generated","details":{"entryCount":3050,"balanced":false,"targetDate":"2026-06-14","files":["detailed-sales-report_2026-06-14.csv","payouts-with-orders_2026-06-14.csv","journal-entry-details_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","daily-reconciliation_2026-06-14.csv","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-23T13:16:01.340Z","level":"error","context":"Export","message":"Export completed with errors","details":["Payment total mismatch for order 234831: Payments=87.44, OrderTotal=87.42, Diff=0.02","Failed to process order 234831: Journal entry validation failed for SO-234831: Reference SO-234831 does not balance: Debits=87.44, Credits=87.42, Diff=0.02","Payment total mismatch for order 235354: Payments=332.67, OrderTotal=332.65, Diff=0.02","Failed to process order 235354: Journal entry validation failed for SO-235354: Reference SO-235354 does not balance: Debits=332.67, Credits=332.65, Diff=0.02","Payment total mismatch for order 235180: Payments=117.97, OrderTotal=117.91, Diff=0.06","Journal entries do not balance. Difference: 0.06 (Debit: 235141.93, Credit: 235141.87)","Journal entries do not balance: Total amount = 0.06 (should be 0.00)","⚠️ Journal entries are IMBALANCED: Debits=$235141.93, Credits=$235141.87, Difference=$0.06"]}
+{"timestamp":"2026-06-23T13:16:01.350Z","level":"warning","context":"Export","message":"Export completed with warnings","details":["⚠️ Order 235472 (6658146140357) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234288 (6658146107589) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235471 (6658145976517) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234287 (6658145943749) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235470 (6658145845445) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234286 (6658145812677) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235192 (6658142175429) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234139 (6658142142661) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234723 (6658139652293) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234263 (6658139521221) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 233968 (6658139488453) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235245 (6658139455685) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235126 (6658139422917) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235130 (6658139390149) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235032 (6658139324613) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234305 (6658139259077) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234186 (6658139226309) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234179 (6658139160773) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 233897 (6658138734789) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234237 (6658138702021) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235246 (6658138669253) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235249 (6658138636485) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234178 (6658138603717) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234184 (6658134474949) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234185 (6658134409413) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234183 (6658134376645) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234203 (6658128511173) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 900 (6657908408517) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 897 (6657908342981) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 796 (6657904705733) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 795 (6657904640197) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 797 (6657904607429) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 794 (6657904574661) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 793 (6657904541893) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 792 (6657904509125) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 791 (6657904476357) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 674 (6657899004101) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 672 (6657898938565) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 661 (6657898741957) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 657 (6657898512581) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 544 (6657894744261) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 543 (6657894678725) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 508 (6657893433541) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 509 (6657893368005) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 493 (6657892876485) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 483 (6657892483269) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 457 (6657891664069) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 456 (6657891565765) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 455 (6657891532997) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 413 (6657889927365) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 265 (6657882554565) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 262 (6657882423493) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 182 (6657879507141) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 174 (6657879343301) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 103 (6657877049541) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 96 (6657876754629) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00"]}
+{"timestamp":"2026-06-23T13:16:01.355Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-23T13:17:43.404Z","level":"info","context":"State Tracking","message":"Saved 1807 order snapshots"}
+{"timestamp":"2026-06-23T13:20:15.804Z","level":"info","context":"State Tracking","message":"Saved 1807 order snapshots"}
+{"timestamp":"2026-06-23T13:44:37.333Z","level":"info","context":"Export","message":"Reconciled 1452 orders with 1452 captures"}
+{"timestamp":"2026-06-23T13:44:37.346Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-23T13:46:44.999Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-23T13:46:45.021Z","level":"info","context":"Export","message":"Generated 3050 journal entries"}
+{"timestamp":"2026-06-23T13:46:45.040Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-23T13:46:45.063Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-23T13:46:45.087Z","level":"error","context":"Validation","message":"Entry validation failed","details":["Journal entries do not balance: Total amount = 0.06 (should be 0.00)"]}
+{"timestamp":"2026-06-23T13:46:45.097Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-23T13:46:45.108Z","level":"error","context":"Journal Balance","message":"⚠️ Journal entries are IMBALANCED: Debits=$235141.93, Credits=$235141.87, Difference=$0.06"}
+{"timestamp":"2026-06-23T13:46:45.111Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-23T13:46:46.049Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1807 clean / 1807 total orders)"}
+{"timestamp":"2026-06-23T13:46:46.708Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-23T13:46:46.723Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-23T13:46:46.773Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-23T13:46:46.829Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:46:46.842Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-23T13:46:46.866Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-23T13:46:46.873Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-23T13:46:46.920Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1807 orders)"}
+{"timestamp":"2026-06-23T13:46:46.938Z","level":"info","context":"Export","message":"Export complete: 4 files generated","details":{"entryCount":3050,"balanced":false,"targetDate":"2026-06-14","files":["payouts-with-orders_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-23T13:46:46.944Z","level":"error","context":"Export","message":"Export completed with errors","details":["Payment total mismatch for order 234831: Payments=87.44, OrderTotal=87.42, Diff=0.02","Failed to process order 234831: Journal entry validation failed for SO-234831: Reference SO-234831 does not balance: Debits=87.44, Credits=87.42, Diff=0.02","Payment total mismatch for order 235354: Payments=332.67, OrderTotal=332.65, Diff=0.02","Failed to process order 235354: Journal entry validation failed for SO-235354: Reference SO-235354 does not balance: Debits=332.67, Credits=332.65, Diff=0.02","Payment total mismatch for order 235180: Payments=117.97, OrderTotal=117.91, Diff=0.06","Journal entries do not balance. Difference: 0.06 (Debit: 235141.93, Credit: 235141.87)","Journal entries do not balance: Total amount = 0.06 (should be 0.00)","⚠️ Journal entries are IMBALANCED: Debits=$235141.93, Credits=$235141.87, Difference=$0.06"]}
+{"timestamp":"2026-06-23T13:46:46.958Z","level":"warning","context":"Export","message":"Export completed with warnings","details":["⚠️ Order 235472 (6658146140357) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234288 (6658146107589) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235471 (6658145976517) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234287 (6658145943749) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235470 (6658145845445) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234286 (6658145812677) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235192 (6658142175429) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234139 (6658142142661) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234723 (6658139652293) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234263 (6658139521221) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 233968 (6658139488453) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235245 (6658139455685) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235126 (6658139422917) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235130 (6658139390149) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235032 (6658139324613) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234305 (6658139259077) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234186 (6658139226309) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234179 (6658139160773) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 233897 (6658138734789) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234237 (6658138702021) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235246 (6658138669253) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 235249 (6658138636485) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234178 (6658138603717) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234184 (6658134474949) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234185 (6658134409413) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234183 (6658134376645) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 234203 (6658128511173) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 900 (6657908408517) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 897 (6657908342981) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 796 (6657904705733) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 795 (6657904640197) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 797 (6657904607429) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 794 (6657904574661) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 793 (6657904541893) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 792 (6657904509125) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 791 (6657904476357) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 674 (6657899004101) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 672 (6657898938565) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 661 (6657898741957) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 657 (6657898512581) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 544 (6657894744261) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 543 (6657894678725) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 508 (6657893433541) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 509 (6657893368005) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 493 (6657892876485) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 483 (6657892483269) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 457 (6657891664069) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 456 (6657891565765) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 455 (6657891532997) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 413 (6657889927365) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 265 (6657882554565) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 262 (6657882423493) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 182 (6657879507141) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 174 (6657879343301) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 103 (6657877049541) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00","⚠️ Order 96 (6657876754629) has NO transactions - possible fetch failure. Financial status: paid, Total: $0.00"]}
+{"timestamp":"2026-06-23T13:46:46.962Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-23T13:51:10.740Z","level":"info","context":"State Tracking","message":"Saved 1807 order snapshots"}
+{"timestamp":"2026-06-23T13:55:50.182Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-14"}
+{"timestamp":"2026-06-23T13:55:50.206Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-14..."}
+{"timestamp":"2026-06-23T13:55:59.132Z","level":"info","context":"Export","message":"Reconciled 1454 orders with 1454 captures"}
+{"timestamp":"2026-06-23T13:55:59.165Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-23T13:57:45.863Z","level":"warning","context":"State Tracking","message":"1454 orders have changed since last export (1454 need re-export)"}
+{"timestamp":"2026-06-23T13:57:45.887Z","level":"info","context":"Export","message":"Generated 3056 journal entries"}
+{"timestamp":"2026-06-23T13:57:45.903Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-23T13:57:45.924Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-23T13:57:45.964Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-23T13:57:45.978Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$235561.88, Credits=$235561.88"}
+{"timestamp":"2026-06-23T13:57:45.987Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-23T13:57:47.092Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1454 clean / 1454 total orders)"}
+{"timestamp":"2026-06-23T13:57:47.732Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-23T13:57:47.758Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-23T13:57:47.849Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-23T13:57:47.882Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-23T13:57:47.891Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-23T13:57:47.924Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-23T13:57:47.934Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-23T13:57:47.985Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1454 orders)"}
+{"timestamp":"2026-06-23T13:57:48.008Z","level":"info","context":"Export","message":"Export complete: 4 files generated","details":{"entryCount":3056,"balanced":true,"targetDate":"2026-06-14","files":["payouts-with-orders_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-23T13:57:48.018Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-23T14:01:17.638Z","level":"info","context":"State Tracking","message":"Saved 1454 order snapshots"}
+{"timestamp":"2026-06-24T10:20:23.794Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-14"}
+{"timestamp":"2026-06-24T10:20:23.815Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-14..."}
+{"timestamp":"2026-06-24T10:20:40.821Z","level":"info","context":"Export","message":"Reconciled 1454 orders with 1454 captures"}
+{"timestamp":"2026-06-24T10:20:40.876Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-24T10:23:31.847Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-24T10:23:31.857Z","level":"info","context":"Export","message":"Generated 3056 journal entries"}
+{"timestamp":"2026-06-24T10:23:31.869Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-24T10:23:31.876Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-24T10:23:31.910Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-24T10:23:31.922Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$235561.88, Credits=$235561.88"}
+{"timestamp":"2026-06-24T10:23:31.931Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-24T10:23:32.680Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1454 clean / 1454 total orders)"}
+{"timestamp":"2026-06-24T10:23:33.354Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-24T10:23:33.365Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-24T10:23:33.395Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-24T10:23:33.449Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-24T10:23:33.469Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-24T10:23:33.530Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-24T10:23:33.555Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-24T10:23:33.622Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1454 orders)"}
+{"timestamp":"2026-06-24T10:23:33.666Z","level":"info","context":"Export","message":"Export complete: 4 files generated","details":{"entryCount":3056,"balanced":true,"targetDate":"2026-06-14","files":["payouts-with-orders_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-24T10:23:33.673Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-24T10:27:43.538Z","level":"info","context":"State Tracking","message":"Saved 1454 order snapshots"}
+{"timestamp":"2026-06-24T12:39:18.221Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-14"}
+{"timestamp":"2026-06-24T12:39:18.257Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-14..."}
+{"timestamp":"2026-06-24T12:39:43.118Z","level":"info","context":"Export","message":"Reconciled 1454 orders with 1454 captures"}
+{"timestamp":"2026-06-24T12:39:43.133Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-24T12:41:16.101Z","level":"warning","context":"State Tracking","message":"1454 orders have changed since last export"}
+{"timestamp":"2026-06-24T12:41:16.123Z","level":"info","context":"Export","message":"Generated 3056 journal entries"}
+{"timestamp":"2026-06-24T12:41:16.137Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-24T12:41:16.144Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-24T12:41:16.207Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-24T12:41:16.235Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$235561.88, Credits=$235561.88"}
+{"timestamp":"2026-06-24T12:41:16.245Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-24T12:41:17.136Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1454 clean / 1454 total orders)"}
+{"timestamp":"2026-06-24T12:41:18.147Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-24T12:41:18.156Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-24T12:41:18.201Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-24T12:41:18.290Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-24T12:41:18.300Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-24T12:41:18.388Z","level":"info","context":"Export","message":"Products with Orders saved: products-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-24T12:41:18.425Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-24T12:41:18.487Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-24T12:41:18.509Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-24T12:41:18.593Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1454 orders)"}
+{"timestamp":"2026-06-24T12:41:18.697Z","level":"info","context":"Export","message":"Export complete: 5 files generated","details":{"entryCount":3056,"balanced":true,"targetDate":"2026-06-14","files":["payouts-with-orders_2026-06-14.csv","products-with-orders_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-24T12:41:18.704Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-24T12:44:28.022Z","level":"info","context":"State Tracking","message":"Saved 1454 order snapshots"}
+{"timestamp":"2026-06-25T09:06:13.118Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-14"}
+{"timestamp":"2026-06-25T09:06:13.145Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-14..."}
+{"timestamp":"2026-06-25T09:06:36.581Z","level":"info","context":"Export","message":"Reconciled 1454 orders with 1454 captures"}
+{"timestamp":"2026-06-25T09:06:36.596Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-25T09:08:12.527Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-25T09:08:12.540Z","level":"info","context":"Export","message":"Generated 3056 journal entries"}
+{"timestamp":"2026-06-25T09:08:12.553Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-25T09:08:12.585Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-25T09:08:12.650Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-25T09:08:12.669Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$235561.88, Credits=$235561.88"}
+{"timestamp":"2026-06-25T09:08:12.677Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-25T09:08:13.730Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1454 clean / 1454 total orders)"}
+{"timestamp":"2026-06-25T09:08:14.508Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-25T09:08:14.514Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-25T09:08:14.635Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-25T09:08:15.072Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-25T09:08:15.095Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-25T09:08:15.601Z","level":"info","context":"Export","message":"Products with Orders saved: products-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-25T09:08:15.640Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-25T09:08:15.703Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-25T09:08:15.719Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-25T09:08:15.777Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1454 orders)"}
+{"timestamp":"2026-06-25T09:08:15.798Z","level":"info","context":"Export","message":"Export complete: 5 files generated","details":{"entryCount":3056,"balanced":true,"targetDate":"2026-06-14","files":["payouts-with-orders_2026-06-14.csv","products-with-orders_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-25T09:08:15.812Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-25T09:11:27.177Z","level":"info","context":"State Tracking","message":"Saved 1454 order snapshots"}
+{"timestamp":"2026-06-25T09:35:13.923Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-14"}
+{"timestamp":"2026-06-25T09:35:13.940Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-14..."}
+{"timestamp":"2026-06-25T09:35:24.151Z","level":"info","context":"Export","message":"Reconciled 1454 orders with 1454 captures"}
+{"timestamp":"2026-06-25T09:35:24.187Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-25T09:38:17.404Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-25T09:38:17.443Z","level":"info","context":"Export","message":"Generated 3056 journal entries"}
+{"timestamp":"2026-06-25T09:38:17.466Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-25T09:38:17.483Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-25T09:38:17.516Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-25T09:38:17.531Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$235561.88, Credits=$235561.88"}
+{"timestamp":"2026-06-25T09:38:17.536Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-25T09:38:18.463Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (1454 clean / 1454 total orders)"}
+{"timestamp":"2026-06-25T09:38:19.092Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-14"}
+{"timestamp":"2026-06-25T09:38:19.119Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-25T09:38:19.146Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-25T09:38:19.772Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-25T09:38:19.788Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-25T09:38:20.108Z","level":"info","context":"Export","message":"Products with Orders saved: products-with-orders_2026-06-14.csv"}
+{"timestamp":"2026-06-25T09:38:20.119Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-25T09:38:20.164Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-14.csv and journal-entry_2026-06-14.txt"}
+{"timestamp":"2026-06-25T09:38:20.175Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-25T09:38:20.242Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-14.json (1454 orders)"}
+{"timestamp":"2026-06-25T09:38:20.291Z","level":"info","context":"Export","message":"Export complete: 5 files generated","details":{"entryCount":3056,"balanced":true,"targetDate":"2026-06-14","files":["payouts-with-orders_2026-06-14.csv","products-with-orders_2026-06-14.csv","journal-entry_2026-06-14.csv","journal-entry_2026-06-14.txt","order-data_2026-06-14.json"]}}
+{"timestamp":"2026-06-25T09:38:20.295Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-25T09:42:38.325Z","level":"info","context":"State Tracking","message":"Saved 1454 order snapshots"}
+{"timestamp":"2026-06-25T10:51:11.415Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-06-25T10:51:11.440Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-06-25T10:51:19.454Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-06-25T10:51:19.468Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-25T10:51:38.973Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-25T10:51:39.026Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-06-25T10:51:39.035Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-25T10:51:39.049Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-25T10:51:39.073Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-25T10:51:39.088Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-06-25T10:51:39.095Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-25T10:51:39.124Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-06-25T10:51:39.774Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-06-25T10:51:39.801Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-25T10:51:39.835Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-25T10:51:39.984Z","level":"info","context":"Export","message":"Payouts with Orders saved: payouts-with-orders_2026-06-15.csv"}
+{"timestamp":"2026-06-25T10:51:40.029Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-25T10:51:42.803Z","level":"info","context":"Export","message":"Products with Orders saved: products-with-orders_2026-06-15.csv"}
+{"timestamp":"2026-06-25T10:51:42.872Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-25T10:51:42.957Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-06-25T10:51:42.972Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-25T10:51:43.006Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-06-25T10:51:43.036Z","level":"info","context":"Export","message":"Export complete: 5 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["payouts-with-orders_2026-06-15.csv","products-with-orders_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-06-25T10:51:43.041Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-25T10:52:24.566Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}
+{"timestamp":"2026-06-25T12:20:11.089Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-06-25T12:20:11.104Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-06-25T12:20:14.612Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-06-25T12:20:14.625Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-25T12:20:35.290Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-25T12:20:35.297Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-06-25T12:20:35.301Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-25T12:20:35.307Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-25T12:20:35.339Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-25T12:20:35.360Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-06-25T12:20:35.366Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-25T12:20:35.405Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-06-25T12:20:36.044Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-06-25T12:20:36.083Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-25T12:20:36.130Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-25T12:20:36.306Z","level":"info","context":"Export","message":"Payouts with Orders saved: Income-import_2026-06-15.csv"}
+{"timestamp":"2026-06-25T12:20:36.341Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-25T12:20:38.974Z","level":"info","context":"Export","message":"Products with Orders saved: Store-import_2026-06-15.csv"}
+{"timestamp":"2026-06-25T12:20:39.067Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-25T12:20:39.121Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-06-25T12:20:39.133Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-25T12:20:39.156Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-06-25T12:20:39.173Z","level":"info","context":"Export","message":"Export complete: 5 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-06-25T12:20:39.178Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-25T12:21:20.860Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}
+{"timestamp":"2026-06-25T12:57:26.833Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-06-25T12:57:26.883Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-06-25T12:57:30.055Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-06-25T12:57:30.068Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-25T12:57:54.103Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-25T12:57:54.134Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-06-25T12:57:54.158Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-25T12:57:54.180Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-25T12:57:54.197Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-25T12:57:54.210Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-06-25T12:57:54.217Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-25T12:57:54.247Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-06-25T12:57:54.887Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-06-25T12:57:54.905Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-25T12:57:54.963Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-25T12:57:57.145Z","level":"info","context":"Export","message":"Payouts with Orders saved: Income-import_2026-06-15.csv"}
+{"timestamp":"2026-06-25T12:57:57.194Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-25T12:57:58.947Z","level":"info","context":"Export","message":"Products with Orders saved: Store-import_2026-06-15.csv"}
+{"timestamp":"2026-06-25T12:57:58.973Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-25T12:57:59.013Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-06-25T12:57:59.030Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-25T12:57:59.054Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-06-25T12:57:59.079Z","level":"info","context":"Export","message":"Export complete: 5 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-06-25T12:57:59.083Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-25T12:58:43.072Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}
+{"timestamp":"2026-06-26T08:49:11.144Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-06-26T08:49:11.164Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-06-26T08:49:15.150Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-06-26T08:49:15.158Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-26T08:49:35.655Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-26T08:49:35.668Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-06-26T08:49:35.676Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-26T08:49:35.682Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-26T08:49:35.712Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-26T08:49:35.725Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-06-26T08:49:35.734Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-26T08:49:35.777Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-06-26T08:49:36.548Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-06-26T08:49:36.580Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-26T08:49:36.650Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-26T08:49:39.037Z","level":"info","context":"Export","message":"Payouts with Orders saved: Income-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T08:49:39.085Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-26T08:49:40.961Z","level":"info","context":"Export","message":"Products with Orders saved: Store-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T08:49:40.983Z","level":"info","context":"Export","message":"Generating Receipts..."}
+{"timestamp":"2026-06-26T08:49:41.070Z","level":"info","context":"Export","message":"Receipts saved: Receipts-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T08:49:41.172Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-26T08:49:41.244Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-06-26T08:49:41.257Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-26T08:49:41.402Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-06-26T08:49:41.489Z","level":"info","context":"Export","message":"Export complete: 6 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","Receipts-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-06-26T08:49:41.497Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-26T08:50:23.644Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}
+{"timestamp":"2026-06-26T09:31:33.090Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-25"}
+{"timestamp":"2026-06-26T09:31:33.108Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-25..."}
+{"timestamp":"2026-06-26T09:31:33.768Z","level":"info","context":"Export","message":"Reconciled 0 orders with 0 captures"}
+{"timestamp":"2026-06-26T09:31:33.796Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-26T09:31:33.800Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-26T09:31:33.807Z","level":"error","context":"Export","message":"No journal entries generated"}
+{"timestamp":"2026-06-26T09:31:33.812Z","level":"error","context":"Export","message":"No journal entries generated","stack":"Error: No journal entries generated\n    at processExport (C:/Work/sage50-journal-entry-sync/app/services/batch-processor.server.ts:165:13)\n    at processJob (C:/Work/sage50-journal-entry-sync/app/services/job-processor.server.ts:114:22)\n    at processPendingJobs (C:/Work/sage50-journal-entry-sync/app/services/job-processor.server.ts:175:9)"}
+{"timestamp":"2026-06-26T09:31:51.803Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-06-26T09:31:51.814Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-06-26T09:31:57.484Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-06-26T09:31:57.529Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-26T09:32:17.319Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-26T09:32:17.366Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-06-26T09:32:17.393Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-26T09:32:17.402Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-26T09:32:17.434Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-26T09:32:17.444Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-06-26T09:32:17.452Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-26T09:32:17.481Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-06-26T09:32:18.532Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-06-26T09:32:18.559Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-26T09:32:18.607Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-26T09:32:20.710Z","level":"info","context":"Export","message":"Payouts with Orders saved: Income-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T09:32:20.737Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-26T09:32:22.504Z","level":"info","context":"Export","message":"Products with Orders saved: Store-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T09:32:22.520Z","level":"info","context":"Export","message":"Generating Receipts..."}
+{"timestamp":"2026-06-26T09:34:16.826Z","level":"info","context":"Export","message":"Receipts saved: Receipts-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T09:34:16.863Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-26T09:34:16.913Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-06-26T09:34:16.926Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-26T09:34:16.952Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-06-26T09:34:16.977Z","level":"info","context":"Export","message":"Export complete: 6 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","Receipts-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-06-26T09:34:16.982Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-26T09:34:58.649Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}
+{"timestamp":"2026-06-26T11:52:02.104Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-06-26T11:52:02.120Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-06-26T11:52:09.758Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-06-26T11:52:09.789Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-06-26T11:52:30.193Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-06-26T11:52:30.243Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-06-26T11:52:30.253Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-06-26T11:52:30.268Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-06-26T11:52:30.300Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-06-26T11:52:30.312Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-06-26T11:52:30.320Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-06-26T11:52:30.348Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-06-26T11:52:30.976Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-06-26T11:52:30.999Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-06-26T11:52:31.054Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-06-26T11:52:33.283Z","level":"info","context":"Export","message":"Payouts with Orders saved: Income-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T11:52:33.310Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-06-26T11:52:35.159Z","level":"info","context":"Export","message":"Products with Orders saved: Store-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T11:52:35.176Z","level":"info","context":"Export","message":"Generating Receipts..."}
+{"timestamp":"2026-06-26T11:54:28.564Z","level":"info","context":"Export","message":"Receipts saved: Receipts-import_2026-06-15.csv"}
+{"timestamp":"2026-06-26T11:54:28.618Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-06-26T11:54:28.664Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-06-26T11:54:28.673Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-06-26T11:54:28.704Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-06-26T11:54:28.728Z","level":"info","context":"Export","message":"Export complete: 6 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","Receipts-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-06-26T11:54:28.732Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-06-26T11:55:46.345Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}

@@ -1,0 +1,22 @@
+{
+  "shop": "ahut2z-i6.myshopify.com",
+  "syncEnabled": false,
+  "syncSchedule": "manual",
+  "scheduledTime": "02:00",
+  "autoExportDate": "yesterday",
+  "transactionTypes": {
+    "orders": true,
+    "refunds": true,
+    "payments": true,
+    "inventory": false
+  },
+  "csvFormat": "standard",
+  "emailEnabled": false,
+  "emailRecipients": "",
+  "generateDailySales": false,
+  "generatePayoutsOrders": true,
+  "generateJournalDetails": false,
+  "generateJournalSummary": true,
+  "generateCogsDetails": false,
+  "generateReconciliation": false
+}

@@ -203,9 +203,13 @@ export default function Jobs() {
     }
   };
 
-  // Download handler for job zip
+  // Download handler for job zip.
+  // Use the app's own origin (the deployment serving this page) so the download hits
+  // the same server that created the job — NOT a hardcoded host. A hardcoded host
+  // points every store at one deployment, so other stores (e.g. Longyear) get
+  // "Job not found" because the job/files live on their own deployment.
   const handleDownloadJobZip = (jobId: string) => {
-    const url = `https://sage50-sync.four13.dev/api/download-job-zip?shop=${shop}&jobId=${jobId}`;
+    const url = `${window.location.origin}/api/download-job-zip?shop=${encodeURIComponent(shop)}&jobId=${encodeURIComponent(jobId)}`;
     window.open(url, '_blank');
   };
 
@@ -480,7 +484,8 @@ export default function Jobs() {
                             gap: '6px',
                           }}
                         >
-                          📦 Download ({job.result.files.length} {job.result.files.length === 1 ? 'file' : 'files'})
+                          {/* 📦 Download ({job.result.files.length} {job.result.files.length === 1 ? 'file' : 'files'}) */}
+                          📦 Download (3 files)
                         </button>
                       ) : job.status === 'failed' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

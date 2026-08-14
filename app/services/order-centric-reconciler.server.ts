@@ -9,6 +9,7 @@ import type {
 import type { CogsCalculation } from '../types/cin7';
 import {
   fetchOrdersByCaptureDateRange,
+  fetchOrdersByOrderDate,
   getOrderCaptureDate,
 } from './order-centric-fetcher.server';
 import {
@@ -22,7 +23,10 @@ import {
   validateOrderEntries,
   hasActualRefunds,
   getPointInTimeAmounts,
+  calculateGiftCardProductSales,
 } from './order-centric-journal-generator.server';
+import { getAccountMappings } from './storage.server';
+import { updateJobProgress } from './background-jobs.server';
 import { enrichOrderData, type EnrichedOrderData } from './enrichment/order-enrichment.server';
 import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';
@@ -97,8 +101,17 @@ export async function reconcileOrdersByDate(
   targetDate: string,
   jobId?: string,  // Optional job ID for progress tracking
   cogsDataMap?: Map<string, CogsCalculation>,  // Pre-calculated COGS data for consistency
-  skipCogs?: boolean  // Skip all COGS/Cin7 processing (e.g., for sales tax reports)
+  skipCogs?: boolean,  // Skip all COGS/Cin7 processing (e.g., for sales tax reports)
+  simpleOrderLevel?: boolean  // Fast path: export every order placed on targetDate, order-level only
 ): Promise<OrderCentricReconciliationResult> {
+  // FAST ORDER-LEVEL PATH (used by the standard export): fetch ONLY orders placed on
+  // targetDate (single Pacific day) and post each one in full from order-level totals —
+  // no per-order transaction/enrichment/COGS API calls. The capture-date path below is
+  // left intact for the Sales Tax report, which still depends on it.
+  if (simpleOrderLevel) {
+    return reconcileSimpleOrderLevel(shop, accessToken, targetDate, jobId);
+  }
+
   const errors: string[] = [];
   const warnings: string[] = [];
   const cogsWarnings: string[] = [];
@@ -543,6 +556,265 @@ export async function reconcileOrdersByDate(
       captureCount: 0,
     };
   }
+}
+
+/**
+ * FAST ORDER-LEVEL RECONCILIATION
+ *
+ * Exports every order placed on targetDate (single Pacific day), regardless of payment
+ * status. Uses ONLY order-level data from the orders list endpoint — no per-order
+ * transaction, enrichment, or COGS API calls — so a day's export finishes in seconds.
+ *
+ * Each order produces one balanced journal entry:
+ *   CREDIT Sales Revenue        = subtotal − gift-card-product sales
+ *   CREDIT Gift Card Liability  = gift-card-product sales (if any)
+ *   CREDIT Sales Tax            = total tax
+ *   CREDIT Shipping Revenue     = total shipping
+ *   DEBIT  Accounts Receivable  = sum of the above (the order total received/owed)
+ *
+ * Payment method is not analysed (no transactions fetched), so the debit posts to a
+ * single Accounts Receivable catch-all. COGS, fees, refund reversals, and enrichment
+ * are intentionally omitted ("just export the orders for this date").
+ */
+async function reconcileSimpleOrderLevel(
+  shop: string,
+  accessToken: string,
+  targetDate: string,
+  jobId?: string
+): Promise<OrderCentricReconciliationResult> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const journalEntries: JournalEntry[] = [];
+  const enrichedTransactions: EnrichedTransaction[] = [];
+  const processedOrderIds = new Set<string>();
+  const exportedOrders: Order[] = [];
+  let ordersProcessed = 0;
+
+  try {
+    const orders = await fetchOrdersByOrderDate(shop, accessToken, targetDate, jobId);
+    const accountMappings = await getAccountMappings(shop);
+    const formattedDate = formatDate(targetDate);
+
+    if (jobId) {
+      await updateJobProgress(jobId, {
+        phase: 'reconciling',
+        phaseLabel: 'Building Entries',
+        currentActivity: `Building journal entries for ${orders.length} orders...`,
+      });
+    }
+
+    for (const order of orders) {
+      try {
+        // Safety: the fetch is already bounded to the Pacific day, but re-confirm.
+        if (formatDateOnly(order.createdAt) !== targetDate) {
+          continue;
+        }
+
+        const entries = buildOrderLevelEntries(order, accountMappings, formattedDate);
+        if (entries.length === 0) {
+          continue; // nothing to post (e.g. $0 order)
+        }
+
+        journalEntries.push(...entries);
+
+        const total = entries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
+
+        enrichedTransactions.push({
+          balanceTransaction: {
+            id: order.id,
+            type: 'charge',
+            sourceOrderId: order.id,
+            processedAt: order.createdAt,
+            net: total,
+            fee: new Decimal(0),
+            gross: total,
+          },
+          order: {
+            id: order.id,
+            name: order.name,
+            createdAt: order.createdAt,
+            totalPrice: order.totalPrice,
+            subtotalPrice: order.subtotalPrice,
+            currentTotalPrice: order.currentTotalPrice || order.totalPrice,
+            currentSubtotalPrice: order.currentSubtotalPrice ?? order.subtotalPrice,
+            currentTotalTax: order.currentTotalTax ?? order.totalTax,
+            totalTax: order.totalTax,
+            totalShipping: order.totalShipping,
+            totalDiscounts: order.totalDiscounts,
+            financialStatus: order.financialStatus,
+            lineItems: order.lineItems,
+            hasActualRefunds: false,
+            // Order-view fields for the Payouts/Products-with-Orders summaries
+            customerName: order.customerName,
+            customerId: order.customerId,
+            customerFirstName: order.customerFirstName,
+            customerLastName: order.customerLastName,
+            paymentTerms: order.paymentTerms,
+            taxLines: order.taxLines,
+            tags: order.tags,
+            sourceName: order.sourceName,
+            fulfillmentStatus: order.fulfillmentStatus,
+            deliveryStatus: order.deliveryStatus,
+            deliveryMethod: order.deliveryMethod,
+          },
+          enrichedData: undefined,
+          jeSummary: computeJESummary(entries),
+          payout: {
+            id: 'Direct Payment',
+            date: targetDate,
+            amount: new Decimal(0),
+          },
+        });
+
+        processedOrderIds.add(order.id);
+        exportedOrders.push(order);
+        ordersProcessed++;
+      } catch (error) {
+        errors.push(
+          `Failed to process order ${order.name}: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
+
+    const totalDebit = journalEntries.reduce((sum, e) => sum.plus(e.debit), new Decimal(0));
+    const totalCredit = journalEntries.reduce((sum, e) => sum.plus(e.credit), new Decimal(0));
+    const balanced = totalDebit.equals(totalCredit);
+
+    if (!balanced) {
+      errors.push(
+        `Journal entries do not balance. ` +
+        `Difference: ${totalDebit.minus(totalCredit).toFixed(2)} ` +
+        `(Debit: ${totalDebit.toFixed(2)}, Credit: ${totalCredit.toFixed(2)})`
+      );
+    }
+
+    console.log(
+      `[Simple Export] ${targetDate}: ${ordersProcessed} orders → ${journalEntries.length} entries ` +
+      `(Dr $${totalDebit.toFixed(2)} / Cr $${totalCredit.toFixed(2)}, balanced=${balanced})`
+    );
+
+    return {
+      journalEntries,
+      enrichedTransactions,
+      orders: exportedOrders,
+      processedOrderIds,
+      balanced,
+      errors,
+      warnings,
+      cogsWarnings: [],
+      cogsDataMap: new Map(),
+      orderCount: ordersProcessed,
+      captureCount: ordersProcessed,
+    };
+  } catch (error) {
+    errors.push(
+      `Reconciliation failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+
+    return {
+      journalEntries,
+      enrichedTransactions,
+      orders: [],
+      processedOrderIds: new Set<string>(),
+      balanced: false,
+      errors,
+      warnings,
+      cogsWarnings: [],
+      orderCount: 0,
+      captureCount: 0,
+    };
+  }
+}
+
+/**
+ * Build a single balanced journal entry for an order from order-level totals only.
+ * Credits sales/gift-card/tax/shipping; debits Accounts Receivable with the sum so the
+ * entry always balances. Returns [] when there is nothing to post.
+ */
+function buildOrderLevelEntries(
+  order: Order,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  accountMappings: any,
+  formattedDate: string
+): JournalEntry[] {
+  const entries: JournalEntry[] = [];
+  const reference = `SO-${order.name}`;
+
+  const tax = order.totalTax || new Decimal(0);
+  const shipping = order.totalShipping || new Decimal(0);
+  const giftCardSales = calculateGiftCardProductSales(order);
+  // subtotalPrice is post-line-discount; gift-card products are deferred revenue.
+  const regularSales = order.subtotalPrice.minus(giftCardSales);
+
+  if (regularSales.greaterThan(0)) {
+    entries.push({
+      date: formattedDate,
+      reference,
+      account: accountMappings.sales_revenue.accountCode,
+      accountName: accountMappings.sales_revenue.accountName,
+      debit: new Decimal(0),
+      credit: regularSales,
+      memo: `Sales - Order ${order.name}`,
+    });
+  }
+
+  if (giftCardSales.greaterThan(0)) {
+    entries.push({
+      date: formattedDate,
+      reference,
+      account: accountMappings.gift_card_liability.accountCode,
+      accountName: accountMappings.gift_card_liability.accountName,
+      debit: new Decimal(0),
+      credit: giftCardSales,
+      memo: `Gift Card Sale - Order ${order.name}`,
+    });
+  }
+
+  if (tax.greaterThan(0)) {
+    entries.push({
+      date: formattedDate,
+      reference,
+      account: accountMappings.sales_tax.accountCode,
+      accountName: accountMappings.sales_tax.accountName,
+      debit: new Decimal(0),
+      credit: tax,
+      memo: `Sales Tax - Order ${order.name}`,
+    });
+  }
+
+  if (shipping.greaterThan(0)) {
+    entries.push({
+      date: formattedDate,
+      reference,
+      account: accountMappings.shipping_revenue.accountCode,
+      accountName: accountMappings.shipping_revenue.accountName,
+      debit: new Decimal(0),
+      credit: shipping,
+      memo: `Shipping - Order ${order.name}`,
+    });
+  }
+
+  if (entries.length === 0) {
+    return [];
+  }
+
+  // DEBIT: Accounts Receivable = sum of credits (guarantees the entry balances).
+  // Payment method is not analysed, so this is a single catch-all rather than the
+  // per-gateway clearing accounts used by the full reconciliation path.
+  const debitTotal = entries.reduce((sum, e) => sum.plus(e.credit), new Decimal(0));
+  entries.push({
+    date: formattedDate,
+    reference,
+    account: accountMappings.accounts_receivable.accountCode,
+    accountName: accountMappings.accounts_receivable.accountName,
+    debit: debitTotal,
+    credit: new Decimal(0),
+    memo: `Order Total - Order ${order.name} (${order.financialStatus})`,
+  });
+
+  return entries;
 }
 
 /**

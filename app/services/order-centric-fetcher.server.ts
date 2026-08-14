@@ -192,6 +192,173 @@ export async function fetchOrdersByCaptureDateRange(
 }
 
 /**
+ * Compute the UTC ISO range that exactly spans a single Pacific calendar day.
+ * Automatically handles PST (UTC-8) vs PDT (UTC-7).
+ *
+ * Example: '2026-06-14' (PDT) → 2026-06-14T07:00:00Z .. 2026-06-15T06:59:59Z
+ */
+function pacificDayToUtcRange(dateStr: string): { startUtc: string; endUtc: string } {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  // Probe midday UTC to read the Pacific offset for this date (avoids DST edges).
+  const probe = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(probe).map((p) => [p.type, p.value])
+  );
+  const pacAsUtc = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour), Number(parts.minute), Number(parts.second)
+  );
+  const offsetMs = pacAsUtc - probe.getTime(); // Pacific − UTC (negative in US)
+  const localMidnightAsUtc = Date.UTC(y, m - 1, d, 0, 0, 0);
+  const startMs = localMidnightAsUtc - offsetMs;          // Pacific 00:00:00 as a UTC instant
+  const endMs = startMs + 24 * 60 * 60 * 1000 - 1000;     // Pacific 23:59:59 as a UTC instant
+  return { startUtc: new Date(startMs).toISOString(), endUtc: new Date(endMs).toISOString() };
+}
+
+/**
+ * Fetch orders by ORDER DATE (created_at) for a single Pacific calendar day — fast.
+ *
+ * This queries Shopify for EXACTLY the target day (created_at_min/max bounded to the
+ * Pacific day in UTC), so the server returns only that day's orders — not a multi-day
+ * window. It does NOT fetch per-order transactions, enrichment, or COGS, so it issues
+ * roughly one API call per 250 orders instead of one (or more) per order. A single day
+ * completes in seconds.
+ *
+ * @param shop - Shop domain
+ * @param accessToken - Shopify access token
+ * @param targetDate - Target order date (YYYY-MM-DD, Pacific)
+ * @param jobId - Optional job ID for progress tracking
+ * @returns Array of orders placed on targetDate (transactions intentionally left empty)
+ */
+export async function fetchOrdersByOrderDate(
+  shop: string,
+  accessToken: string,
+  targetDate: string,
+  jobId?: string
+): Promise<Order[]> {
+  const orders: Order[] = [];
+  const baseUrl = `https://${shop}/admin/api/2024-10/orders.json`;
+  const { startUtc, endUtc } = pacificDayToUtcRange(targetDate);
+
+  console.log(`Fetching orders created on ${targetDate} (Pacific) → UTC ${startUtc} to ${endUtc}`);
+
+  if (jobId) {
+    try {
+      await updateJobProgress(jobId, {
+        phase: 'fetching',
+        phaseLabel: 'Fetching Orders',
+        currentActivity: `Querying Shopify for orders placed on ${targetDate}...`,
+        startTime: Date.now(),
+      });
+    } catch (error) {
+      console.error('[Progress] Failed to update job progress:', error);
+    }
+  }
+
+  let hasNextPage = true;
+  let pageInfo: string | null = null;
+  const seenPageInfos = new Set<string>();
+
+  while (hasNextPage) {
+    // When paginating with page_info, Shopify only allows page_info (+ limit).
+    const params: URLSearchParams = pageInfo
+      ? new URLSearchParams({ page_info: pageInfo, limit: '250' })
+      : new URLSearchParams({
+          created_at_min: startUtc,
+          created_at_max: endUtc,
+          status: 'any',
+          limit: '250',
+        });
+
+    const url = `${baseUrl}?${params.toString()}`;
+
+    let response: Response | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        response = await fetchWithTimeout(url, {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json',
+          },
+        }, 60000);
+
+        if (response.status === 429) {
+          if (attempt < MAX_RETRIES) {
+            const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+            console.log(`Rate limit hit fetching orders. Retrying in ${delay}ms...`);
+            await sleep(delay);
+            continue;
+          }
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch orders after ${MAX_RETRIES} retries: ${response.status} - ${errorText}`);
+        }
+
+        if (response.ok) break;
+
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch orders: ${response.status} ${response.statusText} - ${errorText}`);
+      } catch (error) {
+        if (attempt === MAX_RETRIES || !(error instanceof Error) || !error.message.includes('429')) {
+          console.error('Error fetching orders by order date:', error);
+          throw error;
+        }
+        const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+        await sleep(delay);
+      }
+    }
+
+    if (!response || !response.ok) {
+      throw new Error('Failed to fetch orders after all retry attempts');
+    }
+
+    const data = await response.json();
+
+    if (data.orders && Array.isArray(data.orders)) {
+      for (const orderData of data.orders) {
+        orders.push(parseOrder(orderData));
+      }
+
+      if (jobId) {
+        try {
+          await updateJobProgress(jobId, {
+            ordersFound: orders.length,
+            currentActivity: `Fetched ${orders.length} orders placed on ${targetDate}...`,
+          });
+        } catch (error) {
+          console.error('[Progress] Failed to update job progress:', error);
+        }
+      }
+
+      const linkHeader = response.headers.get('Link');
+      if (linkHeader && linkHeader.includes('rel="next"')) {
+        const nextLinkMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+        const nextUrl = nextLinkMatch ? nextLinkMatch[1] : null;
+        const match = nextUrl ? nextUrl.match(/page_info=([^&>]+)/) : null;
+        if (match && !seenPageInfos.has(match[1])) {
+          seenPageInfos.add(match[1]);
+          pageInfo = match[1];
+          await sleep(250); // gentle pacing between pages
+        } else {
+          hasNextPage = false;
+        }
+      } else {
+        hasNextPage = false;
+      }
+    } else {
+      hasNextPage = false;
+    }
+  }
+
+  console.log(`Fetched ${orders.length} orders placed on ${targetDate} (transaction-free)`);
+  return orders;
+}
+
+/**
  * Helper function to fetch orders by a specific date parameter and add to map
  *
  * @param baseUrl - Base API URL
@@ -474,6 +641,36 @@ function parseOrder(orderData: any): Order {
       successFulfillments[0].created_at)
     : undefined;
 
+  // Customer display name (orders list includes the customer object)
+  const customer = orderData.customer;
+  const customerName = customer
+    ? [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim() || undefined
+    : undefined;
+  const customerId = customer?.id != null ? String(customer.id) : undefined;
+  const customerFirstName = customer?.first_name || undefined;
+  const customerLastName = customer?.last_name || undefined;
+
+  // Payment terms (B2B / net-terms orders). Most orders have none.
+  const paymentTerms = orderData.payment_terms?.payment_terms_name || undefined;
+
+  // Order-level tax lines (title, rate, amount). Used by the Sage 50 sales export.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const taxLines = (orderData.tax_lines || []).map((tax: any) => ({
+    title: tax.title || '',
+    rate: typeof tax.rate === 'number' ? tax.rate : Number(tax.rate || 0),
+    price: new Decimal(tax.price || 0),
+  }));
+
+  // Delivery method: title of the first shipping line (e.g. "Standard", "Shipping not required")
+  const shippingLineTitle = (orderData.shipping_lines && orderData.shipping_lines[0]?.title) || undefined;
+
+  // Delivery status: latest fulfillment shipment_status (often null/empty)
+  const deliveryStatus = successFulfillments.length > 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? (successFulfillments.reduce((latest: any, f: any) =>
+        f.created_at > latest.created_at ? f : latest, successFulfillments[0]).shipment_status || undefined)
+    : undefined;
+
   return {
     id: orderData.id.toString(),
     orderNumber: orderData.order_number,
@@ -501,6 +698,16 @@ function parseOrder(orderData: any): Order {
     closedAt: orderData.closed_at || undefined,
     fulfilledAt,
     sourceName: orderData.source_name || undefined,
+    customerName,
+    customerId,
+    customerFirstName,
+    customerLastName,
+    paymentTerms,
+    taxLines,
+    tags: orderData.tags || undefined,
+    fulfillmentStatus: orderData.fulfillment_status || 'unfulfilled',
+    deliveryStatus,
+    deliveryMethod: shippingLineTitle,
     lineItems,
     transactions: [], // Will be populated separately
     refunds, // Refund details for proper tax splitting
@@ -510,7 +717,7 @@ function parseOrder(orderData: any): Order {
 /**
  * Fetch transactions for a specific order with retry logic
  */
-async function fetchOrderTransactions(
+export async function fetchOrderTransactions(
   shop: string,
   accessToken: string,
   orderId: string
