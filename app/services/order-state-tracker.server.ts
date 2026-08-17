@@ -5,10 +5,8 @@
  * needing re-export. Maintains version history for audit purposes.
  */
 
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.server';
 import type { Order } from '../types/journal-entry';
-
-const prisma = new PrismaClient();
 
 /**
  * Order Snapshot (stored in database)

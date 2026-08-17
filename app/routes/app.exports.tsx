@@ -2,7 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useNavigation } from 'react-router';
 import { useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { getShopConfig } from '../services/storage.server';
+import { getShopConfig } from '../services/storage-adapter.server';
 import { format } from 'date-fns';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

@@ -203,6 +203,27 @@ export default function Jobs() {
     }
   };
 
+  const getJobFiles = (job: ExportJob) => {
+    if (!job.result || !Array.isArray(job.result.files)) {
+      return [] as Array<{ filename: string; size?: number }>;
+    }
+    return job.result.files;
+  };
+
+  const getJobEntryCount = (job: ExportJob) => {
+    if (!job.result || typeof job.result.entryCount !== 'number') {
+      return 0;
+    }
+    return job.result.entryCount;
+  };
+
+  const getJobBalanced = (job: ExportJob) => {
+    if (!job.result) {
+      return true;
+    }
+    return job.result.balanced ?? true;
+  };
+
   // Download handler for job zip.
   // Use the app's own origin (the deployment serving this page) so the download hits
   // the same server that created the job — NOT a hardcoded host. A hardcoded host
@@ -467,7 +488,7 @@ export default function Jobs() {
                       {getDuration(job)}
                     </td>
                     <td style={{ padding: '12px' }}>
-                      {job.status === 'completed' && job.result?.files && job.result.files.length > 0 ? (
+                      {job.status === 'completed' && getJobFiles(job).length > 0 ? (
                         <button
                           onClick={() => handleDownloadJobZip(job.id)}
                           style={{
@@ -484,8 +505,7 @@ export default function Jobs() {
                             gap: '6px',
                           }}
                         >
-                          {/* 📦 Download ({job.result.files.length} {job.result.files.length === 1 ? 'file' : 'files'}) */}
-                          📦 Download (3 files)
+                          📦 Download ({getJobFiles(job).length} {getJobFiles(job).length === 1 ? 'file' : 'files'})
                         </button>
                       ) : job.status === 'failed' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

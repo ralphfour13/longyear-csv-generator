@@ -2,7 +2,7 @@ import type { EnrichedTransaction } from '../types/journal-entry';
 import type { SalesTaxReportRequest, ShopAddress } from '../types/sales-tax';
 import { reconcileOrdersByDate } from './order-centric-reconciler.server';
 import { generateSalesTaxReport } from './sales-tax-report-generator.server';
-import { writeExport } from './storage.server';
+import { writeExport } from './storage-adapter.server';
 import { updateJobProgress } from './background-jobs.server';
 
 /**

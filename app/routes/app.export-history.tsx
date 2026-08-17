@@ -2,7 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useLoaderData } from 'react-router';
 import { useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { listExports, getExportStats, getExportPath } from '../services/storage.server';
+import { listExports, getExportStats, getExportPath } from '../services/storage-adapter.server';
 import { format } from 'date-fns';
 import { promises as fs } from 'fs';
 

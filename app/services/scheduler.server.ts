@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { SyncConfig } from '../types/journal-entry';
-import { getShopConfig } from './storage.server';
+import { getShopConfig } from './storage-adapter.server';
 import { processExport, calculateExportDates } from './batch-processor.server';
 
 /**
@@ -26,7 +26,7 @@ export async function initializeScheduler(
   console.log('Initializing scheduler...');
 
   try {
-    const dataDir = path.join(process.cwd(), 'data');
+    const dataDir = process.env.VERCEL ? '/tmp/data' : path.join(process.cwd(), 'data');
 
     // Check if data directory exists
     try {

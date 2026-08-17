@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from 'react-router';
 import AdmZip from 'adm-zip';
 import { getJobStatus } from '../services/background-jobs.server';
-import { exportExists, readExport } from '../services/storage.server';
+import { exportExists, readExport } from '../services/storage-adapter.server';
 
 /**
  * API endpoint for downloading all job result files as a zip

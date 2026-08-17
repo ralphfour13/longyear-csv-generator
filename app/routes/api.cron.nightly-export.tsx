@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from 'react-router';
 import { processExport, calculateExportDates } from '../services/batch-processor.server';
-import { getShopConfig } from '../services/storage.server';
+import { getShopConfig } from '../services/storage-adapter.server';
 import { logInfo, logError } from '../services/error-logger.server';
 import prisma from '../db.server';
 

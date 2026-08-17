@@ -50,7 +50,9 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
           success: true,
           message: `Sales tax report generated`,
           filename: result.filename,
-          files: [{ filename: result.filename }],
+          files: [{ filename: result.filename, size: 0 }],
+          entryCount: 0,
+          balanced: true,
           orderCount: result.orderCount,
           filteredCount: result.filteredCount,
         },
@@ -81,7 +83,13 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
         status: 'completed',
         completedAt: new Date().toISOString(),
         progress: undefined,
-        result,
+        result: {
+          ...result,
+          success: true,
+          files: Array.isArray(result?.files) ? result.files : [],
+          entryCount: typeof result?.entryCount === 'number' ? result.entryCount : 0,
+          balanced: result?.balanced ?? true,
+        },
       });
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -100,7 +108,13 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
         status: 'completed',
         completedAt: new Date().toISOString(),
         progress: undefined,
-        result,
+        result: {
+          ...result,
+          success: true,
+          files: Array.isArray(result?.files) ? result.files : [],
+          entryCount: typeof result?.entryCount === 'number' ? result.entryCount : 0,
+          balanced: result?.balanced ?? true,
+        },
       });
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);

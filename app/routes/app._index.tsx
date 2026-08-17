@@ -43,9 +43,9 @@ export default function Index() {
 
   return (
     <s-page heading="Longyear Museum CSV Generator">
-      {/* <s-button slot="primary-action" href="/app/exports" variant="primary">
+      <s-button slot="primary-action" href="/app/exports" variant="primary">
         Generate Export
-      </s-button> */}
+      </s-button>
 
       {/* Status Overview */}
       <s-section heading="Sync Status">

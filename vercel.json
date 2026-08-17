@@ -4,14 +4,6 @@
   "framework": null,
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
-    },
-    {
-      "source": "/favicon.ico",
-      "destination": "/favicon.ico"
-    },
-    {
       "source": "/(.*)",
       "destination": "/api/index.js"
     }

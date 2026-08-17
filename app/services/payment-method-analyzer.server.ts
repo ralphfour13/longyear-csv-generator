@@ -1,6 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { Order, Transaction } from '../types/journal-entry';
-import { getAccountMappings } from './storage.server';
+import { getAccountMappings } from './storage-adapter.server';
 
 /**
  * Payment Method Analyzer
