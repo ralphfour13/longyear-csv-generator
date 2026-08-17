@@ -42,10 +42,10 @@ export default function Index() {
       : "Manual only";
 
   return (
-    <s-page heading="Sage 50 Journal Entry Sync">
-      <s-button slot="primary-action" href="/app/exports" variant="primary">
+    <s-page heading="Longyear Museum CSV Generator">
+      {/* <s-button slot="primary-action" href="/app/exports" variant="primary">
         Generate Export
-      </s-button>
+      </s-button> */}
 
       {/* Status Overview */}
       <s-section heading="Sync Status">
@@ -75,7 +75,7 @@ export default function Index() {
       </s-section>
 
       {/* Getting Started */}
-      <s-section heading="Getting Started">
+      {/* <s-section heading="Getting Started">
         <s-paragraph>
           This app generates CSV-formatted journal entries from your Shopify
           transactions for import into Sage 50 accounting software.
@@ -105,7 +105,7 @@ export default function Index() {
             </ol>
           </div>
         </s-stack>
-      </s-section>
+      </s-section> */}
 
       {/* Recent Exports */}
       <s-section heading="Recent Exports">
@@ -213,9 +213,9 @@ export default function Index() {
             {config.transactionTypes.inventory && <li>Inventory</li>} */}
           </ul>
         </s-paragraph>
-        <s-button href="/app/settings" variant="secondary">
+        {/* <s-button href="/app/settings" variant="secondary">
           Edit Settings
-        </s-button>
+        </s-button> */}
       </s-section>
 
       {/* Sidebar - Help */}

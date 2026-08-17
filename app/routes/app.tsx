@@ -28,7 +28,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const version = await getVersionInfo();
 
   // Log version at startup (helps confirm deployment)
-  console.log(`[App] Loading version: ${version.commit} | Built: ${version.buildTime}`);
+  console.log(
+    `[App] Loading version: ${version.commit} | Built: ${version.buildTime}`,
+  );
 
   // eslint-disable-next-line no-undef
   return { apiKey: process.env.SHOPIFY_API_KEY || "", version };
@@ -42,15 +44,15 @@ export default function App() {
       <s-app-nav>
         <s-link href="/app">Home</s-link>
         <s-link href="/app/exports">Export Center</s-link>
-        <s-link href="/app/sales-tax">Sales Tax Report</s-link>
+        {/* <s-link href="/app/sales-tax">Sales Tax Report</s-link> */}
         <s-link href="/app/jobs">Job Queue</s-link>
-        <s-link href="/app/settings">Settings</s-link>
-        <s-link href="/app/mappings">Account Mappings</s-link>
-        <s-link href="/app/cogs-sync">COGS Sync</s-link>
-        <s-link href="/app/uncaptured-auths">Uncaptured Auths</s-link>
+        {/* <s-link href="/app/settings">Settings</s-link> */}
+        {/* <s-link href="/app/mappings">Account Mappings</s-link> */}
+        {/* <s-link href="/app/cogs-sync">COGS Sync</s-link> */}
+        {/* <s-link href="/app/uncaptured-auths">Uncaptured Auths</s-link> */}
       </s-app-nav>
       <Outlet />
-      <div style={{
+      {/* <div style={{
         position: "fixed",
         bottom: "8px",
         right: "8px",
@@ -59,7 +61,7 @@ export default function App() {
         fontFamily: "monospace"
       }}>
         v{version.commit}
-      </div>
+      </div> */}
     </AppProvider>
   );
 }

@@ -2,7 +2,7 @@
 
 client_id = "8d4a1b604293a56f123b1fe90fbbe38e"
 name = "Longyear Store"
-application_url = "https://diagnosis-refused-page-redeem.trycloudflare.com"
+application_url = "https://longyearmuseum.vercel.app"
 embedded = true
 
 [build]
@@ -25,10 +25,13 @@ api_version = "2026-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_all_orders,read_customers,read_locations,read_orders,write_customers,write_metaobject_definitions,write_metaobjects,write_orders,write_products,read_shopify_payments_payouts, read_shopify_payments_accounts, read_products, read_inventory, write_inventory"
+scopes = "read_all_orders,read_customers,read_locations,read_orders,write_customers,write_metaobject_definitions,write_metaobjects,write_orders,write_products,read_shopify_payments_payouts,read_shopify_payments_accounts,read_products,read_inventory,write_inventory"
 
 [auth]
-redirect_urls = [ "https://longyearmuseum.vercel.app/auth/callback " ]
+redirect_urls = [
+  "https://longyearmuseum.vercel.app/auth/callback",
+  "https://longyearmuseum.vercel.app/auth/shopify/callback"
+]
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"

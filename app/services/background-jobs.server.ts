@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import type { FileGenerationOptions } from './batch-processor.server';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = '/tmp/data';
 const JOBS_DIR = path.join(DATA_DIR, 'jobs');
 
 export interface ExportJob {

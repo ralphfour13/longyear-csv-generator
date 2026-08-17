@@ -8,6 +8,10 @@
       "destination": "/api/index.js"
     }
   ],
+  "regions": ["iad1"],
+  "env": {
+    "NODE_ENV": "production"
+  },
   "crons": [
     {
       "path": "/api/cron/nightly-export",
