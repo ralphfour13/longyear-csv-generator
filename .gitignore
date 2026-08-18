@@ -33,3 +33,4 @@ database.sqlite
 # CI/CD deployment artifacts
 deploy.tar
 deploy.log
+.env*

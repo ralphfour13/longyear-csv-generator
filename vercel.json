@@ -1,13 +1,7 @@
 {
-  "buildCommand": "prisma generate && npm run build",
-  "installCommand": "npm install",
+  "buildCommand": "npm run build",
   "framework": null,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index.js"
-    }
-  ],
+  "installCommand": "npm install",
   "regions": ["iad1"],
   "env": {
     "NODE_ENV": "production"
