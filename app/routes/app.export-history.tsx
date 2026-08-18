@@ -2,9 +2,8 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useLoaderData } from 'react-router';
 import { useState } from 'react';
 import { authenticate } from '../shopify.server';
-import { listExports, getExportStats, getExportPath } from '../services/storage-adapter.server';
+import { listExports, getExportStats, deleteExport } from '../services/storage-adapter.server';
 import { format } from 'date-fns';
-import { promises as fs } from 'fs';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -46,8 +45,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     try {
-      const filePath = getExportPath(shop, filename);
-      await fs.unlink(filePath);
+      // Delete through the storage adapter so this works against both the local
+      // filesystem and Vercel Blob.
+      await deleteExport(shop, filename);
 
       return {
         success: true,

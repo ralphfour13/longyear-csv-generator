@@ -2,7 +2,7 @@
 
 client_id = "8d4a1b604293a56f123b1fe90fbbe38e"
 name = "Longyear Store"
-application_url = "https://longyearmuseum.vercel.app"
+application_url = "https://unless-refine-sculpture-dragon.trycloudflare.com"
 embedded = true
 
 [build]
@@ -29,8 +29,8 @@ scopes = "read_all_orders,read_customers,read_locations,read_orders,write_custom
 
 [auth]
 redirect_urls = [
-  "https://longyearmuseum.vercel.app/auth/callback",
-  "https://longyearmuseum.vercel.app/auth/shopify/callback"
+  "https://unless-refine-sculpture-dragon.trycloudflare.com/auth/callback",
+  "https://unless-refine-sculpture-dragon.trycloudflare.com/auth/shopify/callback"
 ]
 
 [product.metafields.app.demo_info]

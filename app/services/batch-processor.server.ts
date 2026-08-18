@@ -71,12 +71,27 @@ export interface FileGenerationOptions {
  * @param fileOptions - Optional file generation options (defaults to all files)
  * @returns Export history entry with download info
  */
+/**
+ * Controls the tail side effects of an export.
+ *
+ * When an export is chunked across several Vercel invocations, processExport runs once
+ * per file with a single flag enabled. Snapshots and the notification email must fire
+ * exactly once for the whole export, not once per chunk — the chunk runner suppresses
+ * them on every step but the last. Both default to running, so a normal single-pass
+ * export (local development, or any direct caller) is unaffected.
+ */
+export interface ExportStepControl {
+  suppressSnapshots?: boolean;
+  suppressEmail?: boolean;
+}
+
 export async function processExport(
   shop: string,
   accessToken: string,
   targetDate: string,
   fileOptions?: FileGenerationOptions,
   jobId?: string, // Optional job ID for progress tracking
+  stepControl?: ExportStepControl,
 ): Promise<ExportHistoryEntry> {
   // Default to generating all files if not specified
   const options: Required<FileGenerationOptions> = {
@@ -233,8 +248,14 @@ export async function processExport(
     }
 
     if (allJournalEntries.length === 0) {
-      const errorMsg = "No journal entries generated";
-      await logError(shop, "Export", errorMsg);
+      // Reconciliation collects failures into result.errors rather than throwing, so
+      // report them here — otherwise a fetch/auth failure is indistinguishable from a
+      // genuinely empty day.
+      const errorMsg =
+        allErrors.length > 0
+          ? `No journal entries generated — reconciliation reported: ${allErrors.join("; ")}`
+          : `No journal entries generated. Shopify returned no orders placed on ${targetDate}, so there was nothing to post.`;
+      await logError(shop, "Export", errorMsg, allErrors);
       throw new Error(errorMsg);
     }
 
@@ -1022,42 +1043,62 @@ export async function processExport(
     }
 
     // Step 7.5: Save order snapshots for state tracking
-    await logInfo(shop, "State Tracking", "Saving order snapshots...");
-    let snapshotsSaved = 0;
-    let snapshotErrors = 0;
-
-    for (const order of orders) {
-      try {
-        // Determine version number
-        const previousSnapshot = await checkOrderChanges(
-          shop,
-          order,
-          targetDate,
-        );
-        const version = previousSnapshot.previousSnapshot
-          ? previousSnapshot.previousSnapshot.version + 1
-          : 1;
-
-        await saveOrderSnapshot(shop, order, targetDate, version);
-        snapshotsSaved++;
-      } catch (error) {
-        // Don't fail export if snapshot saving fails
-        snapshotErrors++;
-        console.warn(`Failed to save snapshot for order ${order.name}:`, error);
-      }
-    }
-
-    if (snapshotsSaved > 0) {
+    // Skipped on intermediate chunks — this loop is one DB round-trip per order
+    // (~32s for 300 orders), so running it per chunk would multiply the cost and
+    // inflate each order's snapshot version.
+    if (stepControl?.suppressSnapshots) {
       await logInfo(
         shop,
         "State Tracking",
-        `Saved ${snapshotsSaved} order snapshots${snapshotErrors > 0 ? ` (${snapshotErrors} failed)` : ""}`,
+        "Skipping order snapshots (deferred to the final export step)",
       );
+    } else {
+      await logInfo(shop, "State Tracking", "Saving order snapshots...");
+      let snapshotsSaved = 0;
+      let snapshotErrors = 0;
+
+      for (const order of orders) {
+        try {
+          // Determine version number
+          const previousSnapshot = await checkOrderChanges(
+            shop,
+            order,
+            targetDate,
+          );
+          const version = previousSnapshot.previousSnapshot
+            ? previousSnapshot.previousSnapshot.version + 1
+            : 1;
+
+          await saveOrderSnapshot(shop, order, targetDate, version);
+          snapshotsSaved++;
+        } catch (error) {
+          // Don't fail export if snapshot saving fails
+          snapshotErrors++;
+          console.warn(
+            `Failed to save snapshot for order ${order.name}:`,
+            error,
+          );
+        }
+      }
+
+      if (snapshotsSaved > 0) {
+        await logInfo(
+          shop,
+          "State Tracking",
+          `Saved ${snapshotsSaved} order snapshots${snapshotErrors > 0 ? ` (${snapshotErrors} failed)` : ""}`,
+        );
+      }
     }
 
-    // Step 8: Send email notification if enabled
+    // Step 8: Send email notification if enabled.
+    // Suppressed on intermediate chunks so a chunked export sends one email listing
+    // every file, rather than one per file.
     const shopConfig = await getShopConfig(shop);
-    if (shopConfig.emailEnabled && shopConfig.emailRecipients) {
+    if (
+      !stepControl?.suppressEmail &&
+      shopConfig.emailEnabled &&
+      shopConfig.emailRecipients
+    ) {
       const recipients = shopConfig.emailRecipients
         .split(",")
         .map((email) => email.trim())

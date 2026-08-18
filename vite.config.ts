@@ -55,7 +55,29 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
   },
+  // Force a single copy of React and the router. Without this, a second copy
+  // resolved through a nested dependency renders hooks against a null
+  // dispatcher ("Cannot read properties of null (reading 'useContext')").
+  resolve: {
+    dedupe: ["react", "react-dom", "react-router"],
+  },
   optimizeDeps: {
-    include: ["@shopify/app-bridge-react"],
+    // Pre-bundle every client dep up front. Anything discovered lazily instead
+    // triggers a re-optimization that bumps the `?v=` browser hash mid-session,
+    // leaving the open page straddling two dep generations -- which breaks
+    // React's shared internals across the two copies.
+    include: [
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "react-router",
+      "react-router/dom",
+      "@shopify/app-bridge-react",
+      "@shopify/shopify-app-react-router/react",
+      "date-fns",
+      "decimal.js",
+    ],
   },
 }) satisfies UserConfig;

@@ -2,7 +2,7 @@
 
 client_id = "ec004ce28be778f86415a4b18a7ab9a2"
 name = "Sage 50 Sync for Fly Shop"
-application_url = "https://sage50.four13.dev"
+application_url = "https://longyearmuseum.vercel.app"
 embedded = true
 
 [build]
@@ -33,6 +33,6 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://sage50.four13.dev/auth/callback",
-  "https://sage50.four13.dev/auth/shopify/callback"
+  "https://longyearmuseum.vercel.app/auth/callback",
+  "https://longyearmuseum.vercel.app/auth/shopify/callback"
 ]

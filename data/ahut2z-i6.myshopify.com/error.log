@@ -680,3 +680,70 @@
 {"timestamp":"2026-08-17T13:13:15.884Z","level":"info","context":"Export","message":"Export complete: 6 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","Receipts-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
 {"timestamp":"2026-08-17T13:13:15.889Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
 {"timestamp":"2026-08-17T13:13:51.878Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}
+{"timestamp":"2026-08-18T10:55:48.334Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-08-18T10:55:48.362Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-08-18T10:55:49.102Z","level":"info","context":"Export","message":"Reconciled 0 orders with 0 captures"}
+{"timestamp":"2026-08-18T10:55:49.135Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-08-18T10:55:49.149Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-08-18T10:55:49.172Z","level":"error","context":"Export","message":"No journal entries generated"}
+{"timestamp":"2026-08-18T10:55:49.185Z","level":"error","context":"Export","message":"No journal entries generated","stack":"Error: No journal entries generated\n    at processExport (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/batch-processor.server.ts:165:13)\n    at processJob (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/job-processor.server.ts:128:22)\n    at processPendingJobs (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/job-processor.server.ts:189:9)"}
+{"timestamp":"2026-08-18T11:03:06.039Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-08-18T11:03:06.055Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-08-18T11:03:06.490Z","level":"error","context":"Export","message":"Shopify authentication failed while fetching orders for 2026-06-15. The stored access token for ahut2z-i6.myshopify.com is invalid or revoked — reinstall the app to re-authorize. (Failed to fetch orders: 401 Unauthorized - {\"errors\":\"[API] Invalid API key or access token (unrecognized login or wrong password)\"})","stack":"Error: Shopify authentication failed while fetching orders for 2026-06-15. The stored access token for ahut2z-i6.myshopify.com is invalid or revoked — reinstall the app to re-authorize. (Failed to fetch orders: 401 Unauthorized - {\"errors\":\"[API] Invalid API key or access token (unrecognized login or wrong password)\"})\n    at reconcileSimpleOrderLevel (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/order-centric-reconciler.server.ts:529:13)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at processExport (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/batch-processor.server.ts:83:20)\n    at processJob (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/job-processor.server.ts:128:22)\n    at processPendingJobs (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/job-processor.server.ts:189:9)"}
+{"timestamp":"2026-08-18T11:04:11.531Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-08-18T11:04:11.544Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-08-18T11:04:15.941Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-08-18T11:04:15.961Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-08-18T11:04:33.788Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-08-18T11:04:33.832Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-08-18T11:04:33.875Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-08-18T11:04:33.896Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-08-18T11:04:33.933Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-08-18T11:04:33.944Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-08-18T11:04:33.953Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-08-18T11:04:33.989Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-08-18T11:04:34.125Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-08-18T11:04:34.157Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-08-18T11:04:34.195Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-08-18T11:04:36.251Z","level":"info","context":"Export","message":"Payouts with Orders saved: Income-import_2026-06-15.csv"}
+{"timestamp":"2026-08-18T11:04:36.275Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-08-18T11:04:38.296Z","level":"info","context":"Export","message":"Products with Orders saved: Store-import_2026-06-15.csv"}
+{"timestamp":"2026-08-18T11:04:38.342Z","level":"info","context":"Export","message":"Generating Receipts..."}
+{"timestamp":"2026-08-18T11:06:37.179Z","level":"info","context":"Export","message":"Receipts saved: Receipts-import_2026-06-15.csv"}
+{"timestamp":"2026-08-18T11:06:37.204Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-08-18T11:06:37.277Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-08-18T11:06:37.297Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-08-18T11:06:37.331Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-08-18T11:06:37.357Z","level":"info","context":"Export","message":"Export complete: 6 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","Receipts-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-08-18T11:06:37.365Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-08-18T11:07:12.995Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}
+{"timestamp":"2026-08-18T11:57:34.126Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-08-18T11:57:34.231Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-08-18T11:57:35.104Z","level":"error","context":"Export","message":"Shopify authentication failed while fetching orders for 2026-06-15. The stored access token for ahut2z-i6.myshopify.com is invalid or revoked — reinstall the app to re-authorize. (Failed to fetch orders: 401 Unauthorized - {\"errors\":\"[API] Invalid API key or access token (unrecognized login or wrong password)\"})","stack":"Error: Shopify authentication failed while fetching orders for 2026-06-15. The stored access token for ahut2z-i6.myshopify.com is invalid or revoked — reinstall the app to re-authorize. (Failed to fetch orders: 401 Unauthorized - {\"errors\":\"[API] Invalid API key or access token (unrecognized login or wrong password)\"})\n    at reconcileSimpleOrderLevel (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/order-centric-reconciler.server.ts:529:13)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at processExport (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/batch-processor.server.ts:83:20)\n    at processJob (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/job-processor.server.ts:134:116)\n    at processPendingJobs (C:/Users/Four13/Desktop/Longyear/longyear-csv-generator/app/services/job-processor.server.ts:195:9)"}
+{"timestamp":"2026-08-18T11:58:45.036Z","level":"info","context":"Export","message":"Starting order-centric export for 2026-06-15"}
+{"timestamp":"2026-08-18T11:58:45.080Z","level":"info","context":"Export","message":"Reconciling orders placed on 2026-06-15..."}
+{"timestamp":"2026-08-18T11:58:48.036Z","level":"info","context":"Export","message":"Reconciled 297 orders with 297 captures"}
+{"timestamp":"2026-08-18T11:58:48.066Z","level":"info","context":"Export","message":"Checking for order changes since last export..."}
+{"timestamp":"2026-08-18T11:59:04.252Z","level":"info","context":"State Tracking","message":"No order changes detected"}
+{"timestamp":"2026-08-18T11:59:04.261Z","level":"info","context":"Export","message":"Generated 688 journal entries"}
+{"timestamp":"2026-08-18T11:59:04.269Z","level":"info","context":"Export","message":"Applying account mappings..."}
+{"timestamp":"2026-08-18T11:59:04.288Z","level":"info","context":"Export","message":"Validating entries..."}
+{"timestamp":"2026-08-18T11:59:04.341Z","level":"info","context":"Export","message":"Validating journal entry balance..."}
+{"timestamp":"2026-08-18T11:59:04.361Z","level":"info","context":"Journal Balance","message":"✅ Journal entries balanced: Debits=$139133.37, Credits=$139133.37"}
+{"timestamp":"2026-08-18T11:59:04.384Z","level":"info","context":"Export","message":"Running consistency checks..."}
+{"timestamp":"2026-08-18T11:59:04.431Z","level":"info","context":"Data Quality","message":"Quality Score: 100.0% (297 clean / 297 total orders)"}
+{"timestamp":"2026-08-18T11:59:04.549Z","level":"info","context":"Metrics","message":"Saved reconciliation metrics for 2026-06-15"}
+{"timestamp":"2026-08-18T11:59:04.554Z","level":"info","context":"Export","message":"Generating export files..."}
+{"timestamp":"2026-08-18T11:59:04.605Z","level":"info","context":"Export","message":"Generating Payouts with Orders..."}
+{"timestamp":"2026-08-18T11:59:07.327Z","level":"info","context":"Export","message":"Payouts with Orders saved: Income-import_2026-06-15.csv"}
+{"timestamp":"2026-08-18T11:59:07.371Z","level":"info","context":"Export","message":"Generating Products with Orders..."}
+{"timestamp":"2026-08-18T11:59:09.560Z","level":"info","context":"Export","message":"Products with Orders saved: Store-import_2026-06-15.csv"}
+{"timestamp":"2026-08-18T11:59:09.715Z","level":"info","context":"Export","message":"Generating Receipts..."}
+{"timestamp":"2026-08-18T12:01:28.024Z","level":"info","context":"Export","message":"Receipts saved: Receipts-import_2026-06-15.csv"}
+{"timestamp":"2026-08-18T12:01:28.070Z","level":"info","context":"Export","message":"Generating Journal Entry Summary (.txt and .csv)..."}
+{"timestamp":"2026-08-18T12:01:28.162Z","level":"info","context":"Export","message":"Journal Entry Summary saved: journal-entry_2026-06-15.csv and journal-entry_2026-06-15.txt"}
+{"timestamp":"2026-08-18T12:01:28.186Z","level":"info","context":"Export","message":"Generating Order JSON Data..."}
+{"timestamp":"2026-08-18T12:01:28.236Z","level":"info","context":"Export","message":"Order JSON Data saved: order-data_2026-06-15.json (297 orders)"}
+{"timestamp":"2026-08-18T12:01:28.272Z","level":"info","context":"Export","message":"Export complete: 6 files generated","details":{"entryCount":688,"balanced":true,"targetDate":"2026-06-15","files":["Income-import_2026-06-15.csv","Store-import_2026-06-15.csv","Receipts-import_2026-06-15.csv","journal-entry_2026-06-15.csv","journal-entry_2026-06-15.txt","order-data_2026-06-15.json"]}}
+{"timestamp":"2026-08-18T12:01:28.328Z","level":"info","context":"State Tracking","message":"Saving order snapshots..."}
+{"timestamp":"2026-08-18T12:02:01.936Z","level":"info","context":"State Tracking","message":"Saved 297 order snapshots"}

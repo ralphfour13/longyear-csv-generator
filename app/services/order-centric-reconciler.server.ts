@@ -709,9 +709,21 @@ async function reconcileSimpleOrderLevel(
       captureCount: ordersProcessed,
     };
   } catch (error) {
-    errors.push(
-      `Reconciliation failed: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    errors.push(`Reconciliation failed: ${message}`);
+    console.error(`[Simple Export] ${targetDate}: reconciliation failed —`, message);
+
+    // Auth/permission failures are not "a day with no orders" — returning an empty
+    // result here masks a dead access token as the downstream "No journal entries
+    // generated" error and sends debugging in the wrong direction. Re-throw so the
+    // real cause reaches the job record.
+    if (/\b(401|403)\b|Invalid API key or access token|unrecognized login/i.test(message)) {
+      throw new Error(
+        `Shopify authentication failed while fetching orders for ${targetDate}. ` +
+        `The stored access token for ${shop} is invalid or revoked — reinstall the app to re-authorize. ` +
+        `(${message})`
+      );
+    }
 
     return {
       journalEntries,

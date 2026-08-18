@@ -1,11 +1,19 @@
 {
-  "buildCommand": "npm run build",
-  "framework": null,
+  "buildCommand": "prisma generate && prisma db push --skip-generate && npm run build",
   "installCommand": "npm install",
-  "regions": ["iad1"],
-  "env": {
-    "NODE_ENV": "production"
+  "framework": null,
+  "outputDirectory": "build/client",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60
+    }
   },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.js"
+    }
+  ],
   "crons": [
     {
       "path": "/api/cron/nightly-export",

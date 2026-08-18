@@ -6,7 +6,7 @@ import {
   getShopConfig,
   listExports,
   getExportStats,
-} from "../services/storage.server";
+} from "../services/storage-adapter.server";
 import { format } from "date-fns";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

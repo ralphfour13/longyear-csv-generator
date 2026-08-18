@@ -6,6 +6,8 @@
  * - Vercel Blob for Vercel deployment
  */
 
+import type { SyncConfig, AccountMappings } from '../types/journal-entry';
+
 const IS_VERCEL = process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
 
 async function getStorageModule() {
@@ -22,7 +24,7 @@ export async function getShopConfig(shop: string) {
   return (await getStorageModule()).getShopConfig(shop);
 }
 
-export async function saveShopConfig(shop: string, config: unknown) {
+export async function saveShopConfig(shop: string, config: SyncConfig) {
   return (await getStorageModule()).saveShopConfig(shop, config);
 }
 
@@ -30,7 +32,7 @@ export async function getAccountMappings(shop: string) {
   return (await getStorageModule()).getAccountMappings(shop);
 }
 
-export async function saveAccountMappings(shop: string, mappings: unknown) {
+export async function saveAccountMappings(shop: string, mappings: AccountMappings) {
   return (await getStorageModule()).saveAccountMappings(shop, mappings);
 }
 
