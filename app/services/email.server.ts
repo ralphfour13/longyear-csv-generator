@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
-import { readExport } from './storage-adapter.server';
+import { promises as fs } from 'fs';
+import { getExportPath } from './storage-adapter.server';
 
 /**
  * Email Service using Resend
@@ -53,9 +54,8 @@ export async function sendExportEmail(
     // Read files and prepare attachments
     const attachments = await Promise.all(
       data.files.map(async (file) => {
-        // Read through the storage adapter rather than the filesystem — on Vercel the
-        // export lives in blob storage and there is no readable path on disk.
-        const content = Buffer.from(await readExport(data.shop, file.filename), 'utf-8');
+        const filePath = getExportPath(data.shop, file.filename);
+        const content = await fs.readFile(filePath);
 
         return {
           filename: file.filename,

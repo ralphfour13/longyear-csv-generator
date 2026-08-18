@@ -52,39 +52,6 @@ model ReconciliationMetric {
   @@unique([shop, date])
 }
 
-// Durable job queue. Required on Vercel: a chunked export runs across several
-// function invocations that may land on different instances, so step N must be able
-// to read what step N-1 wrote. Local development uses the filesystem instead
-// (see job-store.server.ts).
-model ExportJob {
-  id        String   @id
-  shop      String
-  status    String // pending | processing | completed | failed
-  jobType   String   @default("export") // export | sales-tax | uncaptured-auth | cogs-push
-  startDate String
-  endDate   String?
-
-  fileOptions          Json
-  salesTaxRequest      Json?
-  uncapturedAuthRequest Json?
-
-  createdAt   DateTime  @default(now())
-  startedAt   DateTime?
-  completedAt DateTime?
-  error       String?
-  result      Json?
-  progress    Json?
-
-  // Chunked-export cursor: which steps are done and the state carried between them.
-  currentStep    String?
-  completedSteps Json?
-  stepState      Json?
-
-  @@index([shop, status])
-  @@index([shop, createdAt])
-  @@index([status, createdAt])
-}
-
 // Phase 3: Order state tracking
 model OrderSnapshot {
   id                 String   @id @default(cuid())

@@ -1,5 +1,5 @@
 {
-  "id": "export_1787054324931_j1rxqf",
+  "id": "export_1786701784281_l450yf",
   "shop": "ahut2z-i6.myshopify.com",
   "status": "completed",
   "startDate": "2026-06-15",
@@ -11,9 +11,9 @@
     "generateCogsDetails": false,
     "generateReconciliation": false
   },
-  "createdAt": "2026-08-18T11:58:44.931Z",
-  "startedAt": "2026-08-18T11:58:44.998Z",
-  "completedAt": "2026-08-18T12:02:01.958Z",
+  "createdAt": "2026-08-14T10:03:04.281Z",
+  "startedAt": "2026-08-14T10:03:04.387Z",
+  "completedAt": "2026-08-14T10:06:12.323Z",
   "result": {
     "success": true,
     "message": "Export completed for 2026-06-15",

@@ -1,7 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { SyncConfig, AccountMappings } from "../types/journal-entry";
-// import { put, list, del } from "@vercel/blob";
+import { put, list, del } from "@vercel/blob";
 
 const DATA_DIR = process.env.VERCEL
   ? "/tmp/data"
@@ -209,46 +209,44 @@ export async function saveAccountMappings(
  * Sorted by file creation time (newest first)
  * DEVELOPMENT ONLY: This function is not used in production, but can be useful for debugging and testing.
  */
-export async function listExports(shop: string): Promise<string[]> {
-  try {
-    const exportsDir = path.join(DATA_DIR, shop, "exports");
-    const files = await fs.readdir(exportsDir);
+// export async function listExports(shop: string): Promise<string[]> {
+//   try {
+//     const exportsDir = path.join(DATA_DIR, shop, 'exports');
+//     const files = await fs.readdir(exportsDir);
 
-    // Filter for CSV and TXT files
-    const csvFiles = files.filter(
-      (file) => file.endsWith(".csv") || file.endsWith(".txt"),
-    );
+//     // Filter for CSV and TXT files
+//     const csvFiles = files.filter(file => file.endsWith('.csv') || file.endsWith('.txt'));
 
-    // Get file stats for sorting by creation time
-    const filesWithStats = await Promise.all(
-      csvFiles.map(async (file) => {
-        const filePath = path.join(exportsDir, file);
-        const stats = await fs.stat(filePath);
-        return {
-          filename: file,
-          birthtime: stats.birthtime.getTime(),
-          mtime: stats.mtime.getTime(),
-        };
-      }),
-    );
+//     // Get file stats for sorting by creation time
+//     const filesWithStats = await Promise.all(
+//       csvFiles.map(async (file) => {
+//         const filePath = path.join(exportsDir, file);
+//         const stats = await fs.stat(filePath);
+//         return {
+//           filename: file,
+//           birthtime: stats.birthtime.getTime(),
+//           mtime: stats.mtime.getTime(),
+//         };
+//       })
+//     );
 
-    // Sort by modification time (newest first) - mtime changes when file is written
-    return filesWithStats
-      .sort((a, b) => b.mtime - a.mtime)
-      .map((f) => f.filename);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
-    }
-    throw error;
-  }
-}
+//     // Sort by modification time (newest first) - mtime changes when file is written
+//     return filesWithStats
+//       .sort((a, b) => b.mtime - a.mtime)
+//       .map(f => f.filename);
+//   } catch (error) {
+//     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+//       return [];
+//     }
+//     throw error;
+//   }
+// }
 
 /** PRODUCTION ONLY: This function is not used in development, but can be useful for debugging and testing. */
-// export async function listExports(shop: string): Promise<string[]> {
-//   const { blobs } = await list({ prefix: `${shop}/exports/` });
-//   return blobs.map((b) => b.pathname.split("/").pop()!);
-// }
+export async function listExports(shop: string): Promise<string[]> {
+  const { blobs } = await list({ prefix: `${shop}/exports/` });
+  return blobs.map((b) => b.pathname.split("/").pop()!);
+}
 
 /**
  * Get path to export file
@@ -299,31 +297,31 @@ export async function readExport(
  * Write export file
  * development only: This function is not used in production, but can be useful for debugging and testing.
  */
+// export async function writeExport(
+//   shop: string,
+//   filename: string,
+//   content: string
+// ): Promise<string> {
+//   const shopDir = await ensureShopDirectory(shop);
+//   const exportPath = path.join(shopDir, 'exports', filename);
+
+//   await fs.writeFile(exportPath, content, 'utf-8');
+
+//   return exportPath;
+// }
+
+/** PRODUCTION ONLY: This function is not used in development, but can be useful for debugging and testing. */
 export async function writeExport(
   shop: string,
   filename: string,
   content: string,
 ): Promise<string> {
-  const shopDir = await ensureShopDirectory(shop);
-  const exportPath = path.join(shopDir, "exports", filename);
+  const blob = await put(`${shop}/exports/${filename}`, content, {
+    access: "public",
+  });
 
-  await fs.writeFile(exportPath, content, "utf-8");
-
-  return exportPath;
+  return blob.url;
 }
-
-/** PRODUCTION ONLY: This function is not used in development, but can be useful for debugging and testing. */
-// export async function writeExport(
-//   shop: string,
-//   filename: string,
-//   content: string,
-// ): Promise<string> {
-//   const blob = await put(`${shop}/exports/${filename}`, content, {
-//     access: "public",
-//   });
-
-//   return blob.url;
-// }
 
 /**
  * Get export file stats

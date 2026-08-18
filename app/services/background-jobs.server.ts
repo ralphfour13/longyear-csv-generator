@@ -1,11 +1,9 @@
+import { promises as fs } from 'fs';
+import path from 'path';
 import type { FileGenerationOptions } from './batch-processor.server';
-import {
-  readJob,
-  writeJob,
-  listJobs,
-  removeJob,
-  jobStoreBackend,
-} from './job-store.server';
+
+const DATA_DIR = '/tmp/data';
+const JOBS_DIR = path.join(DATA_DIR, 'jobs');
 
 export interface ExportJob {
   id: string;
@@ -54,20 +52,13 @@ export interface ExportJob {
     // Current activity
     currentActivity?: string;
   };
-
-  // Chunked-export cursor. On Vercel an export runs as a series of short steps across
-  // separate invocations; these record how far it got so the next step can resume.
-  currentStep?: string;
-  completedSteps?: string[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stepState?: any;
 }
 
 /**
- * Persist a job, creating or overwriting it.
+ * Ensure jobs directory exists
  */
-async function saveJob(job: ExportJob): Promise<void> {
-  await writeJob(job);
+async function ensureJobsDir() {
+  await fs.mkdir(JOBS_DIR, { recursive: true });
 }
 
 /**
@@ -79,7 +70,9 @@ export async function createExportJob(
   endDate: string | undefined,
   fileOptions: FileGenerationOptions
 ): Promise<string> {
-  const jobId =`export_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  await ensureJobsDir();
+
+  const jobId = `export_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const job: ExportJob = {
     id: jobId,
     shop,
@@ -90,7 +83,8 @@ export async function createExportJob(
     createdAt: new Date().toISOString(),
   };
 
-  await saveJob(job);
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
 
   const dateRange = endDate ? `${startDate} to ${endDate}` : startDate;
   const fileTypes = Object.entries(fileOptions)
@@ -101,8 +95,7 @@ export async function createExportJob(
   console.log(
     `[Job] Created job ${jobId} for shop ${shop}`,
     `\n  Date range: ${dateRange}`,
-    `\n  File options: ${fileTypes}`,
-    `\n  Job store: ${jobStoreBackend}`
+    `\n  File options: ${fileTypes}`
   );
 
   return jobId;
@@ -115,7 +108,9 @@ export async function createSalesTaxJob(
   shop: string,
   salesTaxRequest: { periodType: 'month' | 'quarter'; year: number; month?: number; quarter?: number },
 ): Promise<string> {
-  const jobId =`salestax_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  await ensureJobsDir();
+
+  const jobId = `salestax_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const job: ExportJob = {
     id: jobId,
     shop,
@@ -127,7 +122,8 @@ export async function createSalesTaxJob(
     createdAt: new Date().toISOString(),
   };
 
-  await saveJob(job);
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
 
   const periodLabel = salesTaxRequest.periodType === 'month'
     ? `${salesTaxRequest.year}-${String(salesTaxRequest.month).padStart(2, '0')}`
@@ -148,7 +144,9 @@ export async function createUncapturedAuthJob(
   shop: string,
   sinceDate: string,
 ): Promise<string> {
-  const jobId =`uncapturedauth_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  await ensureJobsDir();
+
+  const jobId = `uncapturedauth_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const job: ExportJob = {
     id: jobId,
     shop,
@@ -160,7 +158,8 @@ export async function createUncapturedAuthJob(
     createdAt: new Date().toISOString(),
   };
 
-  await saveJob(job);
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
 
   console.log(
     `[Job] Created uncaptured auth job ${jobId} for shop ${shop}`,
@@ -178,7 +177,9 @@ export async function createUncapturedAuthJob(
  * is no request payload.
  */
 export async function createCogsPushJob(shop: string): Promise<string> {
-  const jobId =`cogspush_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  await ensureJobsDir();
+
+  const jobId = `cogspush_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const job: ExportJob = {
     id: jobId,
     shop,
@@ -189,7 +190,8 @@ export async function createCogsPushJob(shop: string): Promise<string> {
     createdAt: new Date().toISOString(),
   };
 
-  await saveJob(job);
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(job, null, 2));
 
   console.log(`[Job] Created COGS push job ${jobId} for shop ${shop}`);
 
@@ -201,7 +203,9 @@ export async function createCogsPushJob(shop: string): Promise<string> {
  */
 export async function getJobStatus(jobId: string): Promise<ExportJob | null> {
   try {
-    return await readJob(jobId);
+    const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+    const content = await fs.readFile(jobPath, 'utf-8');
+    return JSON.parse(content);
   } catch {
     return null;
   }
@@ -220,7 +224,8 @@ export async function updateJobStatus(
   }
 
   const updatedJob = { ...job, ...updates };
-  await saveJob(updatedJob);
+  const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+  await fs.writeFile(jobPath, JSON.stringify(updatedJob, null, 2));
 
   // Log status changes
   if (updates.status && updates.status !== job.status) {
@@ -246,7 +251,19 @@ export async function updateJobStatus(
  */
 export async function getShopJobs(shop: string): Promise<ExportJob[]> {
   try {
-    const jobs = await listJobs(shop);
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
+    const jobs: ExportJob[] = [];
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const content = await fs.readFile(path.join(JOBS_DIR, file), 'utf-8');
+        const job = JSON.parse(content);
+        if (job.shop === shop) {
+          jobs.push(job);
+        }
+      }
+    }
 
     // Sort by created date, oldest first (FIFO — process jobs in the order they were queued)
     return jobs.sort((a, b) =>
@@ -262,14 +279,22 @@ export async function getShopJobs(shop: string): Promise<ExportJob[]> {
  */
 export async function cleanupOldJobs(): Promise<void> {
   try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-    for (const job of await listJobs()) {
-      if (
-        (job.status === 'completed' || job.status === 'failed') &&
-        new Date(job.createdAt).getTime() < sevenDaysAgo
-      ) {
-        await removeJob(job.id);
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (
+          (job.status === 'completed' || job.status === 'failed') &&
+          new Date(job.createdAt).getTime() < sevenDaysAgo
+        ) {
+          await fs.unlink(filePath);
+        }
       }
     }
   } catch (error) {
@@ -282,12 +307,23 @@ export async function cleanupOldJobs(): Promise<void> {
  */
 export async function clearCompletedJobs(shop: string): Promise<number> {
   try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
     let deletedCount = 0;
 
-    for (const job of await listJobs(shop)) {
-      if (job.status === 'completed' || job.status === 'failed') {
-        await removeJob(job.id);
-        deletedCount++;
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (
+          job.shop === shop &&
+          (job.status === 'completed' || job.status === 'failed')
+        ) {
+          await fs.unlink(filePath);
+          deletedCount++;
+        }
       }
     }
 
@@ -300,12 +336,20 @@ export async function clearCompletedJobs(shop: string): Promise<number> {
 
 export async function clearFailedJobs(shop: string): Promise<number> {
   try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
     let deletedCount = 0;
 
-    for (const job of await listJobs(shop)) {
-      if (job.status === 'failed') {
-        await removeJob(job.id);
-        deletedCount++;
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (job.shop === shop && job.status === 'failed') {
+          await fs.unlink(filePath);
+          deletedCount++;
+        }
       }
     }
 
@@ -321,17 +365,28 @@ export async function clearFailedJobs(shop: string): Promise<number> {
  */
 export async function cancelPendingJobs(shop: string): Promise<number> {
   try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
     let cancelledCount = 0;
 
-    for (const job of await listJobs(shop)) {
-      if (job.status === 'pending') {
-        await saveJob({
-          ...job,
-          status: 'failed',
-          error: 'Cancelled by user',
-          completedAt: new Date().toISOString(),
-        });
-        cancelledCount++;
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (job.shop === shop && job.status === 'pending') {
+          // Mark as failed with cancellation message
+          const cancelledJob = {
+            ...job,
+            status: 'failed' as const,
+            error: 'Cancelled by user',
+            completedAt: new Date().toISOString(),
+          };
+
+          await fs.writeFile(filePath, JSON.stringify(cancelledJob, null, 2));
+          cancelledCount++;
+        }
       }
     }
 
@@ -357,28 +412,39 @@ export async function cancelOrphanedProcessingJobs(
   timeoutMs: number = 3600000 // 1 hour default
 ): Promise<number> {
   try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
     let cancelledCount = 0;
     const now = Date.now();
 
-    for (const job of await listJobs(shop)) {
-      if (job.status !== 'processing') continue;
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
 
-      // Check if job has been processing too long
-      const startedAt = job.startedAt ? new Date(job.startedAt).getTime() : now;
-      const processingDuration = now - startedAt;
+        if (job.shop === shop && job.status === 'processing') {
+          // Check if job has been processing too long
+          const startedAt = job.startedAt ? new Date(job.startedAt).getTime() : now;
+          const processingDuration = now - startedAt;
 
-      if (processingDuration > timeoutMs) {
-        await saveJob({
-          ...job,
-          status: 'failed',
-          error: `Cancelled - orphaned (processing for ${Math.round(processingDuration / 3600000)}h)`,
-          completedAt: new Date().toISOString(),
-        });
-        cancelledCount++;
+          if (processingDuration > timeoutMs) {
+            // Mark as failed with timeout message
+            const cancelledJob = {
+              ...job,
+              status: 'failed' as const,
+              error: `Cancelled - orphaned (processing for ${Math.round(processingDuration / 3600000)}h)`,
+              completedAt: new Date().toISOString(),
+            };
 
-        console.log(
-          `Cancelled orphaned job ${job.id} (processing for ${Math.round(processingDuration / 3600000)}h ${Math.round((processingDuration % 3600000) / 60000)}m)`
-        );
+            await fs.writeFile(filePath, JSON.stringify(cancelledJob, null, 2));
+            cancelledCount++;
+
+            console.log(
+              `Cancelled orphaned job ${job.id} (processing for ${Math.round(processingDuration / 3600000)}h ${Math.round((processingDuration % 3600000) / 60000)}m)`
+            );
+          }
+        }
       }
     }
 
@@ -397,17 +463,28 @@ export async function cancelOrphanedProcessingJobs(
  */
 export async function cancelAllProcessingJobs(shop: string): Promise<number> {
   try {
+    await ensureJobsDir();
+    const files = await fs.readdir(JOBS_DIR);
     let cancelledCount = 0;
 
-    for (const job of await listJobs(shop)) {
-      if (job.status === 'processing') {
-        await saveJob({
-          ...job,
-          status: 'failed',
-          error: 'Cancelled by user',
-          completedAt: new Date().toISOString(),
-        });
-        cancelledCount++;
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(JOBS_DIR, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const job = JSON.parse(content);
+
+        if (job.shop === shop && job.status === 'processing') {
+          // Mark as failed with cancellation message
+          const cancelledJob = {
+            ...job,
+            status: 'failed' as const,
+            error: 'Cancelled by user',
+            completedAt: new Date().toISOString(),
+          };
+
+          await fs.writeFile(filePath, JSON.stringify(cancelledJob, null, 2));
+          cancelledCount++;
+        }
       }
     }
 
@@ -423,7 +500,8 @@ export async function cancelAllProcessingJobs(shop: string): Promise<number> {
  */
 export async function deleteJob(jobId: string): Promise<boolean> {
   try {
-    await removeJob(jobId);
+    const jobPath = path.join(JOBS_DIR, `${jobId}.json`);
+    await fs.unlink(jobPath);
     return true;
   } catch (error) {
     console.error(`Error deleting job ${jobId}:`, error);

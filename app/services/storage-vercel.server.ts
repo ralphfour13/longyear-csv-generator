@@ -9,44 +9,6 @@ import type { SyncConfig, AccountMappings } from '../types/journal-entry';
 const BLOB_PREFIX = 'sage50-sync';
 
 /**
- * Options shared by every write.
- *
- * - `addRandomSuffix: false` keeps pathnames deterministic, so a blob can be read
- *   back by the same path it was written to.
- * - `allowOverwrite: true` is required by @vercel/blob v2, which throws on writing
- *   an existing pathname otherwise. Config, mappings and re-run exports all overwrite.
- */
-const PUT_OPTIONS = {
-  access: 'public' as const,
-  addRandomSuffix: false,
-  allowOverwrite: true,
-};
-
-/**
- * Read a blob's text by pathname.
- *
- * A blob's public URL is not `https://blob.vercel-storage.com/<pathname>` — it lives on
- * a store-specific host, so that URL 404s for every store. Resolve the real URL with
- * head() first, then fetch it. Returns null when the blob does not exist.
- */
-async function readBlobText(pathname: string): Promise<string | null> {
-  let meta;
-  try {
-    meta = await head(pathname);
-  } catch {
-    return null; // Not found.
-  }
-
-  const response = await fetch(meta.downloadUrl);
-  if (!response.ok) {
-    throw new Error(
-      `Blob ${pathname} resolved to ${meta.downloadUrl} but fetch failed: ${response.status} ${response.statusText}`
-    );
-  }
-  return await response.text();
-}
-
-/**
  * Get default sync configuration
  */
 function getDefaultConfig(shop: string): SyncConfig {
@@ -153,21 +115,18 @@ function getDefaultMappings(): AccountMappings {
  * Read shop configuration from Vercel Blob
  */
 export async function getShopConfig(shop: string): Promise<SyncConfig> {
-  const blobPath = `${BLOB_PREFIX}/${shop}/config.json`;
-  const text = await readBlobText(blobPath);
-
-  if (text === null) {
-    return getDefaultConfig(shop);
-  }
-
   try {
-    return JSON.parse(text) as SyncConfig;
-  } catch (error) {
-    // Don't silently fall back to defaults on a corrupt config — that would look like
-    // the merchant's settings reset themselves.
-    throw new Error(
-      `Stored config for ${shop} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const blobPath = `${BLOB_PREFIX}/${shop}/config.json`;
+    const response = await fetch(`https://blob.vercel-storage.com/${blobPath}`);
+
+    if (response.ok) {
+      return await response.json() as SyncConfig;
+    }
+
+    // Return default if not found
+    return getDefaultConfig(shop);
+  } catch {
+    return getDefaultConfig(shop);
   }
 }
 
@@ -178,7 +137,7 @@ export async function saveShopConfig(shop: string, config: SyncConfig): Promise<
   const blobPath = `${BLOB_PREFIX}/${shop}/config.json`;
 
   await put(blobPath, JSON.stringify(config, null, 2), {
-    ...PUT_OPTIONS,
+    access: 'public',
     contentType: 'application/json',
   });
 }
@@ -187,21 +146,17 @@ export async function saveShopConfig(shop: string, config: SyncConfig): Promise<
  * Read account mappings from Vercel Blob
  */
 export async function getAccountMappings(shop: string): Promise<AccountMappings> {
-  const blobPath = `${BLOB_PREFIX}/${shop}/mappings.json`;
-  const text = await readBlobText(blobPath);
-
-  if (text === null) {
-    return getDefaultMappings();
-  }
-
   try {
-    return JSON.parse(text) as AccountMappings;
-  } catch (error) {
-    // Account mappings drive which GL accounts every journal line posts to. Falling
-    // back to defaults here would silently produce a wrong-but-plausible export.
-    throw new Error(
-      `Stored account mappings for ${shop} are not valid JSON: ${error instanceof Error ? error.message : String(error)}`
-    );
+    const blobPath = `${BLOB_PREFIX}/${shop}/mappings.json`;
+    const response = await fetch(`https://blob.vercel-storage.com/${blobPath}`);
+
+    if (response.ok) {
+      return await response.json() as AccountMappings;
+    }
+
+    return getDefaultMappings();
+  } catch {
+    return getDefaultMappings();
   }
 }
 
@@ -215,7 +170,7 @@ export async function saveAccountMappings(
   const blobPath = `${BLOB_PREFIX}/${shop}/mappings.json`;
 
   await put(blobPath, JSON.stringify(mappings, null, 2), {
-    ...PUT_OPTIONS,
+    access: 'public',
     contentType: 'application/json',
   });
 }
@@ -226,28 +181,14 @@ export async function saveAccountMappings(
 export async function listExports(shop: string): Promise<string[]> {
   try {
     const prefix = `${BLOB_PREFIX}/${shop}/exports/`;
-    const blobs = [];
-
-    // list() is paginated; without following the cursor a shop with many exports
-    // would silently show only the first page.
-    let cursor: string | undefined;
-    do {
-      const page = await list({ prefix, cursor });
-      blobs.push(...page.blobs);
-      cursor = page.hasMore ? page.cursor : undefined;
-    } while (cursor);
+    const { blobs } = await list({ prefix });
 
     return blobs
-      .map((blob) => ({
-        name: blob.pathname.split('/').pop()!,
-        uploadedAt: new Date(blob.uploadedAt).getTime(),
-      }))
-      // Match the filesystem backend, which lists .csv and .txt.
-      .filter(({ name }) => name.endsWith('.csv') || name.endsWith('.txt'))
-      .sort((a, b) => b.uploadedAt - a.uploadedAt) // Newest first.
-      .map(({ name }) => name);
-  } catch (error) {
-    console.error(`[Blob] Failed to list exports for ${shop}:`, error);
+      .map((blob) => blob.pathname.split('/').pop()!)
+      .filter((name) => name.endsWith('.csv'))
+      .sort()
+      .reverse();
+  } catch {
     return [];
   }
 }
@@ -263,18 +204,11 @@ export async function writeExport(
   const blobPath = `${BLOB_PREFIX}/${shop}/exports/${filename}`;
 
   const blob = await put(blobPath, content, {
-    ...PUT_OPTIONS,
-    contentType: contentTypeFor(filename),
+    access: 'public',
+    contentType: 'text/csv',
   });
 
   return blob.url;
-}
-
-/** Exports are not all CSV — the journal summary is .txt and order data is .json. */
-function contentTypeFor(filename: string): string {
-  if (filename.endsWith('.json')) return 'application/json';
-  if (filename.endsWith('.txt')) return 'text/plain';
-  return 'text/csv';
 }
 
 /**
@@ -282,13 +216,13 @@ function contentTypeFor(filename: string): string {
  */
 export async function readExport(shop: string, filename: string): Promise<string> {
   const blobPath = `${BLOB_PREFIX}/${shop}/exports/${filename}`;
-  const text = await readBlobText(blobPath);
+  const response = await fetch(`https://blob.vercel-storage.com/${blobPath}`);
 
-  if (text === null) {
+  if (!response.ok) {
     throw new Error(`Export file not found: ${filename}`);
   }
 
-  return text;
+  return await response.text();
 }
 
 /**
@@ -337,23 +271,4 @@ export function getExportPath(shop: string, filename: string): string {
 export async function deleteExport(shop: string, filename: string): Promise<void> {
   const blobPath = `${BLOB_PREFIX}/${shop}/exports/${filename}`;
   await del(blobPath);
-}
-
-/**
- * Seed a shop's config and mappings if they don't exist yet.
- *
- * The storage adapter calls this on install; it was missing from this backend, so on
- * Vercel the call threw before any shop could be initialised. There are no directories
- * to create in blob storage, so this only writes the defaults.
- */
-export async function initializeShop(shop: string): Promise<void> {
-  const configPath = `${BLOB_PREFIX}/${shop}/config.json`;
-  if ((await readBlobText(configPath)) === null) {
-    await saveShopConfig(shop, getDefaultConfig(shop));
-  }
-
-  const mappingsPath = `${BLOB_PREFIX}/${shop}/mappings.json`;
-  if ((await readBlobText(mappingsPath)) === null) {
-    await saveAccountMappings(shop, getDefaultMappings());
-  }
 }

@@ -1,20 +1,8 @@
 import { getJobStatus, updateJobStatus, cleanupOldJobs, getShopJobs } from './background-jobs.server';
 import { processExport } from './batch-processor.server';
-import { runExportToCompletion } from './export-steps.server';
 import { processSalesTaxReport } from './sales-tax-processor.server';
 import { processUncapturedAuthReport } from './uncaptured-auth-processor.server';
 import { processCogsPush } from './shopify/cogs-push-processor.server';
-
-/**
- * Chunk exports into per-file steps instead of one long run.
- *
- * On by default on Vercel, where a single invocation cannot outlive the function
- * timeout. Set CHUNKED_EXPORTS=1 to exercise the same path locally, or =0 to force
- * the single-pass export on Vercel.
- */
-const CHUNKED_EXPORTS = process.env.CHUNKED_EXPORTS
-  ? process.env.CHUNKED_EXPORTS === '1'
-  : process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined;
 
 // Track processing state per shop to prevent concurrent processing of the same shop's jobs
 // Key: shop domain, Value: true if currently processing
@@ -98,11 +86,9 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
         result: {
           ...result,
           success: true,
-          // An uncaptured-auth report has no journal entries and writes no export
-          // files; these keep the shape the job UI reads uniformly across job types.
-          files: [],
-          entryCount: 0,
-          balanced: true,
+          files: Array.isArray(result?.files) ? result.files : [],
+          entryCount: typeof result?.entryCount === 'number' ? result.entryCount : 0,
+          balanced: result?.balanced ?? true,
         },
       });
 
@@ -125,11 +111,9 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
         result: {
           ...result,
           success: true,
-          // A COGS push updates variant costs in Shopify; it produces no journal
-          // entries and no export files.
-          files: [],
-          entryCount: 0,
-          balanced: true,
+          files: Array.isArray(result?.files) ? result.files : [],
+          entryCount: typeof result?.entryCount === 'number' ? result.entryCount : 0,
+          balanced: result?.balanced ?? true,
         },
       });
 
@@ -150,20 +134,13 @@ async function processJob(jobId: string, shop: string, accessToken: string): Pro
       );
 
       // All jobs are now single-date exports (date ranges are split into separate jobs)
-      //
-      // On Vercel the export is chunked into one step per file, because a full run
-      // (~3 min) exceeds the function timeout. Elsewhere it runs in a single pass, as
-      // before. runExportToCompletion walks the same steps without yielding, so the
-      // two paths generate files through identical code.
-      const result = CHUNKED_EXPORTS
-        ? await runExportToCompletion(jobId, accessToken)
-        : await processExport(
-            shop,
-            accessToken,
-            job.startDate,
-            job.fileOptions,
-            jobId  // Pass jobId for progress tracking
-          );
+      const result = await processExport(
+        shop,
+        accessToken,
+        job.startDate,
+        job.fileOptions,
+        jobId  // Pass jobId for progress tracking
+      );
 
       // Mark as completed
       await updateJobStatus(jobId, {
