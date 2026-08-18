@@ -14,7 +14,7 @@ import {
   getAccountMappings,
   getShopConfig,
   writeExport,
-} from "./storage-adapter.server";
+} from "./storage.server";
 import { randomUUID } from "crypto";
 import { logError, logWarning, logInfo } from "./error-logger.server";
 import { validateExportRequest } from "./validator.server";

@@ -25,7 +25,7 @@ import {
   getPointInTimeAmounts,
   calculateGiftCardProductSales,
 } from './order-centric-journal-generator.server';
-import { getAccountMappings } from './storage-adapter.server';
+import { getAccountMappings } from './storage.server';
 import { updateJobProgress } from './background-jobs.server';
 import { enrichOrderData, type EnrichedOrderData } from './enrichment/order-enrichment.server';
 import { calculateOrderCogsWithService } from './cogs/cogs-calculator.server';

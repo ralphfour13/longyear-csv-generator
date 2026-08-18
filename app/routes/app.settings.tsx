@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { Form, useActionData, useLoaderData } from 'react-router';
 import { authenticate } from '../shopify.server';
-import { getShopConfig, saveShopConfig, listExports, deleteExport } from '../services/storage-adapter.server';
+import { getShopConfig, saveShopConfig, listExports, deleteExport } from '../services/storage.server';
 import { updateShopSchedule } from '../services/scheduler.server';
 import type { SyncConfig } from '../types/journal-entry';
 import type { Cin7Config } from '../types/cin7';

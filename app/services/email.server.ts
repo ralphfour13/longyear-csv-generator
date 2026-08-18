@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 import { promises as fs } from 'fs';
-import { getExportPath } from './storage-adapter.server';
+import { getExportPath } from './storage.server';
 
 /**
  * Email Service using Resend

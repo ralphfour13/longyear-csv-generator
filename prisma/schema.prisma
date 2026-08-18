@@ -31,8 +31,6 @@ model Session {
   emailVerified Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
-
-  @@map("session")
 }
 
 // Phase 3: Reconciliation metrics tracking

@@ -3,9 +3,7 @@ import path from "path";
 import type { SyncConfig, AccountMappings } from "../types/journal-entry";
 import { put, list, del } from "@vercel/blob";
 
-const DATA_DIR = process.env.VERCEL
-  ? "/tmp/data"
-  : path.join(process.cwd(), "data");
+const DATA_DIR = '/tmp/data';
 
 /**
  * Ensures shop directory structure exists

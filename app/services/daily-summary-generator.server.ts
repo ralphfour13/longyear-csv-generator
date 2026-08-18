@@ -1,6 +1,6 @@
 import { Decimal } from 'decimal.js';
 import type { JournalEntry } from '../types/journal-entry';
-import { writeExport } from './storage-adapter.server';
+import { writeExport } from './storage.server';
 
 /**
  * Generate Daily Sales Summary

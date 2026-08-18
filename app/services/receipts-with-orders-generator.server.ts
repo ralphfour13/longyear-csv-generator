@@ -2,7 +2,7 @@ import { Decimal } from 'decimal.js';
 import type { AccountMappings, EnrichedTransaction } from '../types/journal-entry';
 import { getPayoutOrders } from './payouts-with-orders-generator.server';
 import { fetchOrderTransactions } from './order-centric-fetcher.server';
-import { getAccountMappings } from './storage-adapter.server';
+import { getAccountMappings } from './storage.server';
 
 /**
  * Receipts Row — Sage 50 cash-receipts import layout.

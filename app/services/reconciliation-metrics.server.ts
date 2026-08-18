@@ -5,8 +5,10 @@
  * Enables historical tracking of data quality improvements.
  */
 
-import prisma from '../db.server';
+import { PrismaClient } from '@prisma/client';
 import type { ConsistencyCheckResult } from './consistency-checker.server';
+
+const prisma = new PrismaClient();
 
 /**
  * Reconciliation Metric (stored in database)

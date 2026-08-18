@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from 'react-router';
-import { readExport, exportExists } from '../services/storage-adapter.server';
+import { readExport, exportExists } from '../services/storage.server';
 
 /**
  * API endpoint for downloading CSV files

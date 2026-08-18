@@ -4,7 +4,7 @@ import { authenticate } from '../shopify.server';
 import {
   getAccountMappings,
   saveAccountMappings,
-} from '../services/storage-adapter.server';
+} from '../services/storage.server';
 import type { AccountMappings } from '../types/journal-entry';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

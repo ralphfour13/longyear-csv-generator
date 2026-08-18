@@ -1,7 +1,7 @@
 import { Decimal } from 'decimal.js';
 import type { Order, JournalEntry, Transaction } from '../types/journal-entry';
 import type { PaymentMethodBreakdown } from './payment-method-analyzer.server';
-import { getAccountMappings } from './storage-adapter.server';
+import { getAccountMappings } from './storage.server';
 import { calculateOrderCogs, validateCogsCalculation } from './cogs/cogs-calculator.server';
 import { createCogsJournalEntries, createCogsRefundEntries } from './cogs/cogs-journal-generator.server';
 import { isCin7Enabled } from './cin7/cin7-credential-manager.server';

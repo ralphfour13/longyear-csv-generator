@@ -89,8 +89,7 @@ export async function logInfo(
  */
 async function writeLog(shop: string, entry: ErrorLogEntry): Promise<void> {
   try {
-    const baseDir = process.env.VERCEL ? '/tmp/data' : path.join(process.cwd(), 'data');
-    const logDir = path.join(baseDir, shop);
+    const logDir = path.join(process.cwd(), 'data', shop);
     await fs.mkdir(logDir, { recursive: true });
 
     const logFile = path.join(logDir, 'error.log');

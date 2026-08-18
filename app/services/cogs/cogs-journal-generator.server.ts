@@ -1,7 +1,7 @@
 import { Decimal } from 'decimal.js';
 import type { JournalEntry } from '../../types/journal-entry';
 import type { CogsCalculation } from '../../types/cin7';
-import { getAccountMappings } from '../storage-adapter.server';
+import { getAccountMappings } from '../storage.server';
 
 /**
  * COGS Journal Entry Generator
